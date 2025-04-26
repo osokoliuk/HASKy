@@ -2,6 +2,7 @@ module HMF where
 
 import Cosmology
 import Data.Maybe
+import Numeric.Tools.Differentiation
 import Numeric.Tools.Integration
 
 data HMF_kind
@@ -75,3 +76,22 @@ firstCrossing h_kind w_kind mh z =
    in case h_kind of
         Tinker -> a_T * ((sigma / b) ** (-a) + 1) * exp (-c / sigma ** 2)
         ST -> a_ST * sqrt (2 * nu ** 2 / pi) * (1 + nu ** (-2 * p)) * exp (-nu ** 2 / 2)
+
+haloMassFunction :: HMF_kind -> W_kind -> [Mhalo] -> Redshift -> [Double]
+haloMassFunction h_kind w_kind mh_arr z =
+  let diff_func :: Double -> Double
+      diff_func mh = log $ sqrt (cosmicVarianceSq mh z w_kind)
+      dsdm = (\mh -> diffRes $ diffRichardson diff_func 1.0 mh) <$> mh_arr
+
+      dsdm :: [Double]
+      dsdlogm = zipWith (*) mh_arr dsdm
+
+      rho_mean :: Double
+      rho_mean = 3 * h0 ** 2 * om0 / (8 * pi * gn)
+
+      first_crossing :: [Double]
+      first_crossing = (\mh -> firstCrossing h_kind w_kind mh z) <$> mh_arr
+
+      fdsdlogm :: [Double]
+      fdsdlogm = zipWith (*) dsdlogm first_crossing
+   in zipWith (*) fdsdlogm ((* (-rho_mean)) <$> mh_arr)
