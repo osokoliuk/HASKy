@@ -1,6 +1,10 @@
 module Main where
 
-import qualified MyLib (someFunc)
+import Cosmology
+import HMF
+
+args :: [Double]
+args = []
 
 main :: IO ()
 main = do

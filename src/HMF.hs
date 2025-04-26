@@ -24,7 +24,7 @@ type Mhalo = Double
 
 type Rhalo = Double
 
-type Redshift = Float
+type Redshift = Double
 
 -- Initialise background cosmology from the arguments, taken from Cosmology.hs
 cosmology_record = initialiseCosmology []
