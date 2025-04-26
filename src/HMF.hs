@@ -30,8 +30,8 @@ type Redshift = Double
 cosmology_record = initialiseCosmology []
 
 -- Unpack the values in the cosmology_record into variables
-h0, om0, c, gn :: Double
-(h0, om0, c, gn) = (,,,) <$> h0' <*> om0' <*> c' <*> gn' $ cosmology_record
+h0, om0, ob0, c, gn :: Double
+(h0, om0, ob0, c, gn) = (,,,,) <$> h0' <*> om0' <*> ob0' <*> c' <*> gn' $ cosmology_record
 
 -- | Define a radius for the uniform density sphere in terms of it's mass
 rh :: Mhalo -> Rhalo
