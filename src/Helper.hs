@@ -1,5 +1,18 @@
 module Helper where
 
+{-
+Module      : HASKy.Helper
+Description : Helper module
+Copyright   : (c) Oleksii Sokoliuk, 20256
+License     : MIT
+Maintainer  : oleksii.sokoliuk@mao.kiev.ua
+Stability   : experimental
+Portability : portable
+
+A module that defines lots of functions to be used by other modules.
+Kind of useless by itself.
+-}
+
 -- | Helper function to linearly interpolate power spectrum
 -- Taken from the https://cmears.id.au/articles/linear-interpolation.html
 interpolate (a, av) (b, bv) x = av + (x - a) * (bv - av) / (b - a)
