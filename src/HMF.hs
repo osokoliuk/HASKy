@@ -3,6 +3,7 @@
 module HMF where
 
 import Cosmology
+import qualified Data.Map as M
 import Data.Maybe
 import qualified Data.Text as T
 import qualified Data.Vector as V
@@ -10,6 +11,8 @@ import Numeric.Tools.Differentiation
 import Numeric.Tools.Integration
 import Numeric.Tools.Interpolation
 import qualified Safe
+import System.IO
+import Text.Read (readMaybe)
 
 -- Define an HMF datatype, consisting of two choices
 data HMF_kind
@@ -43,15 +46,38 @@ rh cosmology mh =
   let (h0, om0, ob0, c, gn) = unpackCosmology cosmology
    in 1 / c * (2 * mh * gn / (om0 * h0 ** 2)) ** (1 / 3)
 
+-- | Helper function to linearly interpolate power spectrum
+-- Taken from the https://cmears.id.au/articles/linear-interpolation.html
+interpolate (a, av) (b, bv) x = av + (x - a) * (bv - av) / (b - a)
+
+mapLookup :: M.Map Double Double -> Double -> Double
+mapLookup m x =
+  case (M.lookupLE x m, M.lookupGE x m) of
+    (Just (a, av), Just (b, bv)) ->
+      if a == b
+        then av
+        else interpolate (a, av) (b, bv) x
+    (Nothing, Just (b, bv)) -> bv
+    (Just (a, av), Nothing) -> av
+    _ -> error "mapLookup"
+
+-- | Helper function for reading the file into a table
+parseLine :: String -> (Double, Double)
+parseLine line =
+  case mapM readMaybe (words line) of -- Try to read both values
+    Just [x, y] -> (x, y) -- If both are parsed, return the tuple
+    _ -> error ("Invalid line: " ++ line)
+
 -- | Produces a matter power spectrum at the linear level
 -- To be imported from CAMB
-powerSpectrum :: FilePath -> IO [Double]
+powerSpectrum :: FilePath -> IO ([Double], [Double])
 powerSpectrum filepath =
   do
     content <- readFile filepath
-    let pk_arr :: [Double]
-        pk_arr = fmap read (lines content)
-    return pk_arr
+    let linesOfFile = lines content
+        parsedLines = map parseLine linesOfFile
+        (xValues, yValues) = unzip parsedLines
+    return (xValues, yValues)
 
 -- | Window function, used to derive the cosmic variance
 -- You have a choice of two different ones, namely:
@@ -71,14 +97,14 @@ windowFunction cosmology w_kind k mh =
 cosmicVarianceSq :: FilePath -> ReferenceCosmology -> Mhalo -> Redshift -> W_kind -> IO Double
 cosmicVarianceSq filepath cosmology mh z w_kind =
   do
-    pk_arr <- powerSpectrum filepath
-    let interp :: LinearInterp UniformMesh
-        interp = linearInterp $ tabulate (uniformMesh (1e-4, 1e4) (length pk_arr)) (V.fromList pk_arr)
+    (k_arr, pk_arr) <- powerSpectrum filepath
+    let interp_pk :: Double -> Double
+        interp_pk k = mapLookup (M.fromList (zip k_arr pk_arr)) k
 
         integrand :: Wavenumber -> Double
         integrand k =
           (k ** 2 / (2 * pi ** 2))
-            * (interp `at` k)
+            * (interp_pk k)
             * (windowFunction cosmology w_kind k mh) ** 2
 
         params :: QuadParam
@@ -120,15 +146,11 @@ haloMassFunction filepath cosmology h_kind w_kind mh_arr z =
 
     let (h0, om0, omb0, c, gn) = unpackCosmology cosmology
 
-        interp_sigma :: LinearInterp UniformMesh
-        interp_sigma =
-          linearInterp $
-            tabulate
-              (uniformMesh (minimum mh_arr, maximum mh_arr) (length mh_arr))
-              (V.fromList sigma_arr)
+        interp_sigma :: Double -> Double
+        interp_sigma mh = mapLookup (M.fromList (zip mh_arr sigma_arr)) mh
 
         diff_func :: Double -> Double
-        diff_func mh = log . sqrt $ interp_sigma `at` mh
+        diff_func mh = log . sqrt $ interp_sigma mh
         dsdm = (\mh -> diffRes $ diffRichardson diff_func 1.0 mh) <$> mh_arr
 
         dsdm :: [Double]
