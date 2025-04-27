@@ -2,8 +2,10 @@ module HMF where
 
 import Cosmology
 import Data.Maybe
+import qualified Data.Vector as V
 import Numeric.Tools.Differentiation
 import Numeric.Tools.Integration
+import Numeric.Tools.Interpolation
 
 -- Define an HMF datatype, consisting of two choices
 data HMF_kind
@@ -40,7 +42,11 @@ rh mh = 1 / c * (2 * mh * gn / (om0 * h0 ** 2)) ** (1 / 3)
 -- | Produces a matter power spectrum at the linear level
 -- To be imported from CAMB
 powerSpectrum :: Wavenumber -> Redshift -> Double
-powerSpectrum k z = 1e0
+powerSpectrum k z =
+  let xPoints = [1, 2, 3, 4]
+      yPoints = [2, 4, 6, 8]
+      interp = linearInterp $ tabulate (uniformMesh (0, 10) 4) (V.fromList xPoints)
+   in interp `at` k
 
 -- | Window function, used to derive the cosmic variance
 -- You have a choice of two different ones, namely:
@@ -111,3 +117,6 @@ haloMassFunction h_kind w_kind mh_arr z =
       fdsdlogm :: [Double]
       fdsdlogm = zipWith (*) dsdlogm first_crossing
    in zipWith (*) fdsdlogm ((* (-rho_mean)) <$> mh_arr)
+
+main :: IO ()
+main = print $ haloMassFunction ST TopHat [1e8, 1e9, 1e10] 1

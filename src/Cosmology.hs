@@ -18,3 +18,4 @@ initialiseCosmology args =
     [h0, om0, ob0, c, gn] ->
       let [h0, om0, ob0, c, gn] = read <$> args
        in MkCosmology h0 om0 ob0 c gn
+    _ -> MkCosmology 0 0 0 0 0
