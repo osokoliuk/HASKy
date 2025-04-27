@@ -2,6 +2,20 @@
 
 module HMF where
 
+{-
+Module      : HASKy.HMF
+Description : Halo Mass Function
+Copyright   : (c) Oleksii Sokoliuk, 20256
+License     : MIT
+Maintainer  : oleksii.sokoliuk@mao.kiev.ua
+Stability   : experimental
+Portability : portable
+
+This module defines a bunch of routines that in the end
+yield a Halo Mass Function for a given cosmology (i.e., values of
+Hubble parameter H0, Omega_m0, Omega_b0)
+-}
+
 import Cosmology
 import qualified Data.Map as M
 import Data.Maybe
@@ -34,6 +48,8 @@ type Mhalo = Double
 type Rhalo = Double
 
 type Redshift = Double
+
+type PowerSpectrum = Wavenumber -> Double
 
 -- Unpack the values in the cosmology_record into variables
 unpackCosmology :: ReferenceCosmology -> (Double, Double, Double, Double, Double)
@@ -101,24 +117,24 @@ windowFunction cosmology w_kind k mh =
 
 -- | Cosmic variance squared, usually referred to as sigma^2(R,z)
 -- Derived by integrating a matter power spectrum and a window function
-cosmicVarianceSq :: FilePath -> ReferenceCosmology -> Mhalo -> Redshift -> W_kind -> IO Double
-cosmicVarianceSq filepath cosmology mh z w_kind =
+cosmicVarianceSq :: FilePath -> ReferenceCosmology -> PowerSpectrum -> Mhalo -> Redshift -> W_kind -> IO Double
+cosmicVarianceSq filepath cosmology pk mh z w_kind =
   do
-    (k_arr, pk_arr) <- powerSpectrum filepath
-    let interp_pk :: Double -> Double
-        interp_pk k = mapLookup (M.fromList (zip k_arr pk_arr)) k
+    -- (k_arr, pk_arr) <- powerSpectrum filepath
+    let -- interp_pk :: Double -> Double
+        -- interp_pk k = mapLookup (M.fromList (zip k_arr pk_arr)) k
 
         integrand :: Wavenumber -> Double
         integrand k =
           (k ** 2 / (2 * pi ** 2))
-            * (interp_pk k)
+            * (pk k)
             * (windowFunction cosmology w_kind k mh) ** 2
 
         params :: QuadParam
-        params = QuadParam {quadPrecision = 1e0, quadMaxIter = 1000}
+        params = QuadParam {quadPrecision = 1e-3, quadMaxIter = 20}
 
         result :: Maybe Double
-        result = quadRes $ quadSimpson params (minimum k_arr, maximum k_arr) integrand
+        result = quadRes $ quadSimpson params (1e-3, 1e3) integrand
     return $ fromMaybe 0.0 result
 
 -- | First-crossing distribution, crucial for the derivation of a
@@ -126,17 +142,16 @@ cosmicVarianceSq filepath cosmology mh z w_kind =
 --    * Sheth-Tormen
 --    * Tinker
 -- We are planning to add more options in the near future
-firstCrossing :: FilePath -> ReferenceCosmology -> HMF_kind -> W_kind -> Mhalo -> Redshift -> IO Double
-firstCrossing filepath cosmology h_kind w_kind mh z =
+firstCrossing :: FilePath -> ReferenceCosmology -> PowerSpectrum -> HMF_kind -> W_kind -> Mhalo -> Redshift -> IO Double
+firstCrossing filepath cosmology pk h_kind w_kind mh z =
   do
-    sigma <- cosmicVarianceSq filepath cosmology mh z w_kind
+    sigma <- cosmicVarianceSq filepath cosmology pk mh z w_kind
 
     let sigma_eval :: Double
         sigma_eval = sqrt sigma
 
         nu :: Double
-        nu = 1.686 / sigma_eval
-
+        nu = 1.686 / sigma_eval -- CHANGE DELTA_c!!!!
         a_T, a_ST, p, a, b, c :: Double
         (a_T, a_ST, p, a, b, c) = (0.186, 0.3222, 0.3, 1.47, 2.57, 1.19)
     return $ case h_kind of
@@ -148,20 +163,26 @@ firstCrossing filepath cosmology h_kind w_kind mh z =
 haloMassFunction :: FilePath -> ReferenceCosmology -> HMF_kind -> W_kind -> [Mhalo] -> Redshift -> IO [Double]
 haloMassFunction filepath cosmology h_kind w_kind mh_arr z =
   do
-    sigma_arr <- mapM (\mh -> cosmicVarianceSq filepath cosmology mh z w_kind) mh_arr
-    first_crossing_arr <- mapM (\mh -> firstCrossing filepath cosmology h_kind w_kind mh z) mh_arr
+    -- Map arrays for variance and first crossing distributions
+    (k_arr, pk_arr) <- powerSpectrum filepath
+
+    let interp_pk :: PowerSpectrum
+        interp_pk = mapLookup (M.fromList (zip k_arr pk_arr))
+
+    sigma_arr <- mapM (\mh -> cosmicVarianceSq filepath cosmology interp_pk mh z w_kind) mh_arr
+    first_crossing_arr <- mapM (\mh -> firstCrossing filepath cosmology interp_pk h_kind w_kind mh z) mh_arr
 
     let (h0, om0, omb0, c, gn) = unpackCosmology cosmology
 
         interp_sigma :: Double -> Double -- Interpolate cosmic variance
-        interp_sigma mh = mapLookup (M.fromList (zip mh_arr sigma_arr)) mh
+        interp_sigma = mapLookup (M.fromList (zip mh_arr sigma_arr))
 
         diff_func :: Double -> Double
         diff_func mh = log . sqrt $ interp_sigma mh
-        dsdm = (\mh -> diffRes $ diffRichardson diff_func 1.0 mh) <$> mh_arr
+        dsdm = (\mh -> diffRes $ diffRichardson diff_func 1e-0 mh) <$> mh_arr
 
         dsdlogm :: [Double]
-        dsdlogm = zipWith (*) mh_arr dsdm
+        dsdlogm = zipWith (/) dsdm mh_arr
 
         rho_mean :: Double
         rho_mean = 3 * h0 ** 2 * om0 / (8 * pi * gn)
@@ -181,7 +202,11 @@ cosmology =
     }
 
 main :: IO ()
+-- main = print $ rh cosmology TopHat (0.85 * 1e14)
+
 main = do
-  x <- haloMassFunction "Pk_m_z=0.txt" (MkCosmology {h0' = 69, om0' = 0.305, ob0' = 0.05, c' = 3e5, gn' = 1e-11}) ST TopHat [1e10, 1e11] 0
-  -- cosmicVarianceSq "Pk_m_z=0.txt" cosmology 1e12 0 TopHat
+  x <- haloMassFunction "colossus.txt" cosmology ST TopHat (map (\x -> 10 ** x) [9, 9 + 0.2 .. 15]) 0
+  -- sigma_arr <- mapM (\mh -> cosmicVarianceSq filepath cosmology mh z w_kind) mh_arr
+  -- x <- cosmicVarianceSq "Pk_m_z=0.txt" cosmology (0.85 * 1e14) 0 TopHat
+
   print $ x
