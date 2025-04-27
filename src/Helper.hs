@@ -1,0 +1,23 @@
+module Helper where
+
+-- | Helper function to linearly interpolate power spectrum
+-- Taken from the https://cmears.id.au/articles/linear-interpolation.html
+interpolate (a, av) (b, bv) x = av + (x - a) * (bv - av) / (b - a)
+
+mapLookup :: M.Map Double Double -> Double -> Double
+mapLookup m x =
+  case (M.lookupLE x m, M.lookupGE x m) of
+    (Just (a, av), Just (b, bv)) ->
+      if a == b
+        then av
+        else interpolate (a, av) (b, bv) x
+    (Nothing, Just (b, bv)) -> bv
+    (Just (a, av), Nothing) -> av
+    _ -> error "mapLookup"
+
+-- | Helper function for reading the file into a table
+parseLine :: String -> (Double, Double)
+parseLine line =
+  case mapM readMaybe (words line) of -- Try to read both values
+    Just [x, y] -> (x, y) -- If both are parsed, return the tuple
+    _ -> error ("Invalid line: " ++ line)

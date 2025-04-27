@@ -21,6 +21,7 @@ import qualified Data.Map as M
 import Data.Maybe
 import qualified Data.Text as T
 import qualified Data.Vector as V
+import Helper
 import Numeric.Tools.Differentiation
 import Numeric.Tools.Integration
 import Numeric.Tools.Interpolation
@@ -69,28 +70,6 @@ rh cosmology w_kind mh =
         TopHat -> (3 * mh / (4 * pi * rho_mean)) ** (1 / 3)
         Smooth -> (3 * mh / (4 * pi * rho_mean * c_smooth ** 3)) ** (1 / 3)
 
--- | Helper function to linearly interpolate power spectrum
--- Taken from the https://cmears.id.au/articles/linear-interpolation.html
-interpolate (a, av) (b, bv) x = av + (x - a) * (bv - av) / (b - a)
-
-mapLookup :: M.Map Double Double -> Double -> Double
-mapLookup m x =
-  case (M.lookupLE x m, M.lookupGE x m) of
-    (Just (a, av), Just (b, bv)) ->
-      if a == b
-        then av
-        else interpolate (a, av) (b, bv) x
-    (Nothing, Just (b, bv)) -> bv
-    (Just (a, av), Nothing) -> av
-    _ -> error "mapLookup"
-
--- | Helper function for reading the file into a table
-parseLine :: String -> (Double, Double)
-parseLine line =
-  case mapM readMaybe (words line) of -- Try to read both values
-    Just [x, y] -> (x, y) -- If both are parsed, return the tuple
-    _ -> error ("Invalid line: " ++ line)
-
 -- | Produces a matter power spectrum at the linear level
 -- To be imported from CAMB
 powerSpectrum :: FilePath -> IO ([Double], [Double])
@@ -120,11 +99,7 @@ windowFunction cosmology w_kind k mh =
 cosmicVarianceSq :: FilePath -> ReferenceCosmology -> PowerSpectrum -> Mhalo -> Redshift -> W_kind -> IO Double
 cosmicVarianceSq filepath cosmology pk mh z w_kind =
   do
-    -- (k_arr, pk_arr) <- powerSpectrum filepath
-    let -- interp_pk :: Double -> Double
-        -- interp_pk k = mapLookup (M.fromList (zip k_arr pk_arr)) k
-
-        integrand :: Wavenumber -> Double
+    let integrand :: Wavenumber -> Double
         integrand k =
           (k ** 2 / (2 * pi ** 2))
             * (pk k)
@@ -163,7 +138,7 @@ firstCrossing filepath cosmology pk h_kind w_kind mh z =
 haloMassFunction :: FilePath -> ReferenceCosmology -> HMF_kind -> W_kind -> [Mhalo] -> Redshift -> IO [Double]
 haloMassFunction filepath cosmology h_kind w_kind mh_arr z =
   do
-    -- Map arrays for variance and first crossing distributions
+    -- Map arrays for power spectrum, variance and first crossing distributions
     (k_arr, pk_arr) <- powerSpectrum filepath
 
     let interp_pk :: PowerSpectrum
@@ -179,7 +154,7 @@ haloMassFunction filepath cosmology h_kind w_kind mh_arr z =
 
         diff_func :: Double -> Double
         diff_func mh = log . sqrt $ interp_sigma mh
-        dsdm = (\mh -> diffRes $ diffRichardson diff_func 1e-0 mh) <$> mh_arr
+        dsdm = (\mh -> diffRes $ diffRichardson diff_func 1e1 mh) <$> mh_arr
 
         dsdlogm :: [Double]
         dsdlogm = zipWith (/) dsdm mh_arr
@@ -202,11 +177,6 @@ cosmology =
     }
 
 main :: IO ()
--- main = print $ rh cosmology TopHat (0.85 * 1e14)
-
 main = do
-  x <- haloMassFunction "colossus.txt" cosmology ST TopHat (map (\x -> 10 ** x) [9, 9 + 0.2 .. 15]) 0
-  -- sigma_arr <- mapM (\mh -> cosmicVarianceSq filepath cosmology mh z w_kind) mh_arr
-  -- x <- cosmicVarianceSq "Pk_m_z=0.txt" cosmology (0.85 * 1e14) 0 TopHat
-
+  x <- haloMassFunction "colossus.txt" cosmology Tinker Smooth (map (\x -> 10 ** x) [9, 9 + 0.2 .. 15]) 0
   print $ x
