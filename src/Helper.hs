@@ -13,6 +13,9 @@ A module that defines lots of functions to be used by other modules.
 Kind of useless by itself.
 -}
 
+import qualified Data.Map as M
+import Text.Read (readMaybe)
+
 -- | Helper function to linearly interpolate power spectrum
 -- Taken from the https://cmears.id.au/articles/linear-interpolation.html
 interpolate (a, av) (b, bv) x = av + (x - a) * (bv - av) / (b - a)

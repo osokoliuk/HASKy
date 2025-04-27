@@ -37,6 +37,17 @@ unpackCosmology :: ReferenceCosmology -> (Double, Double, Double, Double, Double
 unpackCosmology cosmology =
   (,,,,) <$> h0' <*> om0' <*> ob0' <*> c' <*> gn' $ cosmology
 
+-- | Example Planck 2018 cosmology
+planck18 :: ReferenceCosmology
+planck18 =
+  MkCosmology
+    { h0' = 67.66,
+      om0' = (0.02242 / (67.66 / 100) ** 2 + 0.11933 / (67.66 / 100) ** 2),
+      ob0' = 0.02242 / (67.66 / 100) ** 2,
+      c' = 299792.45800000057,
+      gn' = 4.301 * 10 ** (-9)
+    }
+
 -- | Initialise cosmological model from the args, to be provided from the CLI
 initialiseCosmology :: [String] -> ReferenceCosmology
 initialiseCosmology args =

@@ -1,6 +1,22 @@
 module SMF where
 
--- Import HMF module (to be used to derive SMF)
+{-
+Module      : HASKy.SMF
+Description : Stellar Mass Function
+Copyright   : (c) Oleksii Sokoliuk, 20256
+License     : MIT
+Maintainer  : oleksii.sokoliuk@mao.kiev.ua
+Stability   : experimental
+Portability : portable
+
+This module defines a bunch of routines that in the end
+yield a Stellar Mass Function for a given cosmology (i.e., values of
+Hubble parameter H0, Omega_m0, Omega_b0)
+-}
+
+-- Import HMF, Cosmology modules (to be used to derive SMF)
+
+import Cosmology
 import HMF
 import Numeric.Tools.Differentiation
 
@@ -72,31 +88,40 @@ massAccretionHistory mh z =
 
 -- | Mass accretion rate, i.e., rate at which halo of mass Mh gains mass,
 -- adopted in the units of a solar mass from the Fakhouri et al. 2013 work
-massAccretionRate :: Mhalo -> Redshift -> Double
-massAccretionRate mh z =
-  25.3 * (mh / 1e12) ** 1.1
-    + (1 + 1.65 * z) * sqrt (om0 * (1 + z) ** 3 + 1 - om0)
+massAccretionRate :: ReferenceCosmology -> Mhalo -> Redshift -> Double
+massAccretionRate cosmology mh z =
+  let (h0, om0, ob0, c, gn) = unpackCosmology cosmology
+   in 25.3 * (mh / 1e12) ** 1.1
+        + (1 + 1.65 * z) * sqrt (om0 * (1 + z) ** 3 + 1 - om0)
 
 -- | Star formation rate, derived simply as a normalised halo mass accretion rate
 -- eps_star converts baryonic mass to a stellar mass, while factor Om0/Ob0 converts
 -- halo mass to baryonic mass
-starFormationRate :: SMF_kind -> Mhalo -> Redshift -> Double
-starFormationRate s_kind mh z =
+starFormationRate :: SMF_kind -> ReferenceCosmology -> Mhalo -> Redshift -> Double
+starFormationRate s_kind cosmology mh z =
   let ep = epsStar s_kind mh z
-   in ep * ob0 / om0 * massAccretionRate mh z
+      (h0, om0, ob0, c, gn) = unpackCosmology cosmology
+   in ep * ob0 / om0 * massAccretionRate cosmology mh z
 
 -- | Stellar mass function, derived from the HMF and SFE via a simple chain rule
-stellarMassFunction :: SMF_kind -> HMF_kind -> W_kind -> [Mhalo] -> Redshift -> ([Double], [Double])
-stellarMassFunction s_kind h_kind w_kind mh_arr z =
-  let ms_arr :: [Double] -- Array of stellar masses
-      ms_arr = (\mh -> epsStar s_kind mh z) <$> mh_arr
+stellarMassFunction :: FilePath -> ReferenceCosmology -> SMF_kind -> HMF_kind -> W_kind -> [Mhalo] -> Redshift -> IO ([Double], [Double])
+stellarMassFunction filepath cosmology s_kind h_kind w_kind mh_arr z =
+  do
+    -- Unpack HMF array
+    hmf_arr <- haloMassFunction filepath cosmology h_kind w_kind mh_arr z
 
-      hmf_arr :: [Double] -- Array of HMF values over mh_arr
-      hmf_arr = haloMassFunction h_kind w_kind mh_arr z
+    let ms_arr :: [Double] -- Array of stellar masses
+        ms_arr = (\mh -> mh * epsStar s_kind mh z) <$> mh_arr
 
-      log10_ms :: Mhalo -> Double -- Function that gives a log10 of stellar mass with mh
-      log10_ms = \mh -> log10 $ mh * epsStar s_kind mh z
+        log10_ms :: Mhalo -> Double -- Function that gives a log10 of stellar mass with mh
+        log10_ms = \mh -> log10 $ mh * epsStar s_kind mh z
 
-      dlogmhdlogms :: [Double] -- Part of the chain rule to turn HMF into SMF
-      dlogmhdlogms = (\mh -> diffRes $ diffRichardson (\mh -> log10 mh) 1.0 (log10_ms mh)) <$> mh_arr
-   in (ms_arr, (\x y -> x * y / log 10) <$> hmf_arr <*> dlogmhdlogms)
+        dlogmhdlogms :: [Double] -- Part of the chain rule to turn HMF into SMF
+        dlogmhdlogms = (\mh -> diffRes $ diffRichardson (\mh -> log10 mh) 1.0 (log10_ms mh)) <$> mh_arr
+
+    return $ (ms_arr, zipWith (\x y -> x * y / log 10) hmf_arr dlogmhdlogms)
+
+main_SMF :: IO ()
+main_SMF = do
+  x <- stellarMassFunction "../data/EH_Pk_z=0.txt" planck18 DoublePower Tinker Smooth (map (\x -> 10 ** x) [9, 9 + 0.5 .. 15]) 0
+  print $ x

@@ -27,7 +27,6 @@ import Numeric.Tools.Integration
 import Numeric.Tools.Interpolation
 import qualified Safe
 import System.IO
-import Text.Read (readMaybe)
 
 -- Define an HMF datatype, consisting of two choices
 data HMF_kind
@@ -51,11 +50,6 @@ type Rhalo = Double
 type Redshift = Double
 
 type PowerSpectrum = Wavenumber -> Double
-
--- Unpack the values in the cosmology_record into variables
-unpackCosmology :: ReferenceCosmology -> (Double, Double, Double, Double, Double)
-unpackCosmology cosmology =
-  (,,,,) <$> h0' <*> om0' <*> ob0' <*> c' <*> gn' $ cosmology
 
 -- | Define a radius for the uniform density sphere in terms of it's mass
 rh :: ReferenceCosmology -> W_kind -> Mhalo -> Rhalo
@@ -166,17 +160,7 @@ haloMassFunction filepath cosmology h_kind w_kind mh_arr z =
         fdsdlogm = zipWith (*) dsdlogm first_crossing_arr
     return $ zipWith (*) fdsdlogm ((* (-rho_mean)) <$> mh_arr)
 
-cosmology :: ReferenceCosmology
-cosmology =
-  MkCosmology
-    { h0' = 67.66,
-      om0' = (0.02242 / (67.66 / 100) ** 2 + 0.11933 / (67.66 / 100) ** 2),
-      ob0' = 0.02242 / (67.66 / 100) ** 2,
-      c' = 299792.45800000057,
-      gn' = 4.301 * 10 ** (-9)
-    }
-
 main :: IO ()
 main = do
-  x <- haloMassFunction "colossus.txt" cosmology Tinker Smooth (map (\x -> 10 ** x) [9, 9 + 0.2 .. 15]) 0
+  x <- haloMassFunction "../data/EH_Pk_z=0.txt" planck18 Tinker Smooth (map (\x -> 10 ** x) [9, 9 + 0.2 .. 15]) 0
   print $ x
