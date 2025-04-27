@@ -41,10 +41,17 @@ unpackCosmology cosmology =
   (,,,,) <$> h0' <*> om0' <*> ob0' <*> c' <*> gn' $ cosmology
 
 -- | Define a radius for the uniform density sphere in terms of it's mass
-rh :: ReferenceCosmology -> Mhalo -> Rhalo
-rh cosmology mh =
+rh :: ReferenceCosmology -> W_kind -> Mhalo -> Rhalo
+rh cosmology w_kind mh =
   let (h0, om0, ob0, c, gn) = unpackCosmology cosmology
-   in 1 / c * (2 * mh * gn / (om0 * h0 ** 2)) ** (1 / 3)
+      rho_mean :: Double
+      rho_mean = 3 * h0 ** 2 * om0 / (8 * pi * gn)
+
+      c_smooth :: Double
+      c_smooth = 3.3
+   in case w_kind of
+        TopHat -> (3 * mh / (4 * pi * rho_mean)) ** (1 / 3)
+        Smooth -> (3 * mh / (4 * pi * rho_mean * c_smooth ** 3)) ** (1 / 3)
 
 -- | Helper function to linearly interpolate power spectrum
 -- Taken from the https://cmears.id.au/articles/linear-interpolation.html
@@ -85,7 +92,7 @@ powerSpectrum filepath =
 --    * Smooth-k
 windowFunction :: ReferenceCosmology -> W_kind -> Wavenumber -> Mhalo -> Double
 windowFunction cosmology w_kind k mh =
-  let r = rh cosmology mh
+  let r = rh cosmology w_kind mh
       kr = k * r
       beta = 4.8
    in case w_kind of
@@ -175,7 +182,6 @@ cosmology =
 
 main :: IO ()
 main = do
-  x <- cosmicVarianceSq "Pk_m_z=0.txt" cosmology 1e16 0 TopHat
-  -- powerSpectrum "Pk_m_z=0.txt"
-  -- haloMassFunction "Pk_m_z=0.txt" (MkCosmology {h0' = 69, om0' = 0.305, ob0' = 0.05, c' = 3e5, gn' = 1e-11}) ST TopHat [1e10, 1e11] 0
-  print $ sqrt x
+  x <- haloMassFunction "Pk_m_z=0.txt" (MkCosmology {h0' = 69, om0' = 0.305, ob0' = 0.05, c' = 3e5, gn' = 1e-11}) ST TopHat [1e10, 1e11] 0
+  -- cosmicVarianceSq "Pk_m_z=0.txt" cosmology 1e12 0 TopHat
+  print $ x
