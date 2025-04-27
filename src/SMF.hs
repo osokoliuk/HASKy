@@ -74,7 +74,7 @@ epsStar s_kind mh z =
       gamma = g0 + (g1 * (a - 1) + g2 * z) * nu
       fBehroozi x = -log10 (10 ** (alpha * x) + 1) + delta * (log10 (1 + exp (x))) ** gamma / (1 + exp (10 ** (-x)))
    in case s_kind of
-        DoublePower -> eps_0 / ((mh_0) ** gamma_lo + (mh / mh_0) ** gamma_hi)
+        DoublePower -> eps_0 / ((mh / mh_0) ** gamma_lo + (mh / mh_0) ** gamma_hi)
         Behroozi -> 10 ** (log10 (epsilon * m_1) + fBehroozi (log10 (mh / m_1)) - fBehroozi (0))
 
 -- | Mass accretion history for the CDM halo with
@@ -122,6 +122,12 @@ stellarMassFunction filepath cosmology s_kind h_kind w_kind mh_arr z =
     return $ (ms_arr, zipWith (\x y -> x * y / log 10) hmf_arr dlogmhdlogms)
 
 main_SMF :: IO ()
+{-
 main_SMF = do
-  x <- stellarMassFunction "../data/EH_Pk_z=0.txt" planck18 DoublePower Tinker Smooth (map (\x -> 10 ** x) [9, 9 + 0.5 .. 15]) 0
+  print $ (\mh -> mh * epsStar DoublePower mh 0) <$> (map (\x -> 10 ** x) [9, 9 + 0.5 .. 15])
+  print $ (map (\x -> 10 ** x) [9, 9 + 0.5 .. 15])
+-}
+
+main_SMF = do
+  x <- stellarMassFunction "../data/EH_Pk_z=0.txt" planck18 DoublePower Tinker Smooth (map (\x -> 10 ** x) [9, 9 + 0.5 .. 15]) 4
   print $ x
