@@ -88,8 +88,15 @@ starFormationRate s_kind mh z =
 -- | Stellar mass function, derived from the HMF and SFE via a simple chain rule
 stellarMassFunction :: SMF_kind -> HMF_kind -> W_kind -> [Mhalo] -> Redshift -> ([Double], [Double])
 stellarMassFunction s_kind h_kind w_kind mh_arr z =
-  let ms_arr = (\mh -> epsStar s_kind mh z) <$> mh_arr
+  let ms_arr :: [Double] -- Array of stellar masses
+      ms_arr = (\mh -> epsStar s_kind mh z) <$> mh_arr
+
+      hmf_arr :: [Double] -- Array of HMF values over mh_arr
       hmf_arr = haloMassFunction h_kind w_kind mh_arr z
+
+      log10_ms :: Mhalo -> Double -- Function that gives a log10 of stellar mass with mh
       log10_ms = \mh -> log10 $ mh * epsStar s_kind mh z
+
+      dlogmhdlogms :: [Double] -- Part of the chain rule to turn HMF into SMF
       dlogmhdlogms = (\mh -> diffRes $ diffRichardson (\mh -> log10 mh) 1.0 (log10_ms mh)) <$> mh_arr
    in (ms_arr, (\x y -> x * y / log 10) <$> hmf_arr <*> dlogmhdlogms)
