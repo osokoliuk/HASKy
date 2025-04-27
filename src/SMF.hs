@@ -2,6 +2,7 @@ module SMF where
 
 -- Import HMF module (to be used to derive SMF)
 import HMF
+import Numeric.Tools.Differentiation
 
 -- As usual, specify all kinds of star formation efficiencies that we consider
 data SMF_kind
@@ -83,3 +84,12 @@ starFormationRate :: SMF_kind -> Mhalo -> Redshift -> Double
 starFormationRate s_kind mh z =
   let ep = epsStar s_kind mh z
    in ep * ob0 / om0 * massAccretionRate mh z
+
+-- | Stellar mass function, derived from the HMF and SFE via a simple chain rule
+stellarMassFunction :: SMF_kind -> HMF_kind -> W_kind -> [Mhalo] -> Redshift -> ([Double], [Double])
+stellarMassFunction s_kind h_kind w_kind mh_arr z =
+  let ms_arr = (\mh -> epsStar s_kind mh z) <$> mh_arr
+      hmf_arr = haloMassFunction h_kind w_kind mh_arr z
+      log10_ms = \mh -> log10 $ mh * epsStar s_kind mh z
+      dlogmhdlogms = (\mh -> diffRes $ diffRichardson (\mh -> log10 mh) 1.0 (log10_ms mh)) <$> mh_arr
+   in (ms_arr, (\x y -> x * y / log 10) <$> hmf_arr <*> dlogmhdlogms)
