@@ -108,10 +108,10 @@ cosmicVarianceSq filepath cosmology mh z w_kind =
             * (windowFunction cosmology w_kind k mh) ** 2
 
         params :: QuadParam
-        params = QuadParam {quadPrecision = 1e-9, quadMaxIter = 1000}
+        params = QuadParam {quadPrecision = 1e0, quadMaxIter = 1000}
 
         result :: Maybe Double
-        result = quadRes $ quadSimpson params (1e-4, 1e4) integrand
+        result = quadRes $ quadSimpson params (minimum k_arr, maximum k_arr) integrand
     return $ fromMaybe 0.0 result
 
 -- | First-crossing distribution, crucial for the derivation of a
@@ -146,14 +146,14 @@ haloMassFunction filepath cosmology h_kind w_kind mh_arr z =
 
     let (h0, om0, omb0, c, gn) = unpackCosmology cosmology
 
-        interp_sigma :: Double -> Double
+        interp_sigma :: Double -> Double -- Interpolate cosmic variance
         interp_sigma mh = mapLookup (M.fromList (zip mh_arr sigma_arr)) mh
 
         diff_func :: Double -> Double
         diff_func mh = log . sqrt $ interp_sigma mh
         dsdm = (\mh -> diffRes $ diffRichardson diff_func 1.0 mh) <$> mh_arr
 
-        dsdm :: [Double]
+        dsdlogm :: [Double]
         dsdlogm = zipWith (*) mh_arr dsdm
 
         rho_mean :: Double
@@ -163,7 +163,19 @@ haloMassFunction filepath cosmology h_kind w_kind mh_arr z =
         fdsdlogm = zipWith (*) dsdlogm first_crossing_arr
     return $ zipWith (*) fdsdlogm ((* (-rho_mean)) <$> mh_arr)
 
+cosmology :: ReferenceCosmology
+cosmology =
+  MkCosmology
+    { h0' = 67.66,
+      om0' = (0.02242 / (67.66 / 100) ** 2 + 0.11933 / (67.66 / 100) ** 2),
+      ob0' = 0.02242 / (67.66 / 100) ** 2,
+      c' = 299792.45800000057,
+      gn' = 4.301 * 10 ** (-9)
+    }
+
 main :: IO ()
 main = do
-  x <- haloMassFunction "camb.txt" (MkCosmology {h0' = 69, om0' = 0.305, ob0' = 0.05, c' = 3e5, gn' = 1e-11}) ST TopHat [1e10, 1e11] 0
-  print x
+  x <- cosmicVarianceSq "Pk_m_z=0.txt" cosmology 1e16 0 TopHat
+  -- powerSpectrum "Pk_m_z=0.txt"
+  -- haloMassFunction "Pk_m_z=0.txt" (MkCosmology {h0' = 69, om0' = 0.305, ob0' = 0.05, c' = 3e5, gn' = 1e-11}) ST TopHat [1e10, 1e11] 0
+  print $ sqrt x
