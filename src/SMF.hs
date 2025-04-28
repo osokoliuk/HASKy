@@ -17,9 +17,12 @@ Hubble parameter H0, Omega_m0, Omega_b0)
 -- Import HMF, Cosmology modules (to be used to derive SMF)
 
 import Cosmology
+import qualified Data.Map as M
+import Data.Maybe (fromMaybe)
 import HMF
 import Helper
 import Numeric.Tools.Differentiation
+import Numeric.Tools.Integration
 
 -- As usual, specify all kinds of star formation efficiencies that we consider
 data SMF_kind
@@ -107,7 +110,6 @@ starFormationRate s_kind cosmology mh z =
 stellarMassFunction :: FilePath -> ReferenceCosmology -> SMF_kind -> HMF_kind -> W_kind -> [Mhalo] -> Redshift -> IO ([Double], [Double])
 stellarMassFunction filepath cosmology s_kind h_kind w_kind mh_arr z =
   do
-    -- Unpack HMF array
     hmf_arr <- haloMassFunction filepath cosmology h_kind w_kind mh_arr z
 
     let (h0, om0, ob0, c, gn) = unpackCosmology cosmology
@@ -118,7 +120,7 @@ stellarMassFunction filepath cosmology s_kind h_kind w_kind mh_arr z =
         ms_arr :: [Double]
         ms_arr = ms <$> mh_arr
 
-        ln_factors :: [Double]
+        ln_factors :: [Double] -- Turns dMh/dMstar into dlnMh/dlog10Mstar
         ln_factors = zipWith (\x y -> x * log 10 / y) ms_arr mh_arr
 
         dmhdms :: [Double] -- Part of the chain rule to turn HMF into SMF
@@ -128,15 +130,33 @@ stellarMassFunction filepath cosmology s_kind h_kind w_kind mh_arr z =
 
     return $ (ms_arr, zipWith (\x y -> x * y) hmf_arr dmhdms)
 
--- starFormationRateDensity :: FilePath -> ReferenceCosmology -> SMF_kind -> HMF_kind -> W_kind -> Redshift -> IO (Double)
--- starFormationRateDensity filepath cosmology s_kind h_kind w_kind z =
-{-
-main_SMF :: IO ()
-main_SMF = do
-  print $ (\mh -> mh * epsStar planck18 Behroozi mh 0) <$> (map (\x -> 10 ** x) [9, 9 + 0.5 .. 15])
-  print $ (map (\x -> 10 ** x) [9, 9 + 0.5 .. 15])
--}
+-- | Star formation rate density,
+-- to be used in the IGM/ISM mass fraction differential equations
+starFormationRateDensity :: FilePath -> ReferenceCosmology -> SMF_kind -> HMF_kind -> W_kind -> Redshift -> IO (Double)
+starFormationRateDensity filepath cosmology s_kind h_kind w_kind z =
+  let mh_arr = (10 **) <$> [6, 6 + 1 .. 18]
+   in do
+        hmf_arr <- haloMassFunction filepath cosmology h_kind w_kind mh_arr z
+
+        let dndmh :: [Double]
+            dndmh = zipWith (/) hmf_arr mh_arr
+
+            interp_hmf :: Double -> Double
+            interp_hmf = mapLookup (M.fromList (zip mh_arr dndmh))
+
+            integrand :: Double -> Double
+            integrand mh =
+              (interp_hmf mh)
+                * (starFormationRate s_kind cosmology mh z)
+
+            params :: QuadParam
+            params = QuadParam {quadPrecision = 1e2, quadMaxIter = 20}
+
+            result :: Maybe Double
+            result = quadRes $ quadSimpson params (1e6, 1e18) integrand
+
+        return $ fromMaybe 0.0 result
 
 main_SMF = do
-  x <- stellarMassFunction "../data/CAMB_Pk_z=0.txt" planck18 DoublePower ST Smooth (map (\x -> 10 ** x) [9, 9 + 0.5 .. 15]) 0
+  x <- starFormationRateDensity "../data/CAMB_Pk_z=0.txt" planck18 DoublePower ST Smooth 0
   print $ x
