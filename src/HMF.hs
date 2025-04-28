@@ -155,7 +155,7 @@ haloMassFunction filepath cosmology h_kind w_kind mh_arr z =
 
         diff_func :: Double -> Double
         diff_func mh = log . sqrt $ interp_sigma mh
-        dsdm = (\mh -> diffRes $ diffRichardson diff_func 1e1 mh) <$> mh_arr
+        dsdm = (\mh -> diffRes $ diffRichardson diff_func 10 mh) <$> mh_arr
 
         dsdlogm :: [Double]
         dsdlogm = zipWith (/) dsdm mh_arr
@@ -169,5 +169,5 @@ haloMassFunction filepath cosmology h_kind w_kind mh_arr z =
 
 main_HMF :: IO ()
 main_HMF = do
-  x <- haloMassFunction "../data/EH_Pk_z=0.txt" planck18 Tinker Smooth (map (\x -> 10 ** x) [9, 9 + 0.2 .. 15]) 0
+  x <- haloMassFunction "../data/CAMB_Pk_z=0.txt" planck18 ST Smooth (map (\x -> 10 ** x) [9, 9 + 0.2 .. 15]) 0
   print $ x

@@ -112,16 +112,21 @@ stellarMassFunction filepath cosmology s_kind h_kind w_kind mh_arr z =
 
     let (h0, om0, ob0, c, gn) = unpackCosmology cosmology
 
-        ms_arr :: [Double] -- Array of stellar masses
-        ms_arr = (\mh -> mh * (ob0 / om0) * epsStar cosmology s_kind mh z) <$> mh_arr
+        ms :: Mhalo -> Double -- Function that gives stellar mass
+        ms mh = mh * (ob0 / om0) * epsStar cosmology s_kind mh z
 
-        log10_ms :: Mhalo -> Double -- Function that gives a log10 of stellar mass with mh
-        log10_ms = \mh -> log10 $ mh * (ob0 / om0) * epsStar cosmology s_kind mh z
+        ms_arr :: [Double]
+        ms_arr = ms <$> mh_arr
 
-        dlogmhdlogms :: [Double] -- Part of the chain rule to turn HMF into SMF
-        dlogmhdlogms = (\mh -> diffRes $ diffRichardson (\mh -> log10 mh) 1.0 (log10_ms mh)) <$> mh_arr
+        ln_factors :: [Double]
+        ln_factors = zipWith (\x y -> x * log 10 / y) ms_arr mh_arr
 
-    return $ (ms_arr, zipWith (\x y -> x * y * log 10) hmf_arr dlogmhdlogms)
+        dmhdms :: [Double] -- Part of the chain rule to turn HMF into SMF
+        dmhdms =
+          zipWith (/) ln_factors $
+            (\mh -> diffRes $ diffRichardson ms 10 mh) <$> mh_arr
+
+    return $ (ms_arr, zipWith (\x y -> x * y) hmf_arr dmhdms)
 
 -- starFormationRateDensity :: FilePath -> ReferenceCosmology -> SMF_kind -> HMF_kind -> W_kind -> Redshift -> IO (Double)
 -- starFormationRateDensity filepath cosmology s_kind h_kind w_kind z =
@@ -131,6 +136,7 @@ main_SMF = do
   print $ (\mh -> mh * epsStar planck18 Behroozi mh 0) <$> (map (\x -> 10 ** x) [9, 9 + 0.5 .. 15])
   print $ (map (\x -> 10 ** x) [9, 9 + 0.5 .. 15])
 -}
+
 main_SMF = do
-  x <- stellarMassFunction "../data/EH_Pk_z=0.txt" planck18 DoublePower Tinker Smooth (map (\x -> 10 ** x) [9, 9 + 0.5 .. 15]) 0
+  x <- stellarMassFunction "../data/CAMB_Pk_z=0.txt" planck18 DoublePower ST Smooth (map (\x -> 10 ** x) [9, 9 + 0.5 .. 15]) 0
   print $ x
