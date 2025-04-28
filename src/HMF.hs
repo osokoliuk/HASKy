@@ -116,11 +116,18 @@ firstCrossing filepath cosmology pk h_kind w_kind mh z =
   do
     sigma <- cosmicVarianceSq filepath cosmology pk mh z w_kind
 
-    let sigma_eval :: Double
+    let (h0, om0, omb0, c, gn) = unpackCosmology cosmology
+
+        sigma_eval :: Double
         sigma_eval = sqrt sigma
 
+        -- Critical linear overdensity threshold with
+        -- redshift corrections from [Kitayama et al. 1996]
+        delta_c :: Redshift -> Double
+        delta_c = 1.686 * (om0 * (1 + z) ** 3) ** 0.0055
+
         nu :: Double
-        nu = 1.686 / sigma_eval -- CHANGE DELTA_c!!!!
+        nu = delta_c z / sigma_eval -- CHANGE DELTA_c!!!!
         a_T, a_ST, p, a, b, c :: Double
         (a_T, a_ST, p, a, b, c) = (0.186, 0.3222, 0.3, 1.47, 2.57, 1.19)
     return $ case h_kind of
@@ -160,7 +167,7 @@ haloMassFunction filepath cosmology h_kind w_kind mh_arr z =
         fdsdlogm = zipWith (*) dsdlogm first_crossing_arr
     return $ zipWith (*) fdsdlogm ((* (-rho_mean)) <$> mh_arr)
 
-main :: IO ()
-main = do
-  x <- haloMassFunction "../data/EH_Pk_z=0.txt" planck18 Tinker Smooth (map (\x -> 10 ** x) [9, 9 + 0.2 .. 15]) 0
+main_HMF :: IO ()
+main_HMF = do
+  x <- haloMassFunction "../data/EH_Pk_z=0.txt" planck18 Tinker Smooth (map (\x -> 10 ** x) [9, 9 + 0.2 .. 15]) 4
   print $ x

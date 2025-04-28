@@ -129,5 +129,5 @@ main_SMF = do
 -}
 
 main_SMF = do
-  x <- stellarMassFunction "../data/EH_Pk_z=0.txt" planck18 DoublePower Tinker Smooth (map (\x -> 10 ** x) [9, 9 + 0.5 .. 15]) 4
+  x <- stellarMassFunction "../data/CAMB_Pk_z=0.txt" planck18 DoublePower Tinker Smooth (map (\x -> 10 ** x) [9, 9 + 0.5 .. 15]) 0
   print $ x
