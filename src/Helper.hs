@@ -16,6 +16,11 @@ Kind of useless by itself.
 import qualified Data.Map as M
 import Text.Read (readMaybe)
 
+-- | We define a log10 function (which is apparenly absent from the Prelude)
+-- just for our convenience
+log10 :: (Floating a) => a -> a
+log10 x = log x / log 10
+
 -- | Helper function to linearly interpolate power spectrum
 -- Taken from the https://cmears.id.au/articles/linear-interpolation.html
 interpolate (a, av) (b, bv) x = av + (x - a) * (bv - av) / (b - a)
