@@ -124,15 +124,15 @@ firstCrossing filepath cosmology pk h_kind w_kind mh z =
         -- Critical linear overdensity threshold with
         -- redshift corrections from [Kitayama et al. 1996]
         delta_c :: Redshift -> Double
-        delta_c = 1.686 * (om0 * (1 + z) ** 3) ** 0.0055
+        delta_c z = 1.686 * (om0 * (1 + z) ** 3) ** 0.0055
 
         nu :: Double
         nu = delta_c z / sigma_eval -- CHANGE DELTA_c!!!!
-        a_T, a_ST, p, a, b, c :: Double
-        (a_T, a_ST, p, a, b, c) = (0.186, 0.3222, 0.3, 1.47, 2.57, 1.19)
+        a_T', a_ST', p, a_T, b_T, c_T :: Double
+        (a_T', a_ST', p, a_T, b_T, c_T) = (0.186, 0.3222, 0.3, 1.47, 2.57, 1.19)
     return $ case h_kind of
-      Tinker -> a_T * ((sigma_eval / b) ** (-a) + 1) * exp (-c / sigma_eval ** 2)
-      ST -> a_ST * sqrt (2 * nu ** 2 / pi) * (1 + nu ** (-2 * p)) * exp (-nu ** 2 / 2)
+      Tinker -> a_T' * ((sigma_eval / b_T) ** (-a_T) + 1) * exp (-c_T / sigma_eval ** 2)
+      ST -> a_ST' * sqrt (2 * nu ** 2 / pi) * (1 + nu ** (-2 * p)) * exp (-nu ** 2 / 2)
 
 -- | The Halo Mass Function (HMF) itself, uses most of the functions
 -- defined within this module and a differentiation library
@@ -169,5 +169,5 @@ haloMassFunction filepath cosmology h_kind w_kind mh_arr z =
 
 main_HMF :: IO ()
 main_HMF = do
-  x <- haloMassFunction "../data/EH_Pk_z=0.txt" planck18 Tinker Smooth (map (\x -> 10 ** x) [9, 9 + 0.2 .. 15]) 4
+  x <- haloMassFunction "../data/EH_Pk_z=0.txt" planck18 Tinker Smooth (map (\x -> 10 ** x) [9, 9 + 0.2 .. 15]) 0
   print $ x
