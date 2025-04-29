@@ -23,7 +23,6 @@ import HMF
 import Helper
 import Math.GaussianQuadratureIntegration
 import Numeric.Tools.Differentiation
-import Numeric.Tools.Integration
 
 -- As usual, specify all kinds of star formation efficiencies that we consider
 data SMF_kind
@@ -139,27 +138,22 @@ starFormationRateDensity filepath cosmology s_kind h_kind w_kind z =
    in do
         hmf_arr <- haloMassFunction filepath cosmology h_kind w_kind mh_arr z
 
-        let dndmh :: [Double]
+        let dndmh :: [Double] -- Convert dn/dlnMh to dn/dMh
             dndmh = zipWith (/) hmf_arr mh_arr
 
             interp_hmf :: Double -> Double
             interp_hmf = mapLookup (M.fromList (zip mh_arr dndmh))
 
-            integrand :: Double -> Double
+            integrand :: Double -> Double -- Function giving epsStar * Ob0/Om0 * dn/dt
             integrand mh =
               (interp_hmf mh)
                 * (starFormationRate s_kind cosmology mh z)
 
             result :: Double
-            result = nIntegrate256 integrand 1e6 1e18
+            result = nIntegrate512 integrand (minimum mh_arr) (maximum mh_arr)
 
         return $ result
 
--- {-
 main_SMF = do
   x <- starFormationRateDensity "data/CAMB_Pk_z=0.txt" planck18 DoublePower ST Smooth 0
   print $ x
-
----}
-
--- main_SMF = print ((\mh -> starFormationRate Behroozi planck18 mh 0) <$> (10 **) <$> [6, 6 + 1 .. 18])

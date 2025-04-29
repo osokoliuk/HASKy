@@ -24,7 +24,7 @@ import qualified Data.Vector as V
 import Helper
 import Math.GaussianQuadratureIntegration
 import Numeric.Tools.Differentiation
-import Numeric.Tools.Interpolation
+import Numeric.Tools.Integration
 import qualified Safe
 import System.IO
 
@@ -100,7 +100,7 @@ cosmicVarianceSq filepath cosmology pk mh z w_kind =
             * (windowFunction cosmology w_kind k mh) ** 2
 
         result :: Double
-        result = nIntegrate256 integrand 1e-3 1e3
+        result = nIntegrate1024 integrand 1e-4 1e4
     return $ result
 
 -- | First-crossing distribution, crucial for the derivation of a
@@ -166,5 +166,5 @@ haloMassFunction filepath cosmology h_kind w_kind mh_arr z =
 
 main_HMF :: IO ()
 main_HMF = do
-  x <- haloMassFunction "data/CAMB_Pk_z=0.txt" planck18 Tinker Smooth (map (\x -> 10 ** x) [9, 9 + 0.2 .. 15]) 0
+  x <- haloMassFunction "../data/CAMB_Pk_z=0.txt" planck18 ST Smooth (map (\x -> 10 ** x) [9, 9 + 0.2 .. 15]) 0
   print $ x
