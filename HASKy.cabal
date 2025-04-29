@@ -52,14 +52,14 @@ extra-doc-files:    CHANGELOG.md
 -- extra-source-files:
 
 common warnings
-    ghc-options: -Wall
+    ghc-options: -Wall -O2 -threaded -rtsopts -with-rtsopts=-N 
 
 library
     -- Import common warning flags.
     import:           warnings
 
     -- Modules exported by the library.
-    exposed-modules:  MyLib
+    exposed-modules: Helper, Cosmology, SMF, HMF 
 
     -- Modules included in this library but not exported.
     -- other-modules:
@@ -71,8 +71,11 @@ library
     build-depends:    
       base ^>=4.17.2.1,
       numeric-tools,
-      safe
-      
+      safe,
+      containers,
+      vector,
+      text,
+      GaussQuadIntegration
     -- Directories containing source files.
     hs-source-dirs:   src
 

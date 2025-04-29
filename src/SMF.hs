@@ -21,6 +21,7 @@ import qualified Data.Map as M
 import Data.Maybe (fromMaybe)
 import HMF
 import Helper
+import Math.GaussianQuadratureIntegration
 import Numeric.Tools.Differentiation
 import Numeric.Tools.Integration
 
@@ -90,7 +91,7 @@ massAccretionHistory mh z =
    in mh * (1 + z) ** (alpha_MAR) * exp (neta_MAR * z)
 
 -- | Mass accretion rate, i.e., rate at which halo of mass Mh gains mass,
--- adopted in the units of a solar mass from the Fakhouri et al. 2013 work
+-- adopted in the units of a solar mass from the [Fakhouri et al. 2013] work
 massAccretionRate :: ReferenceCosmology -> Mhalo -> Redshift -> Double
 massAccretionRate cosmology mh z =
   let (h0, om0, ob0, c, gn) = unpackCosmology cosmology
@@ -132,9 +133,9 @@ stellarMassFunction filepath cosmology s_kind h_kind w_kind mh_arr z =
 
 -- | Star formation rate density,
 -- to be used in the IGM/ISM mass fraction differential equations
-starFormationRateDensity :: FilePath -> ReferenceCosmology -> SMF_kind -> HMF_kind -> W_kind -> Redshift -> IO (Double)
+starFormationRateDensity :: FilePath -> ReferenceCosmology -> SMF_kind -> HMF_kind -> W_kind -> Redshift -> IO Double
 starFormationRateDensity filepath cosmology s_kind h_kind w_kind z =
-  let mh_arr = (10 **) <$> [6, 6 + 1 .. 18]
+  let mh_arr = (10 **) <$> [6, 6 + 0.1 .. 18]
    in do
         hmf_arr <- haloMassFunction filepath cosmology h_kind w_kind mh_arr z
 
@@ -149,14 +150,16 @@ starFormationRateDensity filepath cosmology s_kind h_kind w_kind z =
               (interp_hmf mh)
                 * (starFormationRate s_kind cosmology mh z)
 
-            params :: QuadParam
-            params = QuadParam {quadPrecision = 1e2, quadMaxIter = 20}
+            result :: Double
+            result = nIntegrate256 integrand 1e6 1e18
 
-            result :: Maybe Double
-            result = quadRes $ quadSimpson params (1e6, 1e18) integrand
+        return $ result
 
-        return $ fromMaybe 0.0 result
-
+-- {-
 main_SMF = do
-  x <- starFormationRateDensity "../data/CAMB_Pk_z=0.txt" planck18 DoublePower ST Smooth 0
+  x <- starFormationRateDensity "data/CAMB_Pk_z=0.txt" planck18 DoublePower ST Smooth 0
   print $ x
+
+---}
+
+-- main_SMF = print ((\mh -> starFormationRate Behroozi planck18 mh 0) <$> (10 **) <$> [6, 6 + 1 .. 18])

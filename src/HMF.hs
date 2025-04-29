@@ -22,8 +22,8 @@ import Data.Maybe
 import qualified Data.Text as T
 import qualified Data.Vector as V
 import Helper
+import Math.GaussianQuadratureIntegration
 import Numeric.Tools.Differentiation
-import Numeric.Tools.Integration
 import Numeric.Tools.Interpolation
 import qualified Safe
 import System.IO
@@ -99,12 +99,9 @@ cosmicVarianceSq filepath cosmology pk mh z w_kind =
             * (pk k)
             * (windowFunction cosmology w_kind k mh) ** 2
 
-        params :: QuadParam
-        params = QuadParam {quadPrecision = 1e-3, quadMaxIter = 20}
-
-        result :: Maybe Double
-        result = quadRes $ quadSimpson params (1e-3, 1e3) integrand
-    return $ fromMaybe 0.0 result
+        result :: Double
+        result = nIntegrate256 integrand 1e-3 1e3
+    return $ result
 
 -- | First-crossing distribution, crucial for the derivation of a
 -- Halo Mass Function afterwards, again you have a choice of two:
@@ -155,7 +152,7 @@ haloMassFunction filepath cosmology h_kind w_kind mh_arr z =
 
         diff_func :: Double -> Double
         diff_func mh = log . sqrt $ interp_sigma mh
-        dsdm = (\mh -> diffRes $ diffRichardson diff_func 10 mh) <$> mh_arr
+        dsdm = (\mh -> diffRes $ diffRichardson diff_func 1000 mh) <$> mh_arr
 
         dsdlogm :: [Double]
         dsdlogm = zipWith (/) dsdm mh_arr
@@ -169,5 +166,5 @@ haloMassFunction filepath cosmology h_kind w_kind mh_arr z =
 
 main_HMF :: IO ()
 main_HMF = do
-  x <- haloMassFunction "../data/CAMB_Pk_z=0.txt" planck18 Tinker Smooth (map (\x -> 10 ** x) [9, 9 + 0.2 .. 15]) 0
+  x <- haloMassFunction "data/CAMB_Pk_z=0.txt" planck18 Tinker Smooth (map (\x -> 10 ** x) [9, 9 + 0.2 .. 15]) 0
   print $ x
