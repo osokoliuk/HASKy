@@ -162,7 +162,42 @@ haloMassFunction filepath cosmology h_kind w_kind mh_arr z =
         fdsdlogm = zipWith (*) dsdlogm first_crossing_arr
     return $ zipWith (*) fdsdlogm ((* (-rho_mean)) <$> mh_arr)
 
+-- | Escape velocity squared of a star from a halo of mass M and radius R at the redshift z
+escapeVelocitySq :: FilePath -> ReferenceCosmology -> HMF_kind -> W_kind -> Mhalo -> Redshift -> IO Double
+escapeVelocitySq filepath cosmology h_kind w_kind mh_min z =
+  do
+    -- Map arrays for power spectrum and the first crossing distribution
+    (k_arr, pk_arr) <- powerSpectrum filepath
+
+    let interp_pk :: PowerSpectrum
+        interp_pk = mapLookup (M.fromList (zip k_arr pk_arr))
+
+        mh_arr :: [Mhalo]
+        mh_arr = (10 **) <$> [log10 mh_min, log10 mh_min + 0.1 .. 18]
+
+    first_crossing_arr <- mapM (\mh -> firstCrossing filepath cosmology interp_pk h_kind w_kind mh z) mh_arr
+
+    let (h0, om0, ob0, c, gn) = unpackCosmology cosmology
+
+        interp_first_crossing :: Double -> Double
+        interp_first_crossing = mapLookup (M.fromList (zip mh_arr first_crossing_arr))
+
+        integrand_1 :: Double -> Double
+        integrand_1 mh =
+          mh * (2 * gn * mh * rh cosmology w_kind mh) * interp_first_crossing mh
+
+        integrand_2 :: Double -> Double
+        integrand_2 mh = mh * interp_first_crossing mh
+
+        -- Mass-averaged gravitational potential, divided by a DM density
+        result :: Double
+        result =
+          (nIntegrate1024 integrand_1 mh_min (last mh_arr))
+            / (nIntegrate1024 integrand_2 mh_min (last mh_arr))
+
+    return $ result
+
 main_HMF :: IO ()
 main_HMF = do
-  x <- haloMassFunction "../data/CAMB_Pk_z=0.txt" planck18 ST Smooth (map (\x -> 10 ** x) [9, 9 + 0.2 .. 15]) 0
-  print $ x
+  x <- escapeVelocitySq "../data/CAMB_Pk_z=0.txt" planck18 ST Smooth 1e6 5
+  print $ sqrt x
