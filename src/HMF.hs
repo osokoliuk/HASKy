@@ -47,8 +47,6 @@ type Mhalo = Double
 
 type Rhalo = Double
 
-type Redshift = Double
-
 type PowerSpectrum = Wavenumber -> Double
 
 -- | Define a radius for the uniform density sphere in terms of it's mass
@@ -113,7 +111,7 @@ firstCrossing filepath cosmology pk h_kind w_kind mh z =
   do
     sigma <- cosmicVarianceSq filepath cosmology pk mh z w_kind
 
-    let (h0, om0, omb0, c, gn) = unpackCosmology cosmology
+    let (h0, om0, ob0, c, gn) = unpackCosmology cosmology
 
         sigma_eval :: Double
         sigma_eval = sqrt sigma
@@ -145,7 +143,7 @@ haloMassFunction filepath cosmology h_kind w_kind mh_arr z =
     sigma_arr <- mapM (\mh -> cosmicVarianceSq filepath cosmology interp_pk mh z w_kind) mh_arr
     first_crossing_arr <- mapM (\mh -> firstCrossing filepath cosmology interp_pk h_kind w_kind mh z) mh_arr
 
-    let (h0, om0, omb0, c, gn) = unpackCosmology cosmology
+    let (h0, om0, ob0, c, gn) = unpackCosmology cosmology
 
         interp_sigma :: Double -> Double -- Interpolate cosmic variance
         interp_sigma = mapLookup (M.fromList (zip mh_arr sigma_arr))

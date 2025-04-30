@@ -14,6 +14,8 @@ every other module in this library.
 -}
 
 -- Some of the imports
+
+import Math.GaussianQuadratureIntegration
 import System.Environment
 
 -- Define a cosmology datatypes, which includes the following:
@@ -31,6 +33,10 @@ data ReferenceCosmology
     gn' :: Double
   }
   deriving (Eq, Show)
+
+type Redshift = Double
+
+type CosmicTime = Double
 
 -- | Unpack the values in the cosmology_record into variables
 unpackCosmology :: ReferenceCosmology -> (Double, Double, Double, Double, Double)
@@ -56,3 +62,24 @@ initialiseCosmology args =
       let [h0, om0, ob0, c, gn] = read <$> args
        in MkCosmology h0 om0 ob0 c gn
     _ -> MkCosmology 0 0 0 0 0
+
+-- | Fiducial Lambda CDM Hubble parameter, in the units of [km s^-1 Mpc^-1]
+hubbleParameter :: ReferenceCosmology -> Redshift -> Double
+hubbleParameter cosmology z =
+  let (h0, om0, ob0, c, gn) = unpackCosmology cosmology
+   in h0 * sqrt (om0 * (1 + z) ** 3 + 1 - om0)
+
+-- | Define cosmic time t(z) in the units of [Gyr]
+cosmicTime :: ReferenceCosmology -> Redshift -> Redshift -> CosmicTime
+cosmicTime cosmology zinit z =
+  let (h0, om0, ob0, c, gn) = unpackCosmology cosmology
+
+      km_Mpc :: Double
+      km_Mpc = 3.24 * 1e-20
+
+      s_Gyr = 3.15 * 1e16
+
+      integrand :: Double -> Double
+      integrand z =
+        (km_Mpc * s_Gyr * (1 + z) * hubbleParameter cosmology z) ** (-1)
+   in nIntegrate512 integrand z zinit
