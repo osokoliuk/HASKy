@@ -83,13 +83,18 @@ massDynamical t =
 
 -- | Mass of a star that dies at the age t,
 -- essentially an inverse of a function tauMS
-supernovaEjecta :: FilePath -> ReferenceCosmology -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Redshift -> IO Double
-supernovaEjecta filepath cosmology i_kind s_kind h_kind w_kind z =
+interGalacticMediumEjecta :: FilePath -> ReferenceCosmology -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Mhalo -> Redshift -> IO Double
+interGalacticMediumEjecta filepath cosmology i_kind s_kind h_kind w_kind mh_min z =
   let z_arr = [0, 0.25 .. 10]
       t_arr = (\z -> cosmicTime cosmology z) <$> z_arr
+
+      e_w, e_sn :: Double
+      (e_w, e_sn) = (0.02, 0.005)
    in do
         sfrd_arr <-
           mapM (\z -> starFormationRateDensity filepath cosmology s_kind h_kind w_kind z) z_arr
+
+        vesc_sq <- escapeVelocitySq filepath cosmology h_kind w_kind mh_min z
 
         let interp_sfrd :: Double -> Double
             interp_sfrd = mapLookup (M.fromList (zip z_arr sfrd_arr))
@@ -103,15 +108,28 @@ supernovaEjecta filepath cosmology i_kind s_kind h_kind w_kind z =
             z_target :: Double -> Double
             z_target m = interp_time (time_at_z - tauMS m)
 
-            integrand m =
+            m_down :: Double
+            m_down = maximum [1e8, massDynamical time_at_z]
+
+            integrand_SNe :: Double -> Double
+            integrand_SNe m =
               normalisedInitialMassFunction i_kind m
                 * interp_sfrd (z_target m)
                 * (m - massRemnant m)
 
-            result :: Double
-            result = nIntegrate1024 integrand (massDynamical time_at_z) 100
+            integrand_Wind :: Double -> Double
+            integrand_Wind m =
+              normalisedInitialMassFunction i_kind m
+                * interp_sfrd (z_target m)
+                * (2 * energy / vesc_sq)
 
-        return $ result
+            result_SNe :: Double
+            result_SNe = e_sn * nIntegrate1024 integrand_SNe m_down 100
+
+            result_Wind :: Double
+            result_Wind = e_w * nIntegrate1024 integrand_Wind m_down 100
+
+        return $ result_SNe + result_Wind
 
 main_IGM :: IO ()
 main_IGM = do
