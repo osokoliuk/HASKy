@@ -182,14 +182,13 @@ escapeVelocitySq filepath cosmology h_kind w_kind mh_min z =
         interp_first_crossing :: Double -> Double
         interp_first_crossing = mapLookup (M.fromList (zip mh_arr first_crossing_arr))
 
-        integrand_1 :: Double -> Double
+        integrand_1 :: Double -> Double -- Integrand for a mass-averaged gravitational potential
         integrand_1 mh =
           mh * (2 * gn * mh * rh cosmology w_kind mh) * interp_first_crossing mh
 
-        integrand_2 :: Double -> Double
+        integrand_2 :: Double -> Double -- Integrand for the CDM halo density
         integrand_2 mh = mh * interp_first_crossing mh
 
-        -- Mass-averaged gravitational potential, divided by a DM density
         result :: Double
         result =
           (nIntegrate1024 integrand_1 mh_min (last mh_arr))
@@ -199,5 +198,5 @@ escapeVelocitySq filepath cosmology h_kind w_kind mh_min z =
 
 main_HMF :: IO ()
 main_HMF = do
-  x <- escapeVelocitySq "../data/CAMB_Pk_z=0.txt" planck18 ST Smooth 1e6 5
+  x <- escapeVelocitySq "../data/CAMB_Pk_z=0.txt" planck18 ST TopHat 1e7 0
   print $ sqrt x

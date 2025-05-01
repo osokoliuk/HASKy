@@ -70,8 +70,8 @@ hubbleParameter cosmology z =
    in h0 * sqrt (om0 * (1 + z) ** 3 + 1 - om0)
 
 -- | Define cosmic time t(z) in the units of [Gyr]
-cosmicTime :: ReferenceCosmology -> Redshift -> Redshift -> CosmicTime
-cosmicTime cosmology zinit z =
+cosmicTime :: ReferenceCosmology -> Redshift -> CosmicTime
+cosmicTime cosmology z =
   let (h0, om0, ob0, c, gn) = unpackCosmology cosmology
 
       km_Mpc :: Double
@@ -82,4 +82,4 @@ cosmicTime cosmology zinit z =
       integrand :: Double -> Double
       integrand z =
         (km_Mpc * s_Gyr * (1 + z) * hubbleParameter cosmology z) ** (-1)
-   in nIntegrate512 integrand z zinit
+   in nIntegrate512 integrand z 20

@@ -31,6 +31,8 @@ data SMF_kind
   | EMERGE
   deriving (Eq, Show)
 
+type Mstar = Double
+
 -- | Star formation efficiency, i.e. Star mass / Halo mass
 -- There are three possible choices for the SFE model:
 --    * Simple double power-law
@@ -44,7 +46,7 @@ epsStar cosmology s_kind mh z =
       eps_0, mh_0, gamma_lo, gamma_hi :: Double
       (eps_0, mh_0, gamma_lo, gamma_hi) = (0.21, 2.8 * 1e11, 0.49, -0.61)
 
-      -- A set of best fit parameters for the Behrozoi et al. 2013 SFE model
+      -- A set of best fit parameters for the Behroozi et al. 2013 SFE model
       e0, e1, e2, e3, m0, m1, m2, a0, a1, d0, d1, d2, g0, g1, g2 :: Double
       (e0, e1, e2, e3, m0, m1, m2, a0, a1, d0, d1, d2, g0, g1, g2) =
         ( -1.777,
@@ -64,7 +66,7 @@ epsStar cosmology s_kind mh z =
           0.279
         )
 
-      -- Some helper parameters for Behroozi et al. 2013 SFE model
+      -- Some helper functions for Behroozi et al. 2013 SFE model
       a, nu, epsilon, m_1, alpha, delta, gamma :: Double
       a = 1 / (1 + z)
       nu = exp (-4 * a ** 2)
@@ -107,17 +109,17 @@ starFormationRate s_kind cosmology mh z =
    in ep * ob0 / om0 * massAccretionRate cosmology mh z
 
 -- | Stellar mass function, derived from the HMF and SFE via a simple chain rule
-stellarMassFunction :: FilePath -> ReferenceCosmology -> SMF_kind -> HMF_kind -> W_kind -> [Mhalo] -> Redshift -> IO ([Double], [Double])
+stellarMassFunction :: FilePath -> ReferenceCosmology -> SMF_kind -> HMF_kind -> W_kind -> [Mhalo] -> Redshift -> IO ([Mstar], [Double])
 stellarMassFunction filepath cosmology s_kind h_kind w_kind mh_arr z =
   do
     hmf_arr <- haloMassFunction filepath cosmology h_kind w_kind mh_arr z
 
     let (h0, om0, ob0, c, gn) = unpackCosmology cosmology
 
-        ms :: Mhalo -> Double -- Function that gives stellar mass
+        ms :: Mhalo -> Mstar -- Function that gives stellar mass
         ms mh = mh * (ob0 / om0) * epsStar cosmology s_kind mh z
 
-        ms_arr :: [Double]
+        ms_arr :: [Mstar]
         ms_arr = ms <$> mh_arr
 
         ln_factors :: [Double] -- Turns dMh/dMstar into dlnMh/dlog10Mstar
