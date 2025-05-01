@@ -1,5 +1,20 @@
 module IGM where
 
+{-
+Module      : HASKy.IGM
+Description : Inter-Galactic Medium evolution
+Copyright   : (c) Oleksii Sokoliuk, 20256
+License     : MIT
+Maintainer  : oleksii.sokoliuk@mao.kiev.ua
+Stability   : experimental
+Portability : portable
+
+This module is the most important part of the HASKy package. It
+defines two evolutionary equations for the IGM and ISM and enables us to
+observe the chemical evolution of various metals in the IGM/ISM at various
+redshifts.
+-}
+
 import Cosmology
 import qualified Data.Map as M
 import HMF
@@ -34,6 +49,8 @@ initialMassFunction i_kind m =
           | m < 1 -> a_Ch * exp (-(log m - log center_Ch) ** 2 / (2 * sigma_Ch ** 2))
           | otherwise -> m ** (-1.3)
 
+-- | Next two functions normalise IMF between m_inf = 0.1 Msol and m_sup = 100 Msol
+-- so that it can acts as a PDF in that range
 imfNormalisation :: IMF_kind -> Double
 imfNormalisation i_kind =
   let m_arr = (10 **) <$> [0.1, 0.1 + 0.1 .. 100]
