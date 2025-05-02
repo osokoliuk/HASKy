@@ -1,5 +1,17 @@
 module Lookup where
 
+{-
+Module      : HASKy.Lookup
+Description : Lookup tables
+Copyright   : (c) Oleksii Sokoliuk, 20256
+License     : MIT
+Maintainer  : oleksii.sokoliuk@mao.kiev.ua
+Stability   : experimental
+Portability : portable
+
+This module stores all of the lookup tables used in the code.
+-}
+
 import Data.Map (fromList)
 import qualified Data.Map as M
 

@@ -158,8 +158,9 @@ interGalacticMediumTerms filepath cosmology i_kind s_kind h_kind w_kind mh_min z
 
         return $ (e_sn * result_SNe + e_w * result_Wind, result_ISM)
 
-intergalacticMediumEvolution :: FilePath -> ReferenceCosmology -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Mhalo -> Redshift -> IO Double
-intergalacticMediumEvolution filepath cosmology i_kind m0 =
+-- | Coupled solver ...
+igmIsmEvolution :: FilePath -> ReferenceCosmology -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Mhalo -> Redshift -> IO Double
+igmIsmEvolution filepath cosmology i_kind m0 =
   let z_arr = [20, 20 - 0.1 .. 0]
    in do
         terms_arr <-
@@ -168,7 +169,7 @@ intergalacticMediumEvolution filepath cosmology i_kind m0 =
         let (o_arr, e_arr) = unzip terms_arr
 
             baryon_mar :: [Double]
-            baryon_mar = (\z -> ob0 / om0 * massAccretionRate cosmology mh z) <$> z_arr
+            baryon_mar = (\z -> ob0 / om0 * massAccretionRate cosmology mtot z) <$> z_arr
 
         return 1
 
