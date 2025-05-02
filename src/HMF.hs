@@ -162,7 +162,8 @@ haloMassFunction filepath cosmology h_kind w_kind mh_arr z =
         fdsdlogm = zipWith (*) dsdlogm first_crossing_arr
     return $ zipWith (*) fdsdlogm ((* (-rho_mean)) <$> mh_arr)
 
--- | Escape velocity squared of a star from a halo of mass M and radius R at the redshift z
+-- | Escape velocity squared of a star from a halo of mass M and radius R at the redshift z,
+-- in the units of [km^2 s^-2]
 escapeVelocitySq :: FilePath -> ReferenceCosmology -> HMF_kind -> W_kind -> Mhalo -> Redshift -> IO Double
 escapeVelocitySq filepath cosmology h_kind w_kind mh_min z =
   do
@@ -198,5 +199,5 @@ escapeVelocitySq filepath cosmology h_kind w_kind mh_min z =
 
 main_HMF :: IO ()
 main_HMF = do
-  x <- escapeVelocitySq "../data/CAMB_Pk_z=0.txt" planck18 ST TopHat 1e7 0
-  print $ sqrt x
+  x <- escapeVelocitySq "../data/CAMB_Pk_z=0.txt" planck18 ST TopHat 1e11 0
+  print $ 1.989 * 1e43 * x
