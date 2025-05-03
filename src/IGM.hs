@@ -17,6 +17,7 @@ redshifts.
 
 import Cosmology
 import qualified Data.Map as M
+import qualified Data.Vector as V
 import HMF
 import Helper
 import Lookup
@@ -101,8 +102,8 @@ massDynamical t =
 
 -- | Mass of a star that dies at the age t,
 -- essentially an inverse of a function tauMS
-interGalacticMediumTerms :: FilePath -> ReferenceCosmology -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Mhalo -> Redshift -> IO (Double, Double, Double)
-interGalacticMediumTerms filepath cosmology i_kind s_kind h_kind w_kind mh_min z =
+interGalacticMediumTerms :: FilePath -> ReferenceCosmology -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Mhalo -> Redshift -> IO (Double, Double, Double, Double, Double)
+interGalacticMediumTerms filepath cosmology i_kind s_kind h_kind w_kind elem mh_min z =
   let z_arr = [0, 0.25 .. 10]
       t_arr = (\z -> cosmicTime cosmology z) <$> z_arr
 
@@ -113,12 +114,16 @@ interGalacticMediumTerms filepath cosmology i_kind s_kind h_kind w_kind mh_min z
           mapM (\z -> starFormationRateDensity filepath cosmology s_kind h_kind w_kind z) z_arr
 
         vesc_sq <- escapeVelocitySq filepath cosmology h_kind w_kind mh_min z
+        yields_arr <- yieldHighMass 1 elem
 
         let interp_sfrd :: Double -> Double
             interp_sfrd = mapLookup (M.fromList (zip z_arr sfrd_arr))
 
             interp_time :: Double -> Double
             interp_time = mapLookup (M.fromList (zip t_arr z_arr))
+
+            interp_yields :: Double -> Double
+            interp_yields = mapLookup (M.fromList yields_arr)
 
             time_at_z :: Double
             time_at_z = cosmicTime cosmology z
@@ -141,14 +146,27 @@ interGalacticMediumTerms filepath cosmology i_kind s_kind h_kind w_kind mh_min z
                 * interp_sfrd (z_target m)
                 * (m - massRemnant m 0.1)
 
+            integrand_SNe_Element :: Double -> Double
+            integrand_SNe_Element m =
+              normalisedInitialMassFunction i_kind m
+                * interp_sfrd (z_target m)
+                * interp_yields m
+                * (m - massRemnant m 0.1)
+
             integrand_Wind :: Double -> Double
             integrand_Wind m =
               normalisedInitialMassFunction i_kind m
                 * interp_sfrd (z_target m)
                 * (2 * energy / (kms_ergMsol * vesc_sq))
 
+            integrand_ISM_Element :: Double -> Double
+            integrand_ISM_Element = integrand_SNe_Element
+
             result_SNe :: Double
             result_SNe = nIntegrate1024 integrand_SNe m_down 100
+
+            result_SNe_Element :: Double
+            result_SNe_Element = nIntegrate1024 integrand_SNe_Element m_down 100
 
             result_Wind :: Double
             result_Wind = nIntegrate1024 integrand_Wind m_down 100
@@ -156,10 +174,13 @@ interGalacticMediumTerms filepath cosmology i_kind s_kind h_kind w_kind mh_min z
             result_ISM :: Double
             result_ISM = nIntegrate1024 integrand_SNe (massDynamical time_at_z) 100
 
-        return $ (e_sn * result_SNe, e_w * result_Wind, result_ISM)
+            result_ISM_Element :: Double
+            result_ISM_Element = nIntegrate1024 integrand_Element (massDynamical time_at_z) 100
+
+        return $ (e_sn * result_SNe, e_sn * result_SNe_Element, e_w * result_Wind, result_ISM, result_ISM_Element)
 
 -- | Coupled solver ...
-igmIsmEvolution :: FilePath -> ReferenceCosmology -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Mhalo -> Redshift -> IO Double
+igmIsmEvolution :: FilePath -> ReferenceCosmology -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Element -> Mhalo -> Redshift -> IO Double
 igmIsmEvolution filepath cosmology i_kind m0 =
   let z_arr = [20, 20 - 0.1 .. 0]
    in do
@@ -169,33 +190,34 @@ igmIsmEvolution filepath cosmology i_kind m0 =
         sfrd_arr <-
           mapM (\z -> starFormationRateDensity filepath cosmology s_kind h_kind w_kind z) z_arr
 
-        let (osn_arr, ow_arr, e_arr) = unzip terms_arr
-
-            interp_osn = mapLookup $ M.fromList (zip z_arr osn_arr)
-            interp_ow = mapLookup $ M.fromList (zip z_arr ow_arr)
-            interp_e = mapLookup $ M.fromList (zip z_arr e_arr)
-            interp_sfrd = mapLookup $ M.fromList (zip z_arr sfrd_arr)
-
-            interp_o = (+) <$> interp_osn <*> interp_ow $ z
+        let (osn_arr, osni_arr, ow_arr, e_arr, ei_arr) = unzip terms_arr
 
             baryon_mar :: [Double]
             baryon_mar = (\z -> ob0 / om0 * massAccretionRate cosmology mtot z) <$> z_arr
 
+            interp_osn = mapLookup $ M.fromList (zip z_arr osn_arr)
+            interp_osni = mapLookup $ M.fromList (zip z_arr osni_arr)
+            interp_ow = mapLookup $ M.fromList (zip z_arr ow_arr)
+            interp_e = mapLookup $ M.fromList (zip z_arr e_arr)
+            interp_ei = mapLookup $ M.fromList (zip z_arr ei_arr)
+            interp_sfrd = mapLookup $ M.fromList (zip z_arr sfrd_arr)
+            interp_o = (+) <$> interp_osn <*> interp_ow
             interp_mar = mapLookup $ M.fromList (zip z_arr baryon_mar)
 
             -- M_ISM = y!0
             -- M_IGM = y!1
             -- Xi_ISM = y!2
             -- Xi_IGM = y!3
-            oscillator z y =
+            igm_ode z y =
               V.fromList
                 [ -interp_mar z + interp_o z,
                   (-interp_sfrd z + interp_e z) + (interp_mar z - interp_o z),
-                  1 / (y V.! 0) * (interp_ow z * (y V.! 4 - y V.! 3))
+                  1 / (y V.! 0) * (interp_ow z * (y V.! 4 - y V.! 3) + (interp_osni z - interp_osn z * y V.! 3)),
+                  1 / (y V.! 1) * ((interp_ei z - interp_e z * y V.! 4) + interp_mar z * (y V.! 3 - y V.! 4) - (interp_osni z - interp_osn z * y V.! 4))
                 ]
-            result = rk4Solve oscillator t0 h n y0
+            result = rk4Solve igm_ode (minimum z_arr) 0.1 (length z_arr) (V.fromList [1, 1, 0.01, 0.01])
 
-        return 1
+        return result
 
 main_IGM :: IO ()
 main_IGM = do
