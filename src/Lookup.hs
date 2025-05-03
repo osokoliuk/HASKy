@@ -12,152 +12,35 @@ Portability : portable
 This module stores all of the lookup tables used in the code.
 -}
 
+import Data.Bifunctor
+import Data.Char (toLower)
+import Data.Data
 import Data.Map (fromList)
 import qualified Data.Map as M
+import Data.Maybe (fromMaybe)
+import Helper
+import Text.Read (Read (..))
 
 type Metallicity = Double
 
-data Element
-  = H1
-  | He4
-  | H2
-  | He3
-  | Li7
-  | Be7
-  | Be9
-  | B10
-  | B11
-  | C11
-  | C12
-  | C13
-  | C14
-  | N14
-  | N15
-  | O16
-  | O17
-  | O18
-  | F19
-  | Ne20
-  | Ne21
-  | Ne22
-  | Na22
-  | Mg24
-  | Mg25
-  | Mg26
-  | Al26
-  | Al27
-  | Si28
-  | Si29
-  | Si30
-  | P31
-  | S32
-  | S33
-  | S34
-  | S35
-  | S36
-  | Cl35
-  | Cl36
-  | Cl37
-  | Ar36
-  | Ar37
-  | Ar38
-  | Ar40
-  | K39
-  | K40
-  | K41
-  | Ca40
-  | Ca41
-  | Ca42
-  | Ca43
-  | Ca44
-  | Ca45
-  | Ca46
-  | Ca48
-  | Sc43
-  | Sc45
-  | Ti44
-  | Ti45
-  | Ti46
-  | Ti47
-  | Ti48
-  | Ti49
-  | Ti50
-  | V47
-  | V48
-  | V49
-  | V50
-  | V51
-  | Cr48
-  | Cr49
-  | Cr50
-  | Cr51
-  | Cr52
-  | Cr53
-  | Cr54
-  | Mn51
-  | Mn52
-  | Mn53
-  | Mn54
-  | Mn55
-  | Fe52
-  | Fe53
-  | Fe54
-  | Fe55
-  | Fe56
-  | Fe57
-  | Fe58
-  | Fe59
-  | Fe60
-  | Co55
-  | Co56
-  | Co57
-  | Co58
-  | Co59
-  | Co60
-  | Co61
-  | Ni56
-  | Ni57
-  | Ni58
-  | Ni59
-  | Ni60
-  | Ni61
-  | Ni62
-  | Ni63
-  | Ni64
-  | Ni65
-  | Cu59
-  | Cu60
-  | Cu61
-  | Cu62
-  | Cu63
-  | Cu64
-  | Cu65
-  | Cu66
-  | Zn60
-  | Zn61
-  | Zn62
-  | Zn63
-  | Zn64
-  | Zn65
-  | Zn66
-  | Zn67
-  | Zn68
-  | Zn69
-  | Ga64
-  | Ga65
-  | Ga66
-  | Ga67
-  | Ga68
-  | Ga69
-  | Ga70
-  | Ge64
-  | Ge65
-  | Ge66
-  | Ge68
-  | Ge69
-  | Ge70
-  | Ge71
-  deriving (Eq, Show, Ord, Enum)
+yieldsHighMass :: Metallicity -> Element -> IO ([Double], [Double])
+yieldsHighMass metal_frac elem =
+  let metal_str
+        | metal_frac <= 0.001 = "z0001"
+        | metal_frac <= 0.01 = "z001"
+        | metal_frac <= 0.1 = "z01"
+        | otherwise = "z1"
+   in let filepath = "../data/WW95/" ++ metal_str ++ "/" ++ (toLower <$> element elem) ++ ".dat"
+       in do
+            table <- parseFileToTable filepath
+            let yields_arr = lookup elem (values table)
+            return $ (masses table, fromMaybe [] yields_arr)
+
+-- | metal_frac <= 0.01 =
+--
+--  | metal_frac <= 0.1 =
+--
+--  | otherwise  =
 
 -- | Stellar remnant mass for a white dwarf, taken from the [Hoek & Groenewegen 1996]
 remnantMediumMass :: Metallicity -> M.Map Double Double
