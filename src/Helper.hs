@@ -14,6 +14,7 @@ Kind of useless by itself.
 -}
 
 import qualified Data.Map as M
+import qualified Data.Vector as V
 import Text.Read (readMaybe)
 
 -- | We define a log10 function (which is apparenly absent from the Prelude)
@@ -45,12 +46,38 @@ parseLine line =
     Just [x, y] -> (x, y) -- If both are parsed, return the tuple
     _ -> error ("Invalid line: " ++ line)
 
--- | Runge-Kutta solver of 4th order
-rungeKutta4 :: (Double -> Double -> Double) -> (Double, Double) -> Double -> (Double, Double)
-rungeKutta4 f (t, y) t' = (t', y + h * (k1 + 2.0 * k2 + 2.0 * k3 + k4) / 6.0)
+vecAdd :: (Num a) => V.Vector a -> V.Vector a -> V.Vector a
+vecAdd = V.zipWith (+)
+
+vecMultiply :: (Num a) => a -> V.Vector a -> V.Vector a
+vecMultiply x = V.map (x *)
+
+rk4Step :: (Double -> V.Vector Double -> V.Vector Double) -> Double -> Double -> V.Vector Double -> V.Vector Double
+rk4Step f t h y =
+  vecAdd y $
+    vecMultiply (1 / 6) $
+      vecAdd k1 $
+        vecAdd (vecMultiply 2 k2) $
+          vecAdd (vecMultiply 2 k3) k4
   where
-    h = t' - t
-    k1 = f t y
-    k2 = f (t + 0.5 * h) (y + 0.5 * h * k1)
-    k3 = f (t + 0.5 * h) (y + 0.5 * h * k2)
-    k4 = f (t + 1.0 * h) (y + 1.0 * h * k3)
+    k1 = vecMultiply h (f t y)
+    k2 = vecMultiply h (f (t + h / 2) (vecAdd y (vecMultiply 0.5 k1)))
+    k3 = vecMultiply h (f (t + h / 2) (vecAdd y (vecMultiply 0.5 k2)))
+    k4 = vecMultiply h (f (t + h) (vecAdd y k3))
+
+rk4Solve :: (Double -> V.Vector Double -> V.Vector Double) -> Double -> Double -> Int -> V.Vector Double -> [(Double, V.Vector Double)]
+rk4Solve f t0 h n y0 = take (n + 1) $ iterate step (t0, y0)
+  where
+    step (t, y) =
+      let y' = rk4Step f t h y
+       in (t + h, y')
+
+main :: IO ()
+main = do
+  let y0 = V.fromList [1.0, 0.0] -- Initial state [position, velocity]
+      t0 = 0.0
+      h = 0.1
+      n = 100
+      oscillator t y = V.fromList [y V.! 1, -(y V.! 0)]
+      result = rk4Solve oscillator t0 h n y0
+  mapM_ print result

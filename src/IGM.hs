@@ -101,7 +101,7 @@ massDynamical t =
 
 -- | Mass of a star that dies at the age t,
 -- essentially an inverse of a function tauMS
-interGalacticMediumTerms :: FilePath -> ReferenceCosmology -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Mhalo -> Redshift -> IO (Double, Double)
+interGalacticMediumTerms :: FilePath -> ReferenceCosmology -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Mhalo -> Redshift -> IO (Double, Double, Double)
 interGalacticMediumTerms filepath cosmology i_kind s_kind h_kind w_kind mh_min z =
   let z_arr = [0, 0.25 .. 10]
       t_arr = (\z -> cosmicTime cosmology z) <$> z_arr
@@ -156,7 +156,7 @@ interGalacticMediumTerms filepath cosmology i_kind s_kind h_kind w_kind mh_min z
             result_ISM :: Double
             result_ISM = nIntegrate1024 integrand_SNe (massDynamical time_at_z) 100
 
-        return $ (e_sn * result_SNe + e_w * result_Wind, result_ISM)
+        return $ (e_sn * result_SNe, e_w * result_Wind, result_ISM)
 
 -- | Coupled solver ...
 igmIsmEvolution :: FilePath -> ReferenceCosmology -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Mhalo -> Redshift -> IO Double
@@ -166,10 +166,34 @@ igmIsmEvolution filepath cosmology i_kind m0 =
         terms_arr <-
           mapM (\z -> interGalacticMediumTerms filepath cosmology i_kind s_kind h_kind w_kind mh_min z) <$> z_arr
 
-        let (o_arr, e_arr) = unzip terms_arr
+        sfrd_arr <-
+          mapM (\z -> starFormationRateDensity filepath cosmology s_kind h_kind w_kind z) z_arr
+
+        let (osn_arr, ow_arr, e_arr) = unzip terms_arr
+
+            interp_osn = mapLookup $ M.fromList (zip z_arr osn_arr)
+            interp_ow = mapLookup $ M.fromList (zip z_arr ow_arr)
+            interp_e = mapLookup $ M.fromList (zip z_arr e_arr)
+            interp_sfrd = mapLookup $ M.fromList (zip z_arr sfrd_arr)
+
+            interp_o = (+) <$> interp_osn <*> interp_ow $ z
 
             baryon_mar :: [Double]
             baryon_mar = (\z -> ob0 / om0 * massAccretionRate cosmology mtot z) <$> z_arr
+
+            interp_mar = mapLookup $ M.fromList (zip z_arr baryon_mar)
+
+            -- M_ISM = y!0
+            -- M_IGM = y!1
+            -- Xi_ISM = y!2
+            -- Xi_IGM = y!3
+            oscillator z y =
+              V.fromList
+                [ -interp_mar z + interp_o z,
+                  (-interp_sfrd z + interp_e z) + (interp_mar z - interp_o z),
+                  1 / (y V.! 0) * (interp_ow z * (y V.! 4 - y V.! 3))
+                ]
+            result = rk4Solve oscillator t0 h n y0
 
         return 1
 
