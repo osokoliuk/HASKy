@@ -68,6 +68,15 @@ mapLookup m x =
     (Just (a, av), Nothing) -> av
     _ -> error "mapLookup"
 
+-- | Shortcut for the interpolation of two arrays
+makeInterp :: [Double] -> [Double] -> Double -> Double
+makeInterp zs xs = mapLookup $ M.fromList (zip zs xs)
+
+-- | Apply a function to 6-tuple
+mapTuple7 :: (a -> b) -> (a, a, a, a, a, a) -> (b, b, b, b, b, b)
+mapTuple7 f (x1, x2, x3, x4, x5, x6) =
+  (f x1, f x2, f x3, f x4, f x5, f x6)
+
 -- | Helper function for reading the file into a table
 parseLine :: String -> (Double, Double)
 parseLine line =

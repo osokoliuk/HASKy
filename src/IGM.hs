@@ -170,7 +170,12 @@ interGalacticMediumTerms cosmology pk i_kind s_kind h_kind w_kind yield mh_min z
         (\z -> nIntegrate256 (integrand_ISM_Element z) (massDynamical (cosmicTime cosmology z)) 100) <$> z_arr
    in (sfrd_arr, result_SNe, result_SNe_Element, result_Wind, result_ISM, result_ISM_Element)
 
--- | Coupled solver ...
+-- | Solve four copled first-order differential equations that govern the evolution of:
+--    * M_IGM   (1)
+--    * M_ISM   (2)
+--    * Xi_IGM  (3)
+--    * Xi_ISM  (4)
+-- with all equations being taken from the [Daigne et al. 2004]
 igmIsmEvolution :: ReferenceCosmology -> PowerSpectrum -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Yield -> Mhalo -> [(Double, V.Vector Double)]
 igmIsmEvolution cosmology pk i_kind s_kind h_kind w_kind yield mh_min =
   let (h0, om0, ob0, c, gn) = unpackCosmology cosmology
@@ -180,24 +185,15 @@ igmIsmEvolution cosmology pk i_kind s_kind h_kind w_kind yield mh_min =
       terms_arr =
         interGalacticMediumTerms cosmology pk i_kind s_kind h_kind w_kind yield mh_min z_arr
 
-      (sfrd_arr, osn_arr, osni_arr, ow_arr, e_arr, ei_arr) = terms_arr
-
       baryon_mar :: [Double]
       baryon_mar = (\z -> ob0 / om0 * massAccretionRate cosmology m_tot z) <$> z_arr
 
-      interp_osn = mapLookup $ M.fromList (zip z_arr osn_arr)
-      interp_osni = mapLookup $ M.fromList (zip z_arr osni_arr)
-      interp_ow = mapLookup $ M.fromList (zip z_arr ow_arr)
-      interp_e = mapLookup $ M.fromList (zip z_arr e_arr)
-      interp_ei = mapLookup $ M.fromList (zip z_arr ei_arr)
-      interp_sfrd = mapLookup $ M.fromList (zip z_arr sfrd_arr)
+      (interp_sfrd, interp_osn, interp_osni, interp_ow, interp_e, interp_ei) =
+        mapTuple7 (makeInterp z_arr) terms_arr
+
       interp_o = (+) <$> interp_osn <*> interp_ow
       interp_mar = mapLookup $ M.fromList (zip z_arr baryon_mar)
 
-      -- M_ISM = y!0
-      -- M_IGM = y!1
-      -- Xi_ISM = y!2
-      -- Xi_IGM = y!3
       igm_ode z y =
         V.fromList
           [ -interp_mar z + interp_o z,
