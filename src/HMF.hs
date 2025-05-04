@@ -53,10 +53,7 @@ type PowerSpectrum = Wavenumber -> Double
 rh :: ReferenceCosmology -> W_kind -> Mhalo -> Rhalo
 rh cosmology w_kind mh =
   let (h0, om0, ob0, c, gn) = unpackCosmology cosmology
-      rho_mean :: Double
       rho_mean = 3 * h0 ** 2 * om0 / (8 * pi * gn)
-
-      c_smooth :: Double
       c_smooth = 3.3
    in case w_kind of
         TopHat -> (3 * mh / (4 * pi * rho_mean)) ** (1 / 3)
@@ -96,7 +93,6 @@ cosmicVarianceSq cosmology pk mh z w_kind =
           * (pk k)
           * (windowFunction cosmology w_kind k mh) ** 2
 
-      result :: Double
       result = nIntegrate1024 integrand 1e-4 1e4
    in result
 
@@ -108,16 +104,12 @@ cosmicVarianceSq cosmology pk mh z w_kind =
 firstCrossing :: ReferenceCosmology -> PowerSpectrum -> HMF_kind -> W_kind -> Mhalo -> Redshift -> Double
 firstCrossing cosmology pk h_kind w_kind mh z =
   let (h0, om0, ob0, c, gn) = unpackCosmology cosmology
-
-      sigma :: Double
       sigma = sqrt $ cosmicVarianceSq cosmology pk mh z w_kind
 
       -- Critical linear overdensity threshold with
       -- redshift corrections from [Kitayama et al. 1996]
       delta_c :: Redshift -> Double
       delta_c z = 1.686 * (om0 * (1 + z) ** 3) ** 0.0055
-
-      nu :: Double
       nu = delta_c z / sigma
       a_T', a_ST', p, a_T, b_T, c_T :: Double
       (a_T', a_ST', p, a_T, b_T, c_T) = (0.186, 0.3222, 0.3, 1.47, 2.57, 1.19)
@@ -145,19 +137,15 @@ haloMassFunction cosmology pk h_kind w_kind mh z =
 -- in the units of [km^2 s^-2]
 escapeVelocitySq :: ReferenceCosmology -> PowerSpectrum -> HMF_kind -> W_kind -> Mhalo -> Redshift -> Double
 escapeVelocitySq cosmology pk h_kind w_kind mh_min z =
-  let mh_arr :: [Mhalo]
+  let (h0, om0, ob0, c, gn) = unpackCosmology cosmology
       mh_arr = (10 **) <$> [log10 mh_min, log10 mh_min + 0.1 .. 18]
-
-      (h0, om0, ob0, c, gn) = unpackCosmology cosmology
 
       first_crossing = \mh -> firstCrossing cosmology pk h_kind w_kind mh z
 
-      integrand_1 :: Double -> Double -- Integrand for a mass-averaged gravitational potential
       integrand_1 mh =
         mh * (2 * gn * mh * rh cosmology w_kind mh) * first_crossing mh
-
-      integrand_2 :: Double -> Double -- Integrand for the CDM halo density
-      integrand_2 mh = mh * first_crossing mh
+      integrand_2 mh =
+        mh * first_crossing mh
 
       result =
         (nIntegrate256 integrand_1 mh_min (last mh_arr))
