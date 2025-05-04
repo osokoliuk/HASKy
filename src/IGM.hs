@@ -100,10 +100,8 @@ tauMS m
 -- to be used in the next function
 interGalacticMediumTerms :: ReferenceCosmology -> PowerSpectrum -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Yield -> Mhalo -> [Redshift] -> ([Double], [Double], [Double], [Double], [Double], [Double])
 interGalacticMediumTerms cosmology pk i_kind s_kind h_kind w_kind yield mh_min z_arr =
-  let (e_w, e_sn) = (0.02, 0.005)
-      kms_ergMsol = 1.989 * 1e43
-      energy = 2 * 1e51
-      m_up = 100
+  let (e_w, e_sn, kms_ergMsol, energy, m_up) =
+        (0.02, 0.005, 1.989 * 1e43, 2 * 1e51, 100)
 
       t_arr =
         parMap rpar (\z -> cosmicTime cosmology z) z_arr
@@ -181,21 +179,7 @@ igmIsmEvolution cosmology pk i_kind s_kind h_kind w_kind yield mh_min =
             1 / (y V.! 0) * (interp_ow z * (y V.! 3 - y V.! 2) + (interp_osni z - interp_osn z * y V.! 2)),
             1 / (y V.! 1) * ((interp_ei z - interp_e z * y V.! 3) + interp_mar z * (y V.! 2 - y V.! 3) - (interp_osni z - interp_osn z * y V.! 3))
           ]
-      result = rk4Solve igm_ode (minimum z_arr) 0.1 (length z_arr) (V.fromList [1, 1, 0.01, 0.01])
+      -- CHANGE ICs to SUMOTHING APPROPRIATE
+      result =
+        rk4Solve igm_ode (minimum z_arr) 0.1 (length z_arr) (V.fromList [0.9 * m_tot, 0.1 * m_tot, 0, 0])
    in result
-
-main_IGM :: IO ()
-main_IGM =
-  do
-    (k_arr, pk_arr) <- powerSpectrum "data/CAMB_Pk_z=0.txt"
-
-    (mass_arr, yield_arr) <- yieldsHighMass 1 $ Element "C" 12
-
-    let interp_pk :: PowerSpectrum
-        interp_pk = makeInterp k_arr pk_arr
-
-        interp_yield :: Yield
-        interp_yield = makeInterp mass_arr yield_arr
-
-        x = igmIsmEvolution planck18 interp_pk Kroupa DoublePower ST Smooth interp_yield 1e6
-    print x
