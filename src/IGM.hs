@@ -109,9 +109,9 @@ interGalacticMediumTerms cosmology pk i_kind s_kind h_kind w_kind yield mh_min z
       t_arr =
         (\z -> cosmicTime cosmology z) <$> z_arr
       sfrd_arr =
-        (\z -> starFormationRateDensity cosmology pk s_kind h_kind w_kind z) <$> z_arr
+        parMap rseq (\z -> starFormationRateDensity cosmology pk s_kind h_kind w_kind z) z_arr
       vesc_sq_arr =
-        (\z -> escapeVelocitySq cosmology pk h_kind w_kind mh_min z) <$> z_arr
+        parMap rseq (\z -> escapeVelocitySq cosmology pk h_kind w_kind mh_min z) z_arr
 
       sfrd = makeInterp z_arr sfrd_arr
       vesc_sq = makeInterp z_arr vesc_sq_arr

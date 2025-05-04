@@ -16,7 +16,6 @@ yield a Halo Mass Function for a given cosmology (i.e., values of
 Hubble parameter H0, Omega_m0, Omega_b0)
 -}
 
-import Control.Parallel.Strategies
 import Cosmology
 import qualified Data.Map as M
 import Data.Maybe
@@ -128,26 +127,19 @@ firstCrossing cosmology pk h_kind w_kind mh z =
 
 -- | The Halo Mass Function (HMF) itself, uses most of the functions
 -- defined within this module and a differentiation library
-haloMassFunction :: ReferenceCosmology -> PowerSpectrum -> HMF_kind -> W_kind -> [Mhalo] -> Redshift -> [Double]
-haloMassFunction cosmology pk h_kind w_kind mh_arr z =
+haloMassFunction :: ReferenceCosmology -> PowerSpectrum -> HMF_kind -> W_kind -> Mhalo -> Redshift -> Double
+haloMassFunction cosmology pk h_kind w_kind mh z =
   let (h0, om0, ob0, c, gn) = unpackCosmology cosmology
+      rho_mean = 3 * h0 ** 2 * om0 / (8 * pi * gn)
 
       sigma = \mh -> cosmicVarianceSq cosmology pk mh z w_kind
       first_crossing = \mh -> firstCrossing cosmology pk h_kind w_kind mh z
 
-      diff_func :: Double -> Double
       diff_func mh = log . sqrt $ sigma mh
-      dsdm = parMap rseq (\mh -> diffRes $ diffRichardson diff_func 1000 mh) mh_arr
-
-      dsdlogm :: [Double]
-      dsdlogm = zipWith (/) dsdm mh_arr
-
-      rho_mean :: Double
-      rho_mean = 3 * h0 ** 2 * om0 / (8 * pi * gn)
-
-      fdsdlogm :: [Double]
-      fdsdlogm = zipWith (*) dsdlogm (first_crossing <$> mh_arr)
-   in zipWith (*) fdsdlogm ((* (-rho_mean)) <$> mh_arr)
+      dsdm = diffRes $ diffRichardson diff_func 1000 mh
+      dsdlogm = dsdm / mh
+      fdsdlogm = dsdlogm * first_crossing mh
+   in -rho_mean * fdsdlogm * mh
 
 -- | Escape velocity squared of a star from a halo of mass M and radius R at the redshift z,
 -- in the units of [km^2 s^-2]
@@ -167,7 +159,6 @@ escapeVelocitySq cosmology pk h_kind w_kind mh_min z =
       integrand_2 :: Double -> Double -- Integrand for the CDM halo density
       integrand_2 mh = mh * first_crossing mh
 
-      result :: Double
       result =
         (nIntegrate256 integrand_1 mh_min (last mh_arr))
           / (nIntegrate256 integrand_2 mh_min (last mh_arr))
@@ -180,5 +171,5 @@ main_HMF = do
   let interp_pk :: PowerSpectrum
       interp_pk = makeInterp k_arr pk_arr
 
-      vesc = escapeVelocitySq planck18 interp_pk ST TopHat 1e11 0
-  print $ 1.989 * 1e43 * vesc
+      hmf = haloMassFunction planck18 interp_pk ST TopHat 1e11 0
+  print $ hmf

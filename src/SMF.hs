@@ -16,6 +16,7 @@ Hubble parameter H0, Omega_m0, Omega_b0)
 
 -- Import HMF, Cosmology modules (to be used to derive SMF)
 
+import Control.Parallel.Strategies
 import Cosmology
 import qualified Data.Map as M
 import Data.Maybe (fromMaybe)
@@ -116,11 +117,9 @@ stellarMassFunction cosmology pk s_kind h_kind w_kind mh_arr z =
       ms :: Mhalo -> Mstar -- Function that gives stellar mass
       ms mh = mh * (ob0 / om0) * epsStar cosmology s_kind mh z
 
-      ms_arr :: [Mstar]
       ms_arr = ms <$> mh_arr
-
-      hmf_arr :: [Double]
-      hmf_arr = haloMassFunction cosmology pk h_kind w_kind mh_arr z
+      hmf_arr =
+        parMap rseq (\mh -> haloMassFunction cosmology pk h_kind w_kind mh z) mh_arr
 
       ln_factors :: [Double] -- Turns dMh/dMstar into dlnMh/dlog10Mstar
       ln_factors = zipWith (\x y -> x * log 10 / y) ms_arr mh_arr
@@ -137,10 +136,8 @@ starFormationRateDensity :: ReferenceCosmology -> PowerSpectrum -> SMF_kind -> H
 starFormationRateDensity cosmology pk s_kind h_kind w_kind z =
   let mh_arr = (10 **) <$> [6, 6 + 0.1 .. 18]
 
-      hmf_arr :: [Double]
-      hmf_arr = haloMassFunction cosmology pk h_kind w_kind mh_arr z
-
-      dndmh :: [Double] -- Convert dn/dlnMh to dn/dMh
+      hmf_arr =
+        (\mh -> haloMassFunction cosmology pk h_kind w_kind mh z) <$> mh_arr
       dndmh = zipWith (/) hmf_arr mh_arr
 
       interp_hmf :: Double -> Double
