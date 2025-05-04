@@ -15,6 +15,7 @@ observe the chemical evolution of various metals in the IGM/ISM at various
 redshifts.
 -}
 
+import Control.Parallel.Strategies
 import Cosmology
 import Data.List (unzip5)
 import qualified Data.Map as M
@@ -56,7 +57,7 @@ imfNormalisation :: IMF_kind -> Mstar -> Double
 imfNormalisation i_kind mup =
   let m_arr = (10 **) <$> [0.1, 0.1 + 0.1 .. mup]
       integrand m = m * initialMassFunction i_kind m
-   in nIntegrate512 integrand (head m_arr) (last m_arr)
+   in nIntegrate256 integrand (head m_arr) (last m_arr)
 
 normalisedInitialMassFunction :: IMF_kind -> Mstar -> Mstar -> Double
 normalisedInitialMassFunction i_kind mup m =
@@ -141,15 +142,15 @@ interGalacticMediumTerms cosmology pk i_kind s_kind h_kind w_kind yield mh_min z
       integrand_ISM_Element = integrand_SNe_Element
 
       result_SNe =
-        (\z -> e_sn * nIntegrate256 (integrand_SNe z) (m_down z) m_up) <$> z_arr
+        parMap rseq (\z -> e_sn * nIntegrate256 (integrand_SNe z) (m_down z) m_up) z_arr
       result_SNe_Element =
-        (\z -> e_sn * nIntegrate256 (integrand_SNe_Element z) (m_down z) m_up) <$> z_arr
+        parMap rseq (\z -> e_sn * nIntegrate256 (integrand_SNe_Element z) (m_down z) m_up) z_arr
       result_Wind =
-        (\z -> e_w * nIntegrate256 (integrand_Wind z) (m_down z) m_up) <$> z_arr
+        parMap rseq (\z -> e_w * nIntegrate256 (integrand_Wind z) (m_down z) m_up) z_arr
       result_ISM =
-        (\z -> nIntegrate256 (integrand_SNe z) (massDynamical (cosmicTime cosmology z)) m_up) <$> z_arr
+        parMap rseq (\z -> nIntegrate256 (integrand_SNe z) (massDynamical (cosmicTime cosmology z)) m_up) z_arr
       result_ISM_Element =
-        (\z -> nIntegrate256 (integrand_ISM_Element z) (massDynamical (cosmicTime cosmology z)) m_up) <$> z_arr
+        parMap rseq (\z -> nIntegrate256 (integrand_ISM_Element z) (massDynamical (cosmicTime cosmology z)) m_up) z_arr
    in (sfrd_arr, result_SNe, result_SNe_Element, result_Wind, result_ISM, result_ISM_Element)
 
 -- | Solve four copled first-order differential equations that govern the evolution of:
@@ -167,7 +168,7 @@ igmIsmEvolution cosmology pk i_kind s_kind h_kind w_kind yield mh_min =
       terms_arr =
         interGalacticMediumTerms cosmology pk i_kind s_kind h_kind w_kind yield mh_min z_arr
       mar_arr =
-        (\z -> ob0 / om0 * massAccretionRate cosmology m_tot z) <$> z_arr
+        parMap rseq (\z -> ob0 / om0 * massAccretionRate cosmology m_tot z) z_arr
 
       (interp_sfrd, interp_osn, interp_osni, interp_ow, interp_e, interp_ei) =
         mapTuple6 (makeInterp z_arr) terms_arr

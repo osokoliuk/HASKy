@@ -16,6 +16,7 @@ yield a Halo Mass Function for a given cosmology (i.e., values of
 Hubble parameter H0, Omega_m0, Omega_b0)
 -}
 
+import Control.Parallel.Strategies
 import Cosmology
 import qualified Data.Map as M
 import Data.Maybe
@@ -136,7 +137,7 @@ haloMassFunction cosmology pk h_kind w_kind mh_arr z =
 
       diff_func :: Double -> Double
       diff_func mh = log . sqrt $ sigma mh
-      dsdm = (\mh -> diffRes $ diffRichardson diff_func 1000 mh) <$> mh_arr
+      dsdm = parMap rseq (\mh -> diffRes $ diffRichardson diff_func 1000 mh) mh_arr
 
       dsdlogm :: [Double]
       dsdlogm = zipWith (/) dsdm mh_arr

@@ -76,7 +76,8 @@ library
       vector,
       text,
       GaussQuadIntegration,
-      mtl 
+      mtl,
+      parallel
     -- Directories containing source files.
     hs-source-dirs:   src
 
