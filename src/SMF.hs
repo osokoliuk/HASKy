@@ -151,13 +151,3 @@ starFormationRateDensity cosmology pk s_kind h_kind w_kind z =
       result :: Double
       result = nIntegrate256 integrand (minimum mh_arr) (maximum mh_arr)
    in result
-
-main_SMF =
-  do
-    (k_arr, pk_arr) <- powerSpectrum "data/CAMB_Pk_z=0.txt"
-
-    let interp_pk :: PowerSpectrum
-        interp_pk = makeInterp k_arr pk_arr
-
-        x = starFormationRateDensity planck18 interp_pk DoublePower ST Smooth 0
-    print x

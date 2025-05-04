@@ -151,13 +151,3 @@ escapeVelocitySq cosmology pk h_kind w_kind mh_min z =
         (nIntegrate256 integrand_1 mh_min (last mh_arr))
           / (nIntegrate256 integrand_2 mh_min (last mh_arr))
    in result
-
-main_HMF :: IO ()
-main_HMF = do
-  (k_arr, pk_arr) <- powerSpectrum "data/CAMB_Pk_z=0.txt"
-
-  let interp_pk :: PowerSpectrum
-      interp_pk = makeInterp k_arr pk_arr
-
-      hmf = haloMassFunction planck18 interp_pk ST TopHat 1e11 0
-  print $ hmf
