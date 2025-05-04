@@ -88,116 +88,96 @@ windowFunction cosmology w_kind k mh =
 
 -- | Cosmic variance squared, usually referred to as sigma^2(R,z)
 -- Derived by integrating a matter power spectrum and a window function
-cosmicVarianceSq :: FilePath -> ReferenceCosmology -> PowerSpectrum -> Mhalo -> Redshift -> W_kind -> IO Double
-cosmicVarianceSq filepath cosmology pk mh z w_kind =
-  do
-    let integrand :: Wavenumber -> Double
-        integrand k =
-          (k ** 2 / (2 * pi ** 2))
-            * (pk k)
-            * (windowFunction cosmology w_kind k mh) ** 2
+cosmicVarianceSq :: ReferenceCosmology -> PowerSpectrum -> Mhalo -> Redshift -> W_kind -> Double
+cosmicVarianceSq cosmology pk mh z w_kind =
+  let integrand :: Wavenumber -> Double
+      integrand k =
+        (k ** 2 / (2 * pi ** 2))
+          * (pk k)
+          * (windowFunction cosmology w_kind k mh) ** 2
 
-        result :: Double
-        result = nIntegrate1024 integrand 1e-4 1e4
-    return $ result
+      result :: Double
+      result = nIntegrate1024 integrand 1e-4 1e4
+   in result
 
 -- | First-crossing distribution, crucial for the derivation of a
 -- Halo Mass Function afterwards, again you have a choice of two:
 --    * Sheth-Tormen
 --    * Tinker
 -- We are planning to add more options in the near future
-firstCrossing :: FilePath -> ReferenceCosmology -> PowerSpectrum -> HMF_kind -> W_kind -> Mhalo -> Redshift -> IO Double
-firstCrossing filepath cosmology pk h_kind w_kind mh z =
-  do
-    sigma <- cosmicVarianceSq filepath cosmology pk mh z w_kind
+firstCrossing :: ReferenceCosmology -> PowerSpectrum -> HMF_kind -> W_kind -> Mhalo -> Redshift -> Double
+firstCrossing cosmology pk h_kind w_kind mh z =
+  let (h0, om0, ob0, c, gn) = unpackCosmology cosmology
 
-    let (h0, om0, ob0, c, gn) = unpackCosmology cosmology
+      sigma :: Double
+      sigma = sqrt $ cosmicVarianceSq cosmology pk mh z w_kind
 
-        sigma_eval :: Double
-        sigma_eval = sqrt sigma
+      -- Critical linear overdensity threshold with
+      -- redshift corrections from [Kitayama et al. 1996]
+      delta_c :: Redshift -> Double
+      delta_c z = 1.686 * (om0 * (1 + z) ** 3) ** 0.0055
 
-        -- Critical linear overdensity threshold with
-        -- redshift corrections from [Kitayama et al. 1996]
-        delta_c :: Redshift -> Double
-        delta_c z = 1.686 * (om0 * (1 + z) ** 3) ** 0.0055
-
-        nu :: Double
-        nu = delta_c z / sigma_eval -- CHANGE DELTA_c!!!!
-        a_T', a_ST', p, a_T, b_T, c_T :: Double
-        (a_T', a_ST', p, a_T, b_T, c_T) = (0.186, 0.3222, 0.3, 1.47, 2.57, 1.19)
-    return $ case h_kind of
-      Tinker -> a_T' * ((sigma_eval / b_T) ** (-a_T) + 1) * exp (-c_T / sigma_eval ** 2)
-      ST -> a_ST' * sqrt (2 * nu ** 2 / pi) * (1 + nu ** (-2 * p)) * exp (-nu ** 2 / 2)
+      nu :: Double
+      nu = delta_c z / sigma
+      a_T', a_ST', p, a_T, b_T, c_T :: Double
+      (a_T', a_ST', p, a_T, b_T, c_T) = (0.186, 0.3222, 0.3, 1.47, 2.57, 1.19)
+   in case h_kind of
+        Tinker -> a_T' * ((sigma / b_T) ** (-a_T) + 1) * exp (-c_T / sigma ** 2)
+        ST -> a_ST' * sqrt (2 * nu ** 2 / pi) * (1 + nu ** (-2 * p)) * exp (-nu ** 2 / 2)
 
 -- | The Halo Mass Function (HMF) itself, uses most of the functions
 -- defined within this module and a differentiation library
-haloMassFunction :: FilePath -> ReferenceCosmology -> HMF_kind -> W_kind -> [Mhalo] -> Redshift -> IO [Double]
-haloMassFunction filepath cosmology h_kind w_kind mh_arr z =
-  do
-    -- Map arrays for power spectrum, variance and first crossing distributions
-    (k_arr, pk_arr) <- powerSpectrum filepath
+haloMassFunction :: ReferenceCosmology -> PowerSpectrum -> HMF_kind -> W_kind -> [Mhalo] -> Redshift -> [Double]
+haloMassFunction cosmology pk h_kind w_kind mh_arr z =
+  let (h0, om0, ob0, c, gn) = unpackCosmology cosmology
 
-    let interp_pk :: PowerSpectrum
-        interp_pk = mapLookup (M.fromList (zip k_arr pk_arr))
+      sigma = \mh -> cosmicVarianceSq cosmology pk mh z w_kind
+      first_crossing = \mh -> firstCrossing cosmology pk h_kind w_kind mh z
 
-    sigma_arr <- mapM (\mh -> cosmicVarianceSq filepath cosmology interp_pk mh z w_kind) mh_arr
-    first_crossing_arr <- mapM (\mh -> firstCrossing filepath cosmology interp_pk h_kind w_kind mh z) mh_arr
+      diff_func :: Double -> Double
+      diff_func mh = log . sqrt $ sigma mh
+      dsdm = (\mh -> diffRes $ diffRichardson diff_func 1000 mh) <$> mh_arr
 
-    let (h0, om0, ob0, c, gn) = unpackCosmology cosmology
+      dsdlogm :: [Double]
+      dsdlogm = zipWith (/) dsdm mh_arr
 
-        interp_sigma :: Double -> Double -- Interpolate cosmic variance
-        interp_sigma = mapLookup (M.fromList (zip mh_arr sigma_arr))
+      rho_mean :: Double
+      rho_mean = 3 * h0 ** 2 * om0 / (8 * pi * gn)
 
-        diff_func :: Double -> Double
-        diff_func mh = log . sqrt $ interp_sigma mh
-        dsdm = (\mh -> diffRes $ diffRichardson diff_func 1000 mh) <$> mh_arr
-
-        dsdlogm :: [Double]
-        dsdlogm = zipWith (/) dsdm mh_arr
-
-        rho_mean :: Double
-        rho_mean = 3 * h0 ** 2 * om0 / (8 * pi * gn)
-
-        fdsdlogm :: [Double]
-        fdsdlogm = zipWith (*) dsdlogm first_crossing_arr
-    return $ zipWith (*) fdsdlogm ((* (-rho_mean)) <$> mh_arr)
+      fdsdlogm :: [Double]
+      fdsdlogm = zipWith (*) dsdlogm (first_crossing <$> mh_arr)
+   in zipWith (*) fdsdlogm ((* (-rho_mean)) <$> mh_arr)
 
 -- | Escape velocity squared of a star from a halo of mass M and radius R at the redshift z,
 -- in the units of [km^2 s^-2]
-escapeVelocitySq :: FilePath -> ReferenceCosmology -> HMF_kind -> W_kind -> Mhalo -> Redshift -> IO Double
-escapeVelocitySq filepath cosmology h_kind w_kind mh_min z =
-  do
-    -- Map arrays for power spectrum and the first crossing distribution
-    (k_arr, pk_arr) <- powerSpectrum filepath
+escapeVelocitySq :: ReferenceCosmology -> PowerSpectrum -> HMF_kind -> W_kind -> Mhalo -> Redshift -> Double
+escapeVelocitySq cosmology pk h_kind w_kind mh_min z =
+  let mh_arr :: [Mhalo]
+      mh_arr = (10 **) <$> [log10 mh_min, log10 mh_min + 0.1 .. 18]
 
-    let interp_pk :: PowerSpectrum
-        interp_pk = mapLookup (M.fromList (zip k_arr pk_arr))
+      (h0, om0, ob0, c, gn) = unpackCosmology cosmology
 
-        mh_arr :: [Mhalo]
-        mh_arr = (10 **) <$> [log10 mh_min, log10 mh_min + 0.1 .. 18]
+      first_crossing = \mh -> firstCrossing cosmology pk h_kind w_kind mh z
 
-    first_crossing_arr <- mapM (\mh -> firstCrossing filepath cosmology interp_pk h_kind w_kind mh z) mh_arr
+      integrand_1 :: Double -> Double -- Integrand for a mass-averaged gravitational potential
+      integrand_1 mh =
+        mh * (2 * gn * mh * rh cosmology w_kind mh) * first_crossing mh
 
-    let (h0, om0, ob0, c, gn) = unpackCosmology cosmology
+      integrand_2 :: Double -> Double -- Integrand for the CDM halo density
+      integrand_2 mh = mh * first_crossing mh
 
-        interp_first_crossing :: Double -> Double
-        interp_first_crossing = mapLookup (M.fromList (zip mh_arr first_crossing_arr))
-
-        integrand_1 :: Double -> Double -- Integrand for a mass-averaged gravitational potential
-        integrand_1 mh =
-          mh * (2 * gn * mh * rh cosmology w_kind mh) * interp_first_crossing mh
-
-        integrand_2 :: Double -> Double -- Integrand for the CDM halo density
-        integrand_2 mh = mh * interp_first_crossing mh
-
-        result :: Double
-        result =
-          (nIntegrate1024 integrand_1 mh_min (last mh_arr))
-            / (nIntegrate1024 integrand_2 mh_min (last mh_arr))
-
-    return $ result
+      result :: Double
+      result =
+        (nIntegrate256 integrand_1 mh_min (last mh_arr))
+          / (nIntegrate256 integrand_2 mh_min (last mh_arr))
+   in result
 
 main_HMF :: IO ()
 main_HMF = do
-  x <- escapeVelocitySq "../data/CAMB_Pk_z=0.txt" planck18 ST TopHat 1e11 0
-  print $ 1.989 * 1e43 * x
+  (k_arr, pk_arr) <- powerSpectrum "data/CAMB_Pk_z=0.txt"
+
+  let interp_pk :: PowerSpectrum
+      interp_pk = mapLookup (M.fromList (zip k_arr pk_arr))
+
+      vesc = escapeVelocitySq planck18 interp_pk ST TopHat 1e11 0
+  print $ 1.989 * 1e43 * vesc

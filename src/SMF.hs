@@ -109,53 +109,58 @@ starFormationRate s_kind cosmology mh z =
    in ep * ob0 / om0 * massAccretionRate cosmology mh z
 
 -- | Stellar mass function, derived from the HMF and SFE via a simple chain rule
-stellarMassFunction :: FilePath -> ReferenceCosmology -> SMF_kind -> HMF_kind -> W_kind -> [Mhalo] -> Redshift -> IO ([Mstar], [Double])
-stellarMassFunction filepath cosmology s_kind h_kind w_kind mh_arr z =
-  do
-    hmf_arr <- haloMassFunction filepath cosmology h_kind w_kind mh_arr z
+stellarMassFunction :: ReferenceCosmology -> PowerSpectrum -> SMF_kind -> HMF_kind -> W_kind -> [Mhalo] -> Redshift -> ([Mstar], [Double])
+stellarMassFunction cosmology pk s_kind h_kind w_kind mh_arr z =
+  let (h0, om0, ob0, c, gn) = unpackCosmology cosmology
 
-    let (h0, om0, ob0, c, gn) = unpackCosmology cosmology
+      ms :: Mhalo -> Mstar -- Function that gives stellar mass
+      ms mh = mh * (ob0 / om0) * epsStar cosmology s_kind mh z
 
-        ms :: Mhalo -> Mstar -- Function that gives stellar mass
-        ms mh = mh * (ob0 / om0) * epsStar cosmology s_kind mh z
+      ms_arr :: [Mstar]
+      ms_arr = ms <$> mh_arr
 
-        ms_arr :: [Mstar]
-        ms_arr = ms <$> mh_arr
+      hmf_arr :: [Double]
+      hmf_arr = haloMassFunction cosmology pk h_kind w_kind mh_arr z
 
-        ln_factors :: [Double] -- Turns dMh/dMstar into dlnMh/dlog10Mstar
-        ln_factors = zipWith (\x y -> x * log 10 / y) ms_arr mh_arr
+      ln_factors :: [Double] -- Turns dMh/dMstar into dlnMh/dlog10Mstar
+      ln_factors = zipWith (\x y -> x * log 10 / y) ms_arr mh_arr
 
-        dmhdms :: [Double] -- Part of the chain rule to turn HMF into SMF
-        dmhdms =
-          zipWith (/) ln_factors $
-            (\mh -> diffRes $ diffRichardson ms 10 mh) <$> mh_arr
-
-    return $ (ms_arr, zipWith (\x y -> x * y) hmf_arr dmhdms)
+      dmhdms :: [Double] -- Part of the chain rule to turn HMF into SMF
+      dmhdms =
+        zipWith (/) ln_factors $
+          (\mh -> diffRes $ diffRichardson ms 10 mh) <$> mh_arr
+   in (ms_arr, zipWith (\x y -> x * y) hmf_arr dmhdms)
 
 -- | Star formation rate density,
 -- to be used in the IGM/ISM mass fraction differential equations
-starFormationRateDensity :: FilePath -> ReferenceCosmology -> SMF_kind -> HMF_kind -> W_kind -> Redshift -> IO Double
-starFormationRateDensity filepath cosmology s_kind h_kind w_kind z =
+starFormationRateDensity :: ReferenceCosmology -> PowerSpectrum -> SMF_kind -> HMF_kind -> W_kind -> Redshift -> Double
+starFormationRateDensity cosmology pk s_kind h_kind w_kind z =
   let mh_arr = (10 **) <$> [6, 6 + 0.1 .. 18]
-   in do
-        hmf_arr <- haloMassFunction filepath cosmology h_kind w_kind mh_arr z
 
-        let dndmh :: [Double] -- Convert dn/dlnMh to dn/dMh
-            dndmh = zipWith (/) hmf_arr mh_arr
+      hmf_arr :: [Double]
+      hmf_arr = haloMassFunction cosmology pk h_kind w_kind mh_arr z
 
-            interp_hmf :: Double -> Double
-            interp_hmf = mapLookup (M.fromList (zip mh_arr dndmh))
+      dndmh :: [Double] -- Convert dn/dlnMh to dn/dMh
+      dndmh = zipWith (/) hmf_arr mh_arr
 
-            integrand :: Double -> Double -- Function giving epsStar * Ob0/Om0 * dn/dt
-            integrand mh =
-              (interp_hmf mh)
-                * (starFormationRate s_kind cosmology mh z)
+      interp_hmf :: Double -> Double
+      interp_hmf = mapLookup (M.fromList (zip mh_arr dndmh))
 
-            result :: Double
-            result = nIntegrate512 integrand (minimum mh_arr) (maximum mh_arr)
+      integrand :: Double -> Double -- Function giving epsStar * Ob0/Om0 * dn/dt
+      integrand mh =
+        (interp_hmf mh)
+          * (starFormationRate s_kind cosmology mh z)
 
-        return $ result
+      result :: Double
+      result = nIntegrate256 integrand (minimum mh_arr) (maximum mh_arr)
+   in result
 
-main_SMF = do
-  x <- starFormationRateDensity "data/CAMB_Pk_z=0.txt" planck18 DoublePower ST Smooth 0
-  print $ x
+main_SMF =
+  do
+    (k_arr, pk_arr) <- powerSpectrum "data/CAMB_Pk_z=0.txt"
+
+    let interp_pk :: PowerSpectrum
+        interp_pk = mapLookup (M.fromList (zip k_arr pk_arr))
+
+        x = starFormationRateDensity planck18 interp_pk DoublePower ST Smooth 0
+    print x

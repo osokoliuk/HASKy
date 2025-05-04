@@ -23,6 +23,8 @@ import Text.Read (Read (..))
 
 type Metallicity = Double
 
+type Yield = Double -> Double
+
 yieldsHighMass :: Metallicity -> Element -> IO ([Double], [Double])
 yieldsHighMass metal_frac elem =
   let metal_str
