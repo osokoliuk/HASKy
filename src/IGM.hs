@@ -184,22 +184,21 @@ interGalacticMediumTerms filepath cosmology i_kind s_kind h_kind w_kind elem mh_
 
         return $ (result_SNe, result_SNe_Element, result_Wind, result_ISM, result_ISM_Element)
 
-{-
 -- | Coupled solver ...
-igmIsmEvolution :: FilePath -> ReferenceCosmology -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Element -> Mhalo -> Redshift -> IO [(Double, V.Vector Double)]
-igmIsmEvolution filepath cosmology i_kind s_kind h_kind w_kind elem mh_min z =
+igmIsmEvolution :: FilePath -> ReferenceCosmology -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Element -> Mhalo -> IO [(Double, V.Vector Double)]
+igmIsmEvolution filepath cosmology i_kind s_kind h_kind w_kind elem mh_min =
   let z_arr = [20.0, 20.0 - 0.1 .. 0]
       m_tot = 6 * 1e22
    in do
         terms_arr <-
-          mapM (\z -> interGalacticMediumTerms filepath cosmology i_kind s_kind h_kind w_kind elem mh_min z) <$> z_arr
+          interGalacticMediumTerms filepath cosmology i_kind s_kind h_kind w_kind elem mh_min z_arr
 
         sfrd_arr <-
           mapM (\z -> starFormationRateDensity filepath cosmology s_kind h_kind w_kind z) z_arr
 
         let (h0, om0, ob0, c, gn) = unpackCosmology cosmology
 
-            (osn_arr, osni_arr, ow_arr, e_arr, ei_arr) = unzip5 terms_arr
+            (osn_arr, osni_arr, ow_arr, e_arr, ei_arr) = terms_arr
 
             baryon_mar :: [Double]
             baryon_mar = (\z -> ob0 / om0 * massAccretionRate cosmology m_tot z) <$> z_arr
@@ -221,14 +220,14 @@ igmIsmEvolution filepath cosmology i_kind s_kind h_kind w_kind elem mh_min z =
               V.fromList
                 [ -interp_mar z + interp_o z,
                   (-interp_sfrd z + interp_e z) + (interp_mar z - interp_o z),
-                  1 / (y V.! 0) * (interp_ow z * (y V.! 4 - y V.! 3) + (interp_osni z - interp_osn z * y V.! 3)),
-                  1 / (y V.! 1) * ((interp_ei z - interp_e z * y V.! 4) + interp_mar z * (y V.! 3 - y V.! 4) - (interp_osni z - interp_osn z * y V.! 4))
+                  1 / (y V.! 0) * (interp_ow z * (y V.! 3 - y V.! 2) + (interp_osni z - interp_osn z * y V.! 2)),
+                  1 / (y V.! 1) * ((interp_ei z - interp_e z * y V.! 3) + interp_mar z * (y V.! 2 - y V.! 3) - (interp_osni z - interp_osn z * y V.! 3))
                 ]
             result = rk4Solve igm_ode (minimum z_arr) 0.1 (length z_arr) (V.fromList [1, 1, 0.01, 0.01])
 
         return result
--}
+
 main_IGM :: IO ()
 main_IGM = do
-  x <- interGalacticMediumTerms "data/CAMB_Pk_z=0.txt" planck18 Kroupa DoublePower ST Smooth (Element "C" 12) 1e6 [20, 20 - 0.5 .. 0]
+  x <- igmIsmEvolution "data/CAMB_Pk_z=0.txt" planck18 Kroupa DoublePower ST Smooth (Element "C" 12) 1e6
   print $ x
