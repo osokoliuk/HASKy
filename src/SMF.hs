@@ -144,7 +144,7 @@ starFormationRateDensity cosmology pk s_kind h_kind w_kind z =
       dndmh = zipWith (/) hmf_arr mh_arr
 
       interp_hmf :: Double -> Double
-      interp_hmf = mapLookup (M.fromList (zip mh_arr dndmh))
+      interp_hmf = makeInterp mh_arr dndmh
 
       integrand :: Double -> Double -- Function giving epsStar * Ob0/Om0 * dn/dt
       integrand mh =
@@ -160,7 +160,7 @@ main_SMF =
     (k_arr, pk_arr) <- powerSpectrum "data/CAMB_Pk_z=0.txt"
 
     let interp_pk :: PowerSpectrum
-        interp_pk = mapLookup (M.fromList (zip k_arr pk_arr))
+        interp_pk = makeInterp k_arr pk_arr
 
         x = starFormationRateDensity planck18 interp_pk DoublePower ST Smooth 0
     print x

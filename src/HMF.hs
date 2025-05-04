@@ -177,7 +177,7 @@ main_HMF = do
   (k_arr, pk_arr) <- powerSpectrum "data/CAMB_Pk_z=0.txt"
 
   let interp_pk :: PowerSpectrum
-      interp_pk = mapLookup (M.fromList (zip k_arr pk_arr))
+      interp_pk = makeInterp k_arr pk_arr
 
       vesc = escapeVelocitySq planck18 interp_pk ST TopHat 1e11 0
   print $ 1.989 * 1e43 * vesc

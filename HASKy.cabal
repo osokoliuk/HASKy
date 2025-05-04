@@ -75,7 +75,8 @@ library
       containers,
       vector,
       text,
-      GaussQuadIntegration
+      GaussQuadIntegration,
+      mtl 
     -- Directories containing source files.
     hs-source-dirs:   src
 

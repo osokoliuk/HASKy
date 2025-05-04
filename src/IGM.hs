@@ -33,12 +33,10 @@ data IMF_kind
 
 initialMassFunction :: IMF_kind -> Mstar -> Double
 initialMassFunction i_kind m =
-  let alpha0, alpha1, alpha2, k0, k1, k2 :: Double
-      (alpha0, alpha1, alpha2, m1, m2, k0, k1, k2) =
+  let (alpha0, alpha1, alpha2, m1, m2, k0, k1, k2) =
         (-0.3, -1.3, -2.3, 1, 0.08, 0.5, k0 * m1 ** (alpha0 - alpha1), k1 * m2 ** (alpha1 - alpha2))
-
-      a_Ch, b_Ch, center_Ch, sigma_Ch :: Double
-      (a_Ch, b_Ch, center_Ch, sigma_Ch) = (0.85, 0.24, 0.079, 0.69)
+      (a_Ch, b_Ch, center_Ch, sigma_Ch) =
+        (0.85, 0.24, 0.079, 0.69)
    in case i_kind of
         -- Salpeter et al. 1955 IMF (single power-law)
         Salpeter -> m ** (-2.35)
@@ -69,8 +67,12 @@ normalisedInitialMassFunction i_kind m =
 -- calculated according to [Iben & Tutukov 1984] in the units of [Msol]
 massRemnant :: Mstar -> Metallicity -> Double
 massRemnant m metal_frac
-  | m >= 0.9 && m <= 8 = (mapLookup $ remnantMediumMass metal_frac) m
-  | m <= 40 = (mapLookup $ remnantHighMass metal_frac) m
+  | m >= 0.9 && m <= 8 =
+      let (mi, mr) = (unzip . M.toList) (remnantMediumMass metal_frac)
+       in makeInterp mi mr $ m
+  | m <= 40 =
+      let (mi, mr) = (unzip . M.toList) (remnantHighMass metal_frac)
+       in makeInterp mi mr $ m
   | otherwise =
       extrapolate
         m
@@ -94,78 +96,56 @@ tauMS m
   | m <= 60 = 10 ** (-0.86 * log10 m - 0.94)
   | otherwise = 1.2 * m ** (-1.85) + 0.003
 
+-- | Some of the terms (IGM/ISM outflows for all mass and a specific element yield, SFRD),
+-- to be used in the next function
 interGalacticMediumTerms :: ReferenceCosmology -> PowerSpectrum -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Yield -> Mhalo -> [Redshift] -> ([Double], [Double], [Double], [Double], [Double], [Double])
 interGalacticMediumTerms cosmology pk i_kind s_kind h_kind w_kind yield mh_min z_arr =
-  let t_arr = (\z -> cosmicTime cosmology z) <$> z_arr
-
-      (e_w, e_sn) = (0.02, 0.005)
+  let (e_w, e_sn) = (0.02, 0.005)
       kms_ergMsol = 1.989 * 1e43
       energy = 2 * 1e51
 
+      t_arr =
+        (\z -> cosmicTime cosmology z) <$> z_arr
       sfrd_arr =
         (\z -> starFormationRateDensity cosmology pk s_kind h_kind w_kind z) <$> z_arr
       vesc_sq_arr =
         (\z -> escapeVelocitySq cosmology pk h_kind w_kind mh_min z) <$> z_arr
 
-      sfrd = mapLookup (M.fromList (zip z_arr sfrd_arr))
-      vesc_sq = mapLookup (M.fromList (zip z_arr vesc_sq_arr))
+      sfrd = makeInterp z_arr sfrd_arr
+      vesc_sq = makeInterp z_arr vesc_sq_arr
+      time = makeInterp t_arr z_arr
 
-      massDynamical :: Double -> Double
       massDynamical t =
         let mass_range = [0.1, 0.1 + 0.5 .. 100]
-            interp_tau = mapLookup (M.fromList (zip (tauMS <$> mass_range) mass_range))
+            interp_tau = makeInterp (tauMS <$> mass_range) mass_range
          in interp_tau t
 
-      interp_time :: Double -> Double
-      interp_time = mapLookup (M.fromList (zip t_arr z_arr))
-
-      z_target :: Double -> Double -> Double
-      z_target z m = interp_time (cosmicTime cosmology z - tauMS m)
-
-      m_down :: Double -> Double
+      z_target z m = time (cosmicTime cosmology z - tauMS m)
       m_down z = maximum [1e8, (massDynamical (cosmicTime cosmology z))]
 
-      kms_ergMsol :: Double
-
-      integrand_SNe :: Double -> Double -> Double
       integrand_SNe z m =
         normalisedInitialMassFunction i_kind m
           * sfrd (z_target z m)
           * (m - massRemnant m 0.1)
-
-      integrand_SNe_Element :: Double -> Double -> Double
       integrand_SNe_Element z m =
         normalisedInitialMassFunction i_kind m
           * sfrd (z_target z m)
           * yield m
           * (m - massRemnant m 0.1)
-
-      integrand_Wind :: Double -> Double -> Double
       integrand_Wind z m =
         normalisedInitialMassFunction i_kind m
           * sfrd (z_target z m)
           * (2 * energy / (kms_ergMsol * vesc_sq z))
-
-      integrand_ISM_Element :: Double -> Double -> Double
       integrand_ISM_Element = integrand_SNe_Element
 
-      result_SNe :: [Double]
       result_SNe =
         (\z -> e_sn * nIntegrate256 (integrand_SNe z) (m_down z) 100) <$> z_arr
-
-      result_SNe_Element :: [Double]
       result_SNe_Element =
         (\z -> e_sn * nIntegrate256 (integrand_SNe_Element z) (m_down z) 100) <$> z_arr
-
-      result_Wind :: [Double]
       result_Wind =
         (\z -> e_w * nIntegrate256 (integrand_Wind z) (m_down z) 100) <$> z_arr
-
-      result_ISM :: [Double]
       result_ISM =
         (\z -> nIntegrate256 (integrand_SNe z) (massDynamical (cosmicTime cosmology z)) 100) <$> z_arr
-
-      result_ISM_Element :: [Double]
       result_ISM_Element =
         (\z -> nIntegrate256 (integrand_ISM_Element z) (massDynamical (cosmicTime cosmology z)) 100) <$> z_arr
    in (sfrd_arr, result_SNe, result_SNe_Element, result_Wind, result_ISM, result_ISM_Element)
@@ -184,15 +164,13 @@ igmIsmEvolution cosmology pk i_kind s_kind h_kind w_kind yield mh_min =
 
       terms_arr =
         interGalacticMediumTerms cosmology pk i_kind s_kind h_kind w_kind yield mh_min z_arr
-
-      baryon_mar :: [Double]
-      baryon_mar = (\z -> ob0 / om0 * massAccretionRate cosmology m_tot z) <$> z_arr
+      mar_arr =
+        (\z -> ob0 / om0 * massAccretionRate cosmology m_tot z) <$> z_arr
 
       (interp_sfrd, interp_osn, interp_osni, interp_ow, interp_e, interp_ei) =
-        mapTuple7 (makeInterp z_arr) terms_arr
-
+        mapTuple6 (makeInterp z_arr) terms_arr
+      interp_mar = makeInterp z_arr mar_arr
       interp_o = (+) <$> interp_osn <*> interp_ow
-      interp_mar = mapLookup $ M.fromList (zip z_arr baryon_mar)
 
       igm_ode z y =
         V.fromList
@@ -212,10 +190,10 @@ main_IGM =
     (mass_arr, yield_arr) <- yieldsHighMass 1 $ Element "C" 12
 
     let interp_pk :: PowerSpectrum
-        interp_pk = mapLookup (M.fromList (zip k_arr pk_arr))
+        interp_pk = makeInterp k_arr pk_arr
 
         interp_yield :: Yield
-        interp_yield = mapLookup (M.fromList (zip mass_arr yield_arr))
+        interp_yield = makeInterp mass_arr yield_arr
 
         x = igmIsmEvolution planck18 interp_pk Kroupa DoublePower ST Smooth interp_yield 1e6
     print x
