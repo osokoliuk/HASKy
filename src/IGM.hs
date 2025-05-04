@@ -52,15 +52,15 @@ initialMassFunction i_kind m =
 
 -- | Next two functions normalise IMF between m_inf = 0.1 Msol and m_sup = 100 Msol
 -- so that it can acts as a PDF in that range
-imfNormalisation :: IMF_kind -> Double
-imfNormalisation i_kind =
-  let m_arr = (10 **) <$> [0.1, 0.1 + 0.1 .. 100]
+imfNormalisation :: IMF_kind -> Mstar -> Double
+imfNormalisation i_kind mup =
+  let m_arr = (10 **) <$> [0.1, 0.1 + 0.1 .. mup]
       integrand m = m * initialMassFunction i_kind m
    in nIntegrate512 integrand (head m_arr) (last m_arr)
 
-normalisedInitialMassFunction :: IMF_kind -> Mstar -> Double
-normalisedInitialMassFunction i_kind m =
-  let norm = imfNormalisation i_kind
+normalisedInitialMassFunction :: IMF_kind -> Mstar -> Mstar -> Double
+normalisedInitialMassFunction i_kind mup m =
+  let norm = imfNormalisation i_kind mup
    in (initialMassFunction i_kind m) / norm
 
 -- | Mass of a remnant produced by the supernova,
@@ -103,6 +103,7 @@ interGalacticMediumTerms cosmology pk i_kind s_kind h_kind w_kind yield mh_min z
   let (e_w, e_sn) = (0.02, 0.005)
       kms_ergMsol = 1.989 * 1e43
       energy = 2 * 1e51
+      m_up = 100
 
       t_arr =
         (\z -> cosmicTime cosmology z) <$> z_arr
@@ -122,32 +123,33 @@ interGalacticMediumTerms cosmology pk i_kind s_kind h_kind w_kind yield mh_min z
 
       z_target z m = time (cosmicTime cosmology z - tauMS m)
       m_down z = maximum [1e8, (massDynamical (cosmicTime cosmology z))]
+      norm_imf = normalisedInitialMassFunction i_kind m_up
 
       integrand_SNe z m =
-        normalisedInitialMassFunction i_kind m
+        norm_imf m
           * sfrd (z_target z m)
           * (m - massRemnant m 0.1)
       integrand_SNe_Element z m =
-        normalisedInitialMassFunction i_kind m
+        norm_imf m
           * sfrd (z_target z m)
           * yield m
           * (m - massRemnant m 0.1)
       integrand_Wind z m =
-        normalisedInitialMassFunction i_kind m
+        norm_imf m
           * sfrd (z_target z m)
           * (2 * energy / (kms_ergMsol * vesc_sq z))
       integrand_ISM_Element = integrand_SNe_Element
 
       result_SNe =
-        (\z -> e_sn * nIntegrate256 (integrand_SNe z) (m_down z) 100) <$> z_arr
+        (\z -> e_sn * nIntegrate256 (integrand_SNe z) (m_down z) m_up) <$> z_arr
       result_SNe_Element =
-        (\z -> e_sn * nIntegrate256 (integrand_SNe_Element z) (m_down z) 100) <$> z_arr
+        (\z -> e_sn * nIntegrate256 (integrand_SNe_Element z) (m_down z) m_up) <$> z_arr
       result_Wind =
-        (\z -> e_w * nIntegrate256 (integrand_Wind z) (m_down z) 100) <$> z_arr
+        (\z -> e_w * nIntegrate256 (integrand_Wind z) (m_down z) m_up) <$> z_arr
       result_ISM =
-        (\z -> nIntegrate256 (integrand_SNe z) (massDynamical (cosmicTime cosmology z)) 100) <$> z_arr
+        (\z -> nIntegrate256 (integrand_SNe z) (massDynamical (cosmicTime cosmology z)) m_up) <$> z_arr
       result_ISM_Element =
-        (\z -> nIntegrate256 (integrand_ISM_Element z) (massDynamical (cosmicTime cosmology z)) 100) <$> z_arr
+        (\z -> nIntegrate256 (integrand_ISM_Element z) (massDynamical (cosmicTime cosmology z)) m_up) <$> z_arr
    in (sfrd_arr, result_SNe, result_SNe_Element, result_Wind, result_ISM, result_ISM_Element)
 
 -- | Solve four copled first-order differential equations that govern the evolution of:
