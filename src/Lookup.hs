@@ -30,17 +30,11 @@ yieldsHighMass metal_frac elem =
         | metal_frac <= 0.01 = "z001"
         | metal_frac <= 0.1 = "z01"
         | otherwise = "z1"
-   in let filepath = "../data/WW95/" ++ metal_str ++ "/" ++ (toLower <$> element elem) ++ ".dat"
+   in let filepath = "data/WW95/" ++ metal_str ++ "/" ++ (toLower <$> element elem) ++ ".dat"
        in do
             table <- parseFileToTable filepath
             let yields_arr = lookup elem (values table)
             return $ (masses table, fromMaybe [] yields_arr)
-
--- | metal_frac <= 0.01 =
---
---  | metal_frac <= 0.1 =
---
---  | otherwise  =
 
 -- | Stellar remnant mass for a white dwarf, taken from the [Hoek & Groenewegen 1996]
 remnantMediumMass :: Metallicity -> M.Map Double Double

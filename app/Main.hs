@@ -4,6 +4,7 @@ import Cosmology
 import HMF
 import Helper
 import IGM
+import Lookup
 import SMF
 
 args :: [Double]
