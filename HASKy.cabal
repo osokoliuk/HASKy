@@ -42,7 +42,7 @@ maintainer:         oleksii.sokoliuk@mao.kiev.ua
 
 -- A copyright notice.
 -- copyright:
-category:           cosmology
+category:           Physics 
 build-type:         Simple
 
 -- Extra doc files to be distributed with the package, such as a CHANGELOG or a README.

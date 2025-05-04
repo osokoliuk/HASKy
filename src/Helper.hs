@@ -15,6 +15,7 @@ Kind of useless by itself.
 
 import Control.Monad (unless)
 import Control.Monad.State
+import Control.Parallel.Strategies (parTuple4, parTuple6, rpar, using, withStrategy)
 import Data.Bifunctor
 import Data.Char (isDigit, isSpace, toLower, toUpper)
 import Data.List (dropWhileEnd, transpose)
@@ -74,9 +75,11 @@ makeInterp :: [Double] -> [Double] -> Double -> Double
 makeInterp zs xs = mapLookup $ M.fromList (zip zs xs)
 
 -- | Apply a function to 6-tuple
+-- In parallel, but probably the speedup is miniscule
 mapTuple6 :: (a -> b) -> (a, a, a, a, a, a) -> (b, b, b, b, b, b)
 mapTuple6 f (x1, x2, x3, x4, x5, x6) =
-  (f x1, f x2, f x3, f x4, f x5, f x6)
+  withStrategy (parTuple6 rpar rpar rpar rpar rpar rpar) $
+    (f x1, f x2, f x3, f x4, f x5, f x6)
 
 -- | Helper function for reading the file into a table
 parseLine :: String -> (Double, Double)
@@ -111,27 +114,25 @@ vecAdd = V.zipWith (+)
 vecMultiply :: (Num a) => a -> V.Vector a -> V.Vector a
 vecMultiply x = V.map (x *)
 
+-- | Somewhat parallel Runge-Kutta constant step solver
 rk4Step :: (Double -> V.Vector Double -> V.Vector Double) -> Double -> Double -> V.Vector Double -> V.Vector Double
 rk4Step f t h y =
-  vecAdd y $
-    vecMultiply (1 / 6) $
-      vecAdd k1 $
-        vecAdd (vecMultiply 2 k2) $
-          vecAdd (vecMultiply 2 k3) k4
-  where
-    k1 = vecMultiply h (f t y)
-    k2 = vecMultiply h (f (t + h / 2) (vecAdd y (vecMultiply 0.5 k1)))
-    k3 = vecMultiply h (f (t + h / 2) (vecAdd y (vecMultiply 0.5 k2)))
-    k4 = vecMultiply h (f (t + h) (vecAdd y k3))
+  let (k1, k2, k3, k4) = (k1', k2', k3', k4') `using` parTuple4 rpar rpar rpar rpar
 
+      k1' = vecMultiply h (f t y)
+      k2' = vecMultiply h (f (t + h / 2) (vecAdd y (vecMultiply 0.5 k1')))
+      k3' = vecMultiply h (f (t + h / 2) (vecAdd y (vecMultiply 0.5 k2')))
+      k4' = vecMultiply h (f (t + h) (vecAdd y k3'))
+   in vecAdd y $
+        vecMultiply (1 / 6) $
+          vecAdd k1 $
+            vecAdd (vecMultiply 2 k2) $
+              vecAdd (vecMultiply 2 k3) k4
+
+-- | Run the solver for the specific set of initial conditions and a step size
 rk4Solve :: (Double -> V.Vector Double -> V.Vector Double) -> Double -> Double -> Int -> V.Vector Double -> [(Double, V.Vector Double)]
 rk4Solve f t0 h n y0 = take (n + 1) $ iterate step (t0, y0)
   where
     step (t, y) =
       let y' = rk4Step f t h y
        in (t + h, y')
-
-main :: IO ()
-main = do
-  rows <- parseFileToTable "../data/test.txt"
-  print rows

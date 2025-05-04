@@ -17,7 +17,6 @@ redshifts.
 
 import Control.Parallel.Strategies
 import Cosmology
-import Data.List (unzip5)
 import qualified Data.Map as M
 import qualified Data.Vector as V
 import HMF
@@ -107,11 +106,11 @@ interGalacticMediumTerms cosmology pk i_kind s_kind h_kind w_kind yield mh_min z
       m_up = 100
 
       t_arr =
-        (\z -> cosmicTime cosmology z) <$> z_arr
+        parMap rpar (\z -> cosmicTime cosmology z) z_arr
       sfrd_arr =
-        parMap rseq (\z -> starFormationRateDensity cosmology pk s_kind h_kind w_kind z) z_arr
+        parMap rpar (\z -> starFormationRateDensity cosmology pk s_kind h_kind w_kind z) z_arr
       vesc_sq_arr =
-        parMap rseq (\z -> escapeVelocitySq cosmology pk h_kind w_kind mh_min z) z_arr
+        parMap rpar (\z -> escapeVelocitySq cosmology pk h_kind w_kind mh_min z) z_arr
 
       sfrd = makeInterp z_arr sfrd_arr
       vesc_sq = makeInterp z_arr vesc_sq_arr
@@ -142,15 +141,15 @@ interGalacticMediumTerms cosmology pk i_kind s_kind h_kind w_kind yield mh_min z
       integrand_ISM_Element = integrand_SNe_Element
 
       result_SNe =
-        parMap rseq (\z -> e_sn * nIntegrate256 (integrand_SNe z) (m_down z) m_up) z_arr
+        parMap rpar (\z -> e_sn * nIntegrate256 (integrand_SNe z) (m_down z) m_up) z_arr
       result_SNe_Element =
-        parMap rseq (\z -> e_sn * nIntegrate256 (integrand_SNe_Element z) (m_down z) m_up) z_arr
+        parMap rpar (\z -> e_sn * nIntegrate256 (integrand_SNe_Element z) (m_down z) m_up) z_arr
       result_Wind =
-        parMap rseq (\z -> e_w * nIntegrate256 (integrand_Wind z) (m_down z) m_up) z_arr
+        parMap rpar (\z -> e_w * nIntegrate256 (integrand_Wind z) (m_down z) m_up) z_arr
       result_ISM =
-        parMap rseq (\z -> nIntegrate256 (integrand_SNe z) (massDynamical (cosmicTime cosmology z)) m_up) z_arr
+        parMap rpar (\z -> nIntegrate256 (integrand_SNe z) (massDynamical (cosmicTime cosmology z)) m_up) z_arr
       result_ISM_Element =
-        parMap rseq (\z -> nIntegrate256 (integrand_ISM_Element z) (massDynamical (cosmicTime cosmology z)) m_up) z_arr
+        parMap rpar (\z -> nIntegrate256 (integrand_ISM_Element z) (massDynamical (cosmicTime cosmology z)) m_up) z_arr
    in (sfrd_arr, result_SNe, result_SNe_Element, result_Wind, result_ISM, result_ISM_Element)
 
 -- | Solve four copled first-order differential equations that govern the evolution of:
@@ -161,14 +160,14 @@ interGalacticMediumTerms cosmology pk i_kind s_kind h_kind w_kind yield mh_min z
 -- with all equations being taken from the [Daigne et al. 2004]
 igmIsmEvolution :: ReferenceCosmology -> PowerSpectrum -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Yield -> Mhalo -> [(Double, V.Vector Double)]
 igmIsmEvolution cosmology pk i_kind s_kind h_kind w_kind yield mh_min =
-  let (h0, om0, ob0, c, gn) = unpackCosmology cosmology
-      z_arr = [20.0, 20.0 - 0.1 .. 0]
+  let (_, om0, ob0, _, _) = unpackCosmology cosmology
+      z_arr = [20.0, 20.0 - 0.25 .. 0]
       m_tot = 6 * 1e22
 
       terms_arr =
         interGalacticMediumTerms cosmology pk i_kind s_kind h_kind w_kind yield mh_min z_arr
       mar_arr =
-        parMap rseq (\z -> ob0 / om0 * massAccretionRate cosmology m_tot z) z_arr
+        parMap rpar (\z -> ob0 / om0 * massAccretionRate cosmology m_tot z) z_arr
 
       (interp_sfrd, interp_osn, interp_osni, interp_ow, interp_e, interp_ei) =
         mapTuple6 (makeInterp z_arr) terms_arr
