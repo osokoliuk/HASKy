@@ -158,7 +158,7 @@ interGalacticMediumTerms cosmology pk i_kind s_kind h_kind w_kind yield mh_min z
 -- with all equations being taken from the [Daigne et al. 2004]
 igmIsmEvolution :: ReferenceCosmology -> PowerSpectrum -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Yield -> Mhalo -> [(Double, V.Vector Double)]
 igmIsmEvolution cosmology pk i_kind s_kind h_kind w_kind yield mh_min =
-  let (_, om0, ob0, _, _) = unpackCosmology cosmology
+  let (_, om0, ob0, _, _, _, _) = unpackCosmology cosmology
       z_arr = [20.0, 20.0 - 0.25 .. 0]
       m_tot = 6 * 1e22
 

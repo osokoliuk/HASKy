@@ -41,7 +41,7 @@ type Mstar = Double
 --    * EMERGE semi-analytical model
 epsStar :: ReferenceCosmology -> SMF_kind -> Mhalo -> Redshift -> Double
 epsStar cosmology s_kind mh z =
-  let (h0, om0, ob0, c, gn) = unpackCosmology cosmology
+  let (h0, om0, ob0, _, _, _, _) = unpackCosmology cosmology
 
       -- A set of best fit parameter for the double power-law
       eps_0, mh_0, gamma_lo, gamma_hi :: Double
@@ -96,7 +96,7 @@ massAccretionHistory mh z =
 -- adopted in the units of a solar mass from the [Fakhouri et al. 2013] work
 massAccretionRate :: ReferenceCosmology -> Mhalo -> Redshift -> Double
 massAccretionRate cosmology mh z =
-  let (h0, om0, ob0, c, gn) = unpackCosmology cosmology
+  let (h0, om0, ob0, _, _, _, _) = unpackCosmology cosmology
    in 25.3 * (mh / 1e12) ** 1.1
         + (1 + 1.65 * z) * sqrt (om0 * (1 + z) ** 3 + 1 - om0)
 
@@ -105,14 +105,14 @@ massAccretionRate cosmology mh z =
 -- halo mass to baryonic mass
 starFormationRate :: SMF_kind -> ReferenceCosmology -> Mhalo -> Redshift -> Double
 starFormationRate s_kind cosmology mh z =
-  let (h0, om0, ob0, c, gn) = unpackCosmology cosmology
+  let (h0, om0, ob0, _, _, _, _) = unpackCosmology cosmology
       ep = epsStar cosmology s_kind mh z
    in ep * ob0 / om0 * massAccretionRate cosmology mh z
 
 -- | Stellar mass function, derived from the HMF and SFE via a simple chain rule
 stellarMassFunction :: ReferenceCosmology -> PowerSpectrum -> SMF_kind -> HMF_kind -> W_kind -> [Mhalo] -> Redshift -> ([Mstar], [Double])
 stellarMassFunction cosmology pk s_kind h_kind w_kind mh_arr z =
-  let (h0, om0, ob0, c, gn) = unpackCosmology cosmology
+  let (h0, om0, ob0, _, _, _, _) = unpackCosmology cosmology
 
       ms :: Mhalo -> Mstar -- Function that gives stellar mass
       ms mh = mh * (ob0 / om0) * epsStar cosmology s_kind mh z
@@ -134,7 +134,7 @@ stellarMassFunction cosmology pk s_kind h_kind w_kind mh_arr z =
 -- to be used in the IGM/ISM mass fraction differential equations
 starFormationRateDensity :: ReferenceCosmology -> PowerSpectrum -> SMF_kind -> HMF_kind -> W_kind -> Redshift -> Double
 starFormationRateDensity cosmology pk s_kind h_kind w_kind z =
-  let mh_arr = (10 **) <$> [6, 6 + 0.1 .. 18]
+  let mh_arr = (10 **) <$> [6, 6 + 0.25 .. 16]
 
       hmf_arr =
         (\mh -> haloMassFunction cosmology pk h_kind w_kind mh z) <$> mh_arr

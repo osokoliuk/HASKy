@@ -59,7 +59,7 @@ library
     import:           warnings
 
     -- Modules exported by the library.
-    exposed-modules: Helper, Lookup, Cosmology, HMF, SMF, IGM
+    exposed-modules: Helper, Lookup, Cosmology, HMF, SMF, IGM, Pk
 
     -- Modules included in this library but not exported.
     -- other-modules:
