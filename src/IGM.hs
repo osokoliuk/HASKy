@@ -54,7 +54,7 @@ initialMassFunction i_kind m =
 -- so that it can acts as a PDF in that range
 imfNormalisation :: IMF_kind -> Mstar -> Double
 imfNormalisation i_kind mup =
-  let m_arr = (10 **) <$> [0.1, 0.1 + 0.1 .. mup]
+  let m_arr = [0.1, 0.1 + 0.1 .. mup]
       integrand m = m * initialMassFunction i_kind m
    in nIntegrate256 integrand (head m_arr) (last m_arr)
 
@@ -181,5 +181,5 @@ igmIsmEvolution cosmology pk i_kind s_kind h_kind w_kind yield mh_min =
           ]
       -- CHANGE ICs to SUMOTHING APPROPRIATE
       result =
-        rk4Solve igm_ode (minimum z_arr) 0.1 (length z_arr) (V.fromList [0.9 * m_tot, 0.1 * m_tot, 0, 0])
+        rk4Solve igm_ode (maximum z_arr) 0.1 (length z_arr) (V.fromList [0.9 * m_tot, 0.1 * m_tot, 0, 0])
    in result
