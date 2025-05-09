@@ -14,13 +14,14 @@ args = []
 main :: IO ()
 main =
   do
-    (mass_arr, yield_arr) <- yieldsHighMass 1 $ Element "H" 1
+    (mass_arr, yield_arr) <- yieldsHighMass 1 $ Element "C" 12
 
     let interp_yield :: Yield
         interp_yield = makeInterp mass_arr yield_arr
 
         pk = powerSpectrumEisensteinHu planck18
 
-        x = igmIsmEvolution planck18 (powerSpectrumEisensteinHu planck18) Kroupa DoublePower ST Smooth interp_yield 1e6
+        -- x = interGalacticMediumTerms planck18 (powerSpectrumEisensteinHu planck18) Kroupa DoublePower ST Smooth interp_yield 1e6 [20, 20 - 1 .. 0]
+        x = escapeVelocitySq planck18 pk Tinker TopHat 1e7 20
 
-    print x
+    print $ 1.988 * 1e43 * x

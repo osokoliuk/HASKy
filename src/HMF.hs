@@ -18,6 +18,7 @@ Hubble parameter H0, Omega_m0, Omega_b0)
 
 import Cosmology
 import qualified Data.Map as M
+import qualified Data.Map.Strict as M'
 import Data.Maybe
 import qualified Data.Text as T
 import qualified Data.Vector as V
@@ -28,10 +29,13 @@ import Numeric.Tools.Integration
 import qualified Safe
 import System.IO
 
--- Define an HMF datatype, consisting of two choices
+-- Define an HMF datatype, consisting of five possible choices
 data HMF_kind
   = Tinker
   | ST
+  | Angulo
+  | Jenkins
+  | Warren
   deriving (Eq, Show)
 
 -- Similarly, define the options for the window function
@@ -111,11 +115,15 @@ firstCrossing cosmology pk h_kind w_kind mh z =
       delta_c :: Redshift -> Double
       delta_c z = 1.686 * (om0 * (1 + z) ** 3) ** 0.0055
       nu = delta_c z / sigma
-      a_T', a_ST', p, a_T, b_T, c_T :: Double
-      (a_T', a_ST', p, a_T, b_T, c_T) = (0.186, 0.3222, 0.3, 1.47, 2.57, 1.19)
+      a_T', a_ST', p, a_T, b_T, c_T, a_Ang, b_Ang, c_Ang, a_Jen, b_Jen, a_War, b_War, c_War :: Double
+      (a_T', a_ST', p, a_T, b_T, c_T, a_Ang, b_Ang, c_Ang, a_Jen, b_Jen, a_War, b_War, c_War) =
+        (0.186, 0.3222, 0.3, 1.47, 2.57, 1.19, 0.201, 2.08, -1.172, 0.315, 0.61, 0.7234, 0.2538, 1.1982)
    in case h_kind of
         Tinker -> a_T' * ((sigma / b_T) ** (-a_T) + 1) * exp (-c_T / sigma ** 2)
         ST -> a_ST' * sqrt (2 * nu ** 2 / pi) * (1 + nu ** (-2 * p)) * exp (-nu ** 2 / 2)
+        Angulo -> a_Ang * (b_Ang / sigma + 1) ** 1.7 * exp (c_Ang / sigma ** 2)
+        Jenkins -> a_Jen * exp (-abs (log sigma ** (-1) + b_Jen) ** 3.8)
+        Warren -> a_War * (sigma ** (-1.625) + b_War) * exp (-c_War / sigma)
 
 -- | The Halo Mass Function (HMF) itself, uses most of the functions
 -- defined within this module and a differentiation library
@@ -134,20 +142,28 @@ haloMassFunction cosmology pk h_kind w_kind mh z =
    in -rho_mean * fdsdlogm * mh
 
 -- | Escape velocity squared of a star from a halo of mass M and radius R at the redshift z,
--- in the units of [km^2 s^-2]
+-- in the units of [km^2 s^-2], taken from the [Tan et al. 2018]
 escapeVelocitySq :: ReferenceCosmology -> PowerSpectrum -> HMF_kind -> W_kind -> Mhalo -> Redshift -> Double
 escapeVelocitySq cosmology pk h_kind w_kind mh_min z =
   let (h0, om0, ob0, _, gn, _, _) = unpackCosmology cosmology
-      mh_arr = (10 **) <$> [log10 mh_min, log10 mh_min + 0.1 .. 18]
 
-      first_crossing = \mh -> firstCrossing cosmology pk h_kind w_kind mh z
+      mh_arr = (10 **) <$> [5, 5 + 0.25 .. 17]
+
+      hmf_arr =
+        (\mh -> haloMassFunction cosmology pk h_kind w_kind mh z) <$> mh_arr
+      dndmh = zipWith (/) hmf_arr mh_arr
+
+      (_, n_CDM) =
+        (unzip . M'.toList)
+          (cumulativeTrapezoidMap $ M'.fromList (zip mh_arr dndmh))
+      n_interp = makeInterp mh_arr n_CDM
 
       integrand_1 mh =
-        mh * (2 * gn * mh * rh cosmology w_kind mh) * first_crossing mh
+        mh * (2 * gn * mh / rh cosmology w_kind mh) * n_interp mh
       integrand_2 mh =
-        mh * first_crossing mh
+        mh * n_interp mh
 
       result =
-        (nIntegrate256 integrand_1 mh_min (last mh_arr))
-          / (nIntegrate256 integrand_2 mh_min (last mh_arr))
+        (nIntegrate256 integrand_1 mh_min 1e18)
+          / (nIntegrate256 integrand_2 mh_min 1e18)
    in result

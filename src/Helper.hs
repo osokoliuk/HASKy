@@ -20,6 +20,7 @@ import Data.Bifunctor
 import Data.Char (isDigit, isSpace, toLower, toUpper)
 import Data.List (dropWhileEnd, transpose)
 import qualified Data.Map as M
+import qualified Data.Map.Strict as M'
 import qualified Data.Vector as V
 import System.IO
 import Text.Read (readMaybe)
@@ -148,3 +149,27 @@ sinc x =
     else 1 - x ^ 2 / 6 + x ^ 4 / 120
   where
     taylor_n_bound = sqrt $ sqrt epsilon
+
+-- | Cumulative trapezoid rule (reversed),
+-- mainly used to calculate n(>Mh,z) from dn/dMh
+cumulativeTrapezoidMap :: M'.Map Double Double -> M'.Map Double Double
+cumulativeTrapezoidMap xyMap = M'.fromAscList $ reverse $ zip xsRev cumulativeRev
+  where
+    xsRev = reverse xs
+    ysRev = reverse ys
+    xs = M'.keys xyMap
+    ys = M'.elems xyMap
+
+    -- Compute trapezoid areas
+    trapezoids =
+      zipWith3
+        ( \x1 x2 y1 ->
+            let y2 = xyMap M'.! x2
+             in 0.5 * (y1 + y2) * (x2 - x1)
+        )
+        xs
+        (tail xs)
+        ys
+
+    -- Cumulative sum from right to left
+    cumulativeRev = scanl1 (+) (reverse trapezoids ++ [0])
