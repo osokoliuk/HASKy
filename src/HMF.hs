@@ -147,15 +147,13 @@ escapeVelocitySq :: ReferenceCosmology -> PowerSpectrum -> HMF_kind -> W_kind ->
 escapeVelocitySq cosmology pk h_kind w_kind mh_min z =
   let (h0, om0, ob0, _, gn, _, _) = unpackCosmology cosmology
 
-      mh_arr = (10 **) <$> [5, 5 + 0.25 .. 17]
+      mh_arr = (10 **) <$> [6, 6 + 0.1 .. 17]
 
       hmf_arr =
         (\mh -> haloMassFunction cosmology pk h_kind w_kind mh z) <$> mh_arr
       dndmh = zipWith (/) hmf_arr mh_arr
 
-      (_, n_CDM) =
-        (unzip . M'.toList)
-          (cumulativeTrapezoidMap $ M'.fromList (zip mh_arr dndmh))
+      n_CDM = cumulativeTrapezoid mh_arr dndmh
       n_interp = makeInterp mh_arr n_CDM
 
       integrand_1 mh =

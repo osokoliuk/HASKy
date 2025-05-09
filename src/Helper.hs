@@ -18,7 +18,7 @@ import Control.Monad.State
 import Control.Parallel.Strategies (parTuple4, parTuple6, rpar, using, withStrategy)
 import Data.Bifunctor
 import Data.Char (isDigit, isSpace, toLower, toUpper)
-import Data.List (dropWhileEnd, transpose)
+import Data.List (dropWhileEnd, elemIndex, transpose)
 import qualified Data.Map as M
 import qualified Data.Map.Strict as M'
 import qualified Data.Vector as V
@@ -152,24 +152,22 @@ sinc x =
 
 -- | Cumulative trapezoid rule (reversed),
 -- mainly used to calculate n(>Mh,z) from dn/dMh
-cumulativeTrapezoidMap :: M'.Map Double Double -> M'.Map Double Double
-cumulativeTrapezoidMap xyMap = M'.fromAscList $ reverse $ zip xsRev cumulativeRev
+cumulativeTrapezoid :: [Double] -> [Double] -> [Double]
+cumulativeTrapezoid x y
+  | length x /= length y = error "Input lists must be of equal length"
+  | otherwise = reverse $ scanl1 (+) trapezoidsRev
   where
-    xsRev = reverse xs
-    ysRev = reverse ys
-    xs = M'.keys xyMap
-    ys = M'.elems xyMap
+    xRev = reverse x
+    yRev = reverse y
+    trapezoidsRev = zipWith3 trapArea xRev (tail xRev) yRev
 
-    -- Compute trapezoid areas
-    trapezoids =
-      zipWith3
-        ( \x1 x2 y1 ->
-            let y2 = xyMap M'.! x2
-             in 0.5 * (y1 + y2) * (x2 - x1)
-        )
-        xs
-        (tail xs)
-        ys
+    -- Compute area of trapezoid between two x values and corresponding y values
+    trapArea x1 x2 y1 =
+      let i = indexOf x1 xRev
+          y2 = yRev !! (i + 1)
+       in 0.5 * (y1 + y2) * (x1 - x2)
 
-    -- Cumulative sum from right to left
-    cumulativeRev = scanl1 (+) (reverse trapezoids ++ [0])
+    -- Helper: index lookup (simple linear search)
+    indexOf x xs = case elemIndex x xs of
+      Just i -> i
+      Nothing -> error "Value not found in x array"

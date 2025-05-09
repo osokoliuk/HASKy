@@ -22,6 +22,6 @@ main =
         pk = powerSpectrumEisensteinHu planck18
 
         -- x = interGalacticMediumTerms planck18 (powerSpectrumEisensteinHu planck18) Kroupa DoublePower ST Smooth interp_yield 1e6 [20, 20 - 1 .. 0]
-        x = escapeVelocitySq planck18 pk Tinker TopHat 1e7 20
+        x = (\mh -> 1.988 * 1e43 * escapeVelocitySq planck18 pk Tinker TopHat 1e11 mh) <$> [0, 0 + 0.5 .. 20]
 
-    print $ 1.988 * 1e43 * x
+    print $ x
