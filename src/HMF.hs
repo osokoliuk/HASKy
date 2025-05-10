@@ -42,6 +42,7 @@ data HMF_kind
 data W_kind
   = TopHat
   | Smooth
+  | Sharp
   deriving (Eq, Show)
 
 -- Some simple types added for convenience
@@ -59,9 +60,11 @@ rh cosmology w_kind mh =
   let (h0, om0, ob0, _, gn, _, _) = unpackCosmology cosmology
       rho_mean = 3 * h0 ** 2 * om0 / (8 * pi * gn)
       c_smooth = 3.3
+      c_sharp = 2.5
    in case w_kind of
         TopHat -> (3 * mh / (4 * pi * rho_mean)) ** (1 / 3)
         Smooth -> (3 * mh / (4 * pi * rho_mean * c_smooth ** 3)) ** (1 / 3)
+        Sharp -> (3 * mh / (4 * pi * rho_mean * c_sharp ** 3)) ** (1 / 3)
 
 -- | Produces a matter power spectrum at the linear level
 -- To be imported from CAMB
@@ -78,6 +81,7 @@ powerSpectrum filepath =
 -- You have a choice of two different ones, namely:
 --    * Top-Hat
 --    * Smooth-k
+--    * Sharp-k
 windowFunction :: ReferenceCosmology -> W_kind -> Wavenumber -> Mhalo -> Double
 windowFunction cosmology w_kind k mh =
   let r = rh cosmology w_kind mh
@@ -86,6 +90,7 @@ windowFunction cosmology w_kind k mh =
    in case w_kind of
         TopHat -> 3 * (sin (kr) - kr * cos (kr)) / (kr) ** 3
         Smooth -> (1 + kr ** beta) ** (-1)
+        Sharp -> heaviside (1 - kr)
 
 -- | Cosmic variance squared, usually referred to as sigma^2(R,z)
 -- Derived by integrating a matter power spectrum and a window function
@@ -147,19 +152,13 @@ escapeVelocitySq :: ReferenceCosmology -> PowerSpectrum -> HMF_kind -> W_kind ->
 escapeVelocitySq cosmology pk h_kind w_kind mh_min z =
   let (h0, om0, ob0, _, gn, _, _) = unpackCosmology cosmology
 
-      mh_arr = (10 **) <$> [6, 6 + 0.1 .. 17]
-
-      hmf_arr =
-        (\mh -> haloMassFunction cosmology pk h_kind w_kind mh z) <$> mh_arr
-      dndmh = zipWith (/) hmf_arr mh_arr
-
-      n_CDM = cumulativeTrapezoid mh_arr dndmh
-      n_interp = makeInterp mh_arr n_CDM
+      first_crossing =
+        (\mh -> firstCrossing cosmology pk h_kind w_kind mh z)
 
       integrand_1 mh =
-        mh * (2 * gn * mh / rh cosmology w_kind mh) * n_interp mh
+        mh * (2 * gn * mh / rh cosmology w_kind mh) * first_crossing mh
       integrand_2 mh =
-        mh * n_interp mh
+        mh * first_crossing mh
 
       result =
         (nIntegrate256 integrand_1 mh_min 1e18)

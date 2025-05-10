@@ -20,8 +20,7 @@ main =
         interp_yield = makeInterp mass_arr yield_arr
 
         pk = powerSpectrumEisensteinHu planck18
-
+        coeff = 1.988 * 1e43
         -- x = interGalacticMediumTerms planck18 (powerSpectrumEisensteinHu planck18) Kroupa DoublePower ST Smooth interp_yield 1e6 [20, 20 - 1 .. 0]
-        x = (\mh -> 1.988 * 1e43 * escapeVelocitySq planck18 pk Tinker TopHat 1e11 mh) <$> [0, 0 + 0.5 .. 20]
-
+        x = (\mh -> escapeVelocitySq planck18 pk ST Sharp mh 0) <$> ((10 **) <$> [6, 6 + 0.1 .. 16])
     print $ x

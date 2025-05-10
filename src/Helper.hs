@@ -171,3 +171,9 @@ cumulativeTrapezoid x y
     indexOf x xs = case elemIndex x xs of
       Just i -> i
       Nothing -> error "Value not found in x array"
+
+-- | Heaveside step function
+heaviside :: (Ord a, Num a) => a -> a
+heaviside x
+  | x >= 0 = 1
+  | otherwise = 0
