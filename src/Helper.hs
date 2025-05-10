@@ -177,3 +177,11 @@ heaviside :: (Ord a, Num a) => a -> a
 heaviside x
   | x >= 0 = 1
   | otherwise = 0
+
+-- Convert a vector to two lists
+splitXY :: [V.Vector Double] -> ([Double], [Double])
+splitXY vlist = unzip $ map toTuple vlist
+  where
+    toTuple v
+      | V.length v == 2 = (v V.! 0, v V.! 1)
+      | otherwise = error "Each vector must have exactly two elements"

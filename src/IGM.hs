@@ -102,7 +102,7 @@ tauMS m
 interGalacticMediumTerms :: ReferenceCosmology -> PowerSpectrum -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Yield -> Mhalo -> [Redshift] -> ([Double], [Double], [Double], [Double], [Double], [Double])
 interGalacticMediumTerms cosmology pk i_kind s_kind h_kind w_kind yield mh_min z_arr =
   let (e_w, e_sn, kms_ergMsol, yr_Gyr, energy, m_up) =
-        (0.02, 0.005, 1.989 * 1e43, 1, 2 * 1e51, 100)
+        (0.02, 0.005, 1.989 * 1e43, 1e9, 2 * 1e51, 100)
 
       t_arr =
         parMap rpar (\z -> cosmicTime cosmology z) z_arr
@@ -156,18 +156,19 @@ interGalacticMediumTerms cosmology pk i_kind s_kind h_kind w_kind yield mh_min z
 --    * Xi_IGM    (4)
 --    * Xi_ISM    (5)
 -- with all equations being taken from the [Daigne et al. 2004]
-igmIsmEvolution :: ReferenceCosmology -> PowerSpectrum -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Yield -> Mhalo -> ([Double], [V.Vector Double])
+igmIsmEvolution :: ReferenceCosmology -> PowerSpectrum -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Yield -> Mhalo -> ([Double], [Double], [Double], [Double])
 igmIsmEvolution cosmology pk i_kind s_kind h_kind w_kind yield mh_min =
   let (h0, om0, ob0, _, gn, _, _) = unpackCosmology cosmology
-      z_arr = [20.0, 20.0 - 0.25 .. 0]
+      z_arr = [20.0, 20.0 - 0.1 .. 0]
       rho_mean z = 3 * h0 ** 2 * ob0 / (8 * pi * gn) * (1 + z) ** (-4)
+      rho_tot = rho_mean 0
 
       terms_arr =
         interGalacticMediumTerms cosmology pk i_kind s_kind h_kind w_kind yield mh_min z_arr
       mar_arr =
-        parMap rpar (\z -> baryonFormationRateDensity cosmology pk h_kind w_kind z) z_arr
+        parMap rpar (\z -> 1e9 * baryonFormationRateDensity cosmology pk h_kind w_kind z) z_arr
       t_arr =
-        parMap rpar (\z -> 1e9 * cosmicTime cosmology z) z_arr
+        parMap rpar (\z -> cosmicTime cosmology z) z_arr
 
       (interp_sfrd, interp_osn, interp_osni, interp_ow, interp_e, interp_ei) =
         mapTuple6 (makeInterp z_arr) terms_arr
@@ -180,15 +181,20 @@ igmIsmEvolution cosmology pk i_kind s_kind h_kind w_kind yield mh_min =
       -- with M_ISM/M_IGM ~ 0.01 (stellar mass is negligible at this redshift)
       -- following the prescription of [Daigne et al. 2006]
       (n_steps, t_init, rho_init, igm_ini, ism_ini) =
-        (20 :: Int, interp_t (maximum z_arr), rho_mean (maximum z_arr), rho_init, 1e-2 * rho_init)
+        (20 :: Int, interp_t (maximum z_arr), rho_mean (maximum z_arr), rho_init, 0)
 
       igm_ode t y =
         let z = interp_z t
          in V.fromList
               [ -interp_mar z + interp_o z,
-                (-interp_sfrd z + interp_e z) + (interp_mar z - interp_o z)
+                interp_sfrd z - interp_e z
               ]
 
-      result =
-        rk4Solve igm_ode t_init ((interp_t 0 - t_init) / fromIntegral n_steps) n_steps (V.fromList [igm_ini, ism_ini])
-   in unzip result
+      (times, masses) =
+        unzip $
+          rk4Solve igm_ode t_init ((interp_t 0 - t_init) / fromIntegral n_steps) n_steps (V.fromList [igm_ini, ism_ini])
+
+      (migm_arr, mstar_arr) = splitXY masses
+      -- M_ISM = M_IGM - Mstar - rho_tot from the conservation equation
+      mism_arr = zipWith (\x y -> x - y - rho_init) migm_arr mstar_arr
+   in (times, migm_arr, mism_arr, mstar_arr)
