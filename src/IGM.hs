@@ -151,35 +151,45 @@ interGalacticMediumTerms cosmology pk i_kind s_kind h_kind w_kind yield mh_min z
    in (sfrd_arr, result_SNe, result_SNe_Element, result_Wind, result_ISM, result_ISM_Element)
 
 -- | Solve four copled first-order differential equations that govern the evolution of:
---    * M_IGM   (1)
---    * M_ISM   (2)
---    * Xi_IGM  (3)
---    * Xi_ISM  (4)
+--    * M_IGM     (1)
+--    * M_ISM     (3)
+--    * Xi_IGM    (4)
+--    * Xi_ISM    (5)
 -- with all equations being taken from the [Daigne et al. 2004]
 igmIsmEvolution :: ReferenceCosmology -> PowerSpectrum -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Yield -> Mhalo -> [(Double, V.Vector Double)]
 igmIsmEvolution cosmology pk i_kind s_kind h_kind w_kind yield mh_min =
   let (_, om0, ob0, _, _, _, _) = unpackCosmology cosmology
       z_arr = [20.0, 20.0 - 0.25 .. 0]
-      m_tot = 6 * 1e22
+      m_tot = 1e22
 
       terms_arr =
         interGalacticMediumTerms cosmology pk i_kind s_kind h_kind w_kind yield mh_min z_arr
-      mar_arr =
+      mar_arr m_tot =
         parMap rpar (\z -> ob0 / om0 * massAccretionRate cosmology m_tot z) z_arr
+      t_arr =
+        parMap rpar (\z -> cosmicTime cosmology z) z_arr
 
       (interp_sfrd, interp_osn, interp_osni, interp_ow, interp_e, interp_ei) =
         mapTuple6 (makeInterp z_arr) terms_arr
-      interp_mar = makeInterp z_arr mar_arr
+      interp_mar m_tot = makeInterp z_arr (mar_arr m_tot)
+      interp_z = makeInterp t_arr z_arr
+      interp_t = makeInterp z_arr t_arr
       interp_o = (+) <$> interp_osn <*> interp_ow
 
-      igm_ode z y =
-        V.fromList
-          [ -interp_mar z + interp_o z,
-            (-interp_sfrd z + interp_e z) + (interp_mar z - interp_o z),
-            1 / (y V.! 0) * (interp_ow z * (y V.! 3 - y V.! 2) + (interp_osni z - interp_osn z * y V.! 2)),
-            1 / (y V.! 1) * ((interp_ei z - interp_e z * y V.! 3) + interp_mar z * (y V.! 2 - y V.! 3) - (interp_osni z - interp_osn z * y V.! 3))
-          ]
-      -- CHANGE ICs to SUMOTHING APPROPRIATE
+      -- ICs are set assuming very small baryon fraction in the structures,
+      -- following the prescription of [Daigne et al. 2006]
+      (n_steps, t_init, igm_ini, ism_ini) =
+        (20 :: Int, interp_t (maximum z_arr), m_tot, 1e-6 * m_tot)
+
+      igm_ode t y =
+        let z = interp_z t
+         in V.fromList
+              [ -interp_mar m_tot z + interp_o z,
+                (-interp_sfrd z + interp_e z) + (interp_mar m_tot z - interp_o z),
+                1 / (y V.! 0) * (interp_ow z * (y V.! 3 - y V.! 2) + (interp_osni z - interp_osn z * y V.! 2)),
+                1 / (y V.! 1) * ((interp_ei z - interp_e z * y V.! 3) + interp_mar m_tot z * (y V.! 2 - y V.! 3) - (interp_osni z - interp_osn z * y V.! 3))
+              ]
+      -- CHANGE ICs to SOMETHING APPROPRIATE
       result =
-        rk4Solve igm_ode (maximum z_arr) 0.1 (length z_arr) (V.fromList [0.9 * m_tot, 0.1 * m_tot, 0, 0])
+        rk4Solve igm_ode t_init ((interp_t 0 - t_init) / fromIntegral n_steps) n_steps (V.fromList [igm_ini, ism_ini, igm_ini * 1e-8, ism_ini * 1e-8])
    in result

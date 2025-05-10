@@ -22,5 +22,7 @@ main =
         pk = powerSpectrumEisensteinHu planck18
         coeff = 1.988 * 1e43
         -- x = interGalacticMediumTerms planck18 (powerSpectrumEisensteinHu planck18) Kroupa DoublePower ST Smooth interp_yield 1e6 [20, 20 - 1 .. 0]
-        x = (\mh -> escapeVelocitySq planck18 pk ST Sharp mh 0) <$> ((10 **) <$> [6, 6 + 0.1 .. 16])
+        -- x = (\mh -> sqrt $ escapeVelocitySq planck18 pk ST Smooth mh 0) <$> ((10 **) <$> [6, 6 + 0.1 .. 16])
+        x = igmIsmEvolution planck18 pk Kroupa Behroozi ST Smooth interp_yield 1e6
+
     print $ x

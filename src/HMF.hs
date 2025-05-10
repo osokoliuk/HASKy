@@ -106,9 +106,12 @@ cosmicVarianceSq cosmology pk mh z w_kind =
    in result
 
 -- | First-crossing distribution, crucial for the derivation of a
--- Halo Mass Function afterwards, again you have a choice of two:
+-- Halo Mass Function afterwards, again you have a choice of five:
 --    * Sheth-Tormen
 --    * Tinker
+--    * Angulo
+--    * Jenkins
+--    * Warren
 -- We are planning to add more options in the near future
 firstCrossing :: ReferenceCosmology -> PowerSpectrum -> HMF_kind -> W_kind -> Mhalo -> Redshift -> Double
 firstCrossing cosmology pk h_kind w_kind mh z =
@@ -161,6 +164,6 @@ escapeVelocitySq cosmology pk h_kind w_kind mh_min z =
         mh * first_crossing mh
 
       result =
-        (nIntegrate256 integrand_1 mh_min 1e18)
-          / (nIntegrate256 integrand_2 mh_min 1e18)
+        (nIntegrate256 integrand_1 mh_min 1e17)
+          / (nIntegrate256 integrand_2 mh_min 1e17)
    in result
