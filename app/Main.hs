@@ -26,7 +26,7 @@ main =
         -- x = interGalacticMediumTerms planck18 (powerSpectrumEisensteinHu planck18) Kroupa DoublePower ST Smooth interp_yield 1e6 [20, 20 - 1 .. 0]
         -- x = (\mh -> sqrt $ escapeVelocitySq planck18 pk ST Smooth mh 0) <$> ((10 **) <$> [6, 6 + 0.1 .. 16])
         -- x = (\z -> baryonFormationRateDensity planck18 pk ST Smooth z) <$> z_arr
-
+        -- x = (\m -> m - massRemnant m 0.1) <$> [0.1, 1.1 .. 100]
         x = igmIsmEvolution planck18 pk Kroupa Behroozi ST Smooth interp_yield 1e7
     -- x = (\z -> baryonAccretionRate planck18 pk ST Smooth 1e6 z) <$> z_arr
 

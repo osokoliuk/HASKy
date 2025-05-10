@@ -65,9 +65,12 @@ normalisedInitialMassFunction i_kind mup m =
    in (initialMassFunction i_kind m) / norm
 
 -- | Mass of a remnant produced by the supernova,
--- calculated according to [Iben & Tutukov 1984] in the units of [Msol]
+-- calculated according to various works in the units of [Msol].
+-- Note that below a certain mass, stellar lifetimes are higher than the
+-- t_0 (age of the universe), so there will be no remnant
 massRemnant :: Mstar -> Metallicity -> Double
 massRemnant m metal_frac
+  | m < 0.9 = 0
   | m >= 0.9 && m <= 8 =
       let (mi, mr) = (unzip . M.toList) (remnantMediumMass metal_frac)
        in makeInterp mi mr $ m
@@ -121,7 +124,7 @@ interGalacticMediumTerms cosmology pk i_kind s_kind h_kind w_kind yield mh_min z
          in interp_tau t
 
       z_target z m = time (cosmicTime cosmology z - tauMS m)
-      m_down z = maximum [1e8, (massDynamical (cosmicTime cosmology z))]
+      m_down z = maximum [8, (massDynamical (cosmicTime cosmology z))]
       norm_imf = normalisedInitialMassFunction i_kind m_up
 
       integrand_SNe z m =
@@ -131,7 +134,8 @@ interGalacticMediumTerms cosmology pk i_kind s_kind h_kind w_kind yield mh_min z
       integrand_SNe_Element z m =
         norm_imf m
           * sfrd (z_target z m)
-          * (m - yield m * massRemnant m 0.1)
+          * yield m
+          * (m - massRemnant m 0.1)
       integrand_Wind z m =
         norm_imf m
           * sfrd (z_target z m)
@@ -183,6 +187,8 @@ igmIsmEvolution cosmology pk i_kind s_kind h_kind w_kind yield mh_min =
       (n_steps, t_init, rho_init, igm_ini, ism_ini) =
         (20 :: Int, interp_t (maximum z_arr), rho_mean (maximum z_arr), rho_init, 0)
 
+      -- Convert Differential-Algebraic system into ODE via Lagrangian multipliers
+      -- We are using an approach laid out in [van der Houwen & de Swart 1997]
       igm_ode t y =
         let z = interp_z t
          in V.fromList
