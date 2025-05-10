@@ -132,6 +132,28 @@ stellarMassFunction cosmology pk s_kind h_kind w_kind mh_arr z =
           (\mh -> diffRes $ diffRichardson ms 10 mh) <$> mh_arr
    in (ms_arr, zipWith (\x y -> x * y) hmf_arr dmhdms)
 
+baryonFormationRateDensity :: ReferenceCosmology -> PowerSpectrum -> HMF_kind -> W_kind -> Redshift -> Double
+baryonFormationRateDensity cosmology pk h_kind w_kind z =
+  let (_, om0, ob0, _, _, _, _) = unpackCosmology cosmology
+
+      mh_arr = (10 **) <$> [6, 6 + 0.25 .. 16]
+
+      hmf_arr =
+        (\mh -> haloMassFunction cosmology pk h_kind w_kind mh z) <$> mh_arr
+      dndmh = zipWith (/) hmf_arr mh_arr
+
+      interp_hmf :: Double -> Double
+      interp_hmf = makeInterp mh_arr dndmh
+
+      integrand :: Double -> Double -- Function giving epsStar * Ob0/Om0 * dn/dt
+      integrand mh =
+        (interp_hmf mh)
+          * (ob0 / om0 * massAccretionRate cosmology mh z)
+
+      result :: Double
+      result = nIntegrate256 integrand (minimum mh_arr) (maximum mh_arr)
+   in result
+
 -- | Star formation rate density,
 -- to be used in the IGM/ISM mass fraction differential equations
 starFormationRateDensity :: ReferenceCosmology -> PowerSpectrum -> SMF_kind -> HMF_kind -> W_kind -> Redshift -> Double

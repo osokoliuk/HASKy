@@ -75,17 +75,15 @@ hubbleParameter cosmology z =
   let (h0, om0, ob0, _, _, _, _) = unpackCosmology cosmology
    in h0 * sqrt (om0 * (1 + z) ** 3 + 1 - om0)
 
+-- | dt/dz, will be used as an integrand to derive cosmic time
+dtdz :: ReferenceCosmology -> Redshift -> Double
+dtdz cosmology z =
+  let (h0, om0, ob0, _, _, _, _) = unpackCosmology cosmology
+      km_Mpc = 3.24 * 1e-20
+      s_Gyr = 3.15 * 1e16
+   in (km_Mpc * s_Gyr * (1 + z) * hubbleParameter cosmology z) ** (-1)
+
 -- | Define cosmic time t(z) in the units of [Gyr]
 cosmicTime :: ReferenceCosmology -> Redshift -> CosmicTime
 cosmicTime cosmology z =
-  let (h0, om0, ob0, _, _, _, _) = unpackCosmology cosmology
-
-      km_Mpc :: Double
-      km_Mpc = 3.24 * 1e-20
-
-      s_Gyr = 3.15 * 1e16
-
-      integrand :: Double -> Double
-      integrand z =
-        (km_Mpc * s_Gyr * (1 + z) * hubbleParameter cosmology z) ** (-1)
-   in nIntegrate512 integrand z 20
+  nIntegrate512 (dtdz cosmology) z 20

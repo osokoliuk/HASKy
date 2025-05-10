@@ -158,20 +158,20 @@ interGalacticMediumTerms cosmology pk i_kind s_kind h_kind w_kind yield mh_min z
 -- with all equations being taken from the [Daigne et al. 2004]
 igmIsmEvolution :: ReferenceCosmology -> PowerSpectrum -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Yield -> Mhalo -> ([Double], [V.Vector Double])
 igmIsmEvolution cosmology pk i_kind s_kind h_kind w_kind yield mh_min =
-  let (_, om0, ob0, _, _, _, _) = unpackCosmology cosmology
+  let (h0, om0, ob0, _, gn, _, _) = unpackCosmology cosmology
       z_arr = [20.0, 20.0 - 0.25 .. 0]
-      m_tot = 1e22
+      rho_mean z = 3 * h0 ** 2 * ob0 / (8 * pi * gn) * (1 + z) ** (-4)
 
       terms_arr =
         interGalacticMediumTerms cosmology pk i_kind s_kind h_kind w_kind yield mh_min z_arr
-      mar_arr m_tot =
-        parMap rpar (\z -> ob0 / om0 * massAccretionRate cosmology m_tot z) z_arr
+      mar_arr =
+        parMap rpar (\z -> baryonFormationRateDensity cosmology pk h_kind w_kind z) z_arr
       t_arr =
-        parMap rpar (\z -> cosmicTime cosmology z) z_arr
+        parMap rpar (\z -> 1e9 * cosmicTime cosmology z) z_arr
 
       (interp_sfrd, interp_osn, interp_osni, interp_ow, interp_e, interp_ei) =
         mapTuple6 (makeInterp z_arr) terms_arr
-      interp_mar m_tot = makeInterp z_arr (mar_arr m_tot)
+      interp_mar = makeInterp z_arr mar_arr
       interp_z = makeInterp t_arr z_arr
       interp_t = makeInterp z_arr t_arr
       interp_o = (+) <$> interp_osn <*> interp_ow
@@ -179,14 +179,14 @@ igmIsmEvolution cosmology pk i_kind s_kind h_kind w_kind yield mh_min =
       -- ICs are set assuming very small baryon fraction in the structures,
       -- with M_ISM/M_IGM ~ 0.01 (stellar mass is negligible at this redshift)
       -- following the prescription of [Daigne et al. 2006]
-      (n_steps, t_init, igm_ini, ism_ini) =
-        (20 :: Int, interp_t (maximum z_arr), m_tot, 1e-2 * m_tot)
+      (n_steps, t_init, rho_init, igm_ini, ism_ini) =
+        (20 :: Int, interp_t (maximum z_arr), rho_mean (maximum z_arr), rho_init, 1e-2 * rho_init)
 
       igm_ode t y =
         let z = interp_z t
          in V.fromList
-              [ -interp_mar m_tot z + interp_o z,
-                (-interp_sfrd z + interp_e z) + (interp_mar m_tot z - interp_o z)
+              [ -interp_mar z + interp_o z,
+                (-interp_sfrd z + interp_e z) + (interp_mar z - interp_o z)
               ]
 
       result =
