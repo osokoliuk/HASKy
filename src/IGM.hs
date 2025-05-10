@@ -17,6 +17,7 @@ redshifts.
 
 import Control.Parallel.Strategies
 import Cosmology
+import Data.Bifunctor
 import qualified Data.Map as M
 import qualified Data.Vector as V
 import HMF
@@ -100,13 +101,13 @@ tauMS m
 -- to be used in the next function
 interGalacticMediumTerms :: ReferenceCosmology -> PowerSpectrum -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Yield -> Mhalo -> [Redshift] -> ([Double], [Double], [Double], [Double], [Double], [Double])
 interGalacticMediumTerms cosmology pk i_kind s_kind h_kind w_kind yield mh_min z_arr =
-  let (e_w, e_sn, kms_ergMsol, energy, m_up) =
-        (0.02, 0.005, 1.989 * 1e43, 2 * 1e51, 100)
+  let (e_w, e_sn, kms_ergMsol, yr_Gyr, energy, m_up) =
+        (0.02, 0.005, 1.989 * 1e43, 1, 2 * 1e51, 100)
 
       t_arr =
         parMap rpar (\z -> cosmicTime cosmology z) z_arr
       sfrd_arr =
-        parMap rpar (\z -> starFormationRateDensity cosmology pk s_kind h_kind w_kind z) z_arr
+        parMap rpar (\z -> yr_Gyr * starFormationRateDensity cosmology pk s_kind h_kind w_kind z) z_arr
       vesc_sq_arr =
         parMap rpar (\z -> escapeVelocitySq cosmology pk h_kind w_kind mh_min z) z_arr
 
@@ -130,8 +131,7 @@ interGalacticMediumTerms cosmology pk i_kind s_kind h_kind w_kind yield mh_min z
       integrand_SNe_Element z m =
         norm_imf m
           * sfrd (z_target z m)
-          * yield m
-          * (m - massRemnant m 0.1)
+          * (m - yield m * massRemnant m 0.1)
       integrand_Wind z m =
         norm_imf m
           * sfrd (z_target z m)
@@ -139,15 +139,15 @@ interGalacticMediumTerms cosmology pk i_kind s_kind h_kind w_kind yield mh_min z
       integrand_ISM_Element = integrand_SNe_Element
 
       result_SNe =
-        parMap rpar (\z -> e_sn * nIntegrate256 (integrand_SNe z) (m_down z) m_up) z_arr
+        parMap rpar (\z -> yr_Gyr * e_sn * nIntegrate256 (integrand_SNe z) (m_down z) m_up) z_arr
       result_SNe_Element =
-        parMap rpar (\z -> e_sn * nIntegrate256 (integrand_SNe_Element z) (m_down z) m_up) z_arr
+        parMap rpar (\z -> yr_Gyr * e_sn * nIntegrate256 (integrand_SNe_Element z) (m_down z) m_up) z_arr
       result_Wind =
-        parMap rpar (\z -> e_w * nIntegrate256 (integrand_Wind z) (m_down z) m_up) z_arr
+        parMap rpar (\z -> yr_Gyr * e_w * nIntegrate256 (integrand_Wind z) (m_down z) m_up) z_arr
       result_ISM =
-        parMap rpar (\z -> nIntegrate256 (integrand_SNe z) (massDynamical (cosmicTime cosmology z)) m_up) z_arr
+        parMap rpar (\z -> yr_Gyr * nIntegrate256 (integrand_SNe z) (massDynamical (cosmicTime cosmology z)) m_up) z_arr
       result_ISM_Element =
-        parMap rpar (\z -> nIntegrate256 (integrand_ISM_Element z) (massDynamical (cosmicTime cosmology z)) m_up) z_arr
+        parMap rpar (\z -> yr_Gyr * nIntegrate256 (integrand_ISM_Element z) (massDynamical (cosmicTime cosmology z)) m_up) z_arr
    in (sfrd_arr, result_SNe, result_SNe_Element, result_Wind, result_ISM, result_ISM_Element)
 
 -- | Solve four copled first-order differential equations that govern the evolution of:
@@ -156,7 +156,7 @@ interGalacticMediumTerms cosmology pk i_kind s_kind h_kind w_kind yield mh_min z
 --    * Xi_IGM    (4)
 --    * Xi_ISM    (5)
 -- with all equations being taken from the [Daigne et al. 2004]
-igmIsmEvolution :: ReferenceCosmology -> PowerSpectrum -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Yield -> Mhalo -> [(Double, V.Vector Double)]
+igmIsmEvolution :: ReferenceCosmology -> PowerSpectrum -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Yield -> Mhalo -> ([Double], [V.Vector Double])
 igmIsmEvolution cosmology pk i_kind s_kind h_kind w_kind yield mh_min =
   let (_, om0, ob0, _, _, _, _) = unpackCosmology cosmology
       z_arr = [20.0, 20.0 - 0.25 .. 0]
@@ -177,19 +177,18 @@ igmIsmEvolution cosmology pk i_kind s_kind h_kind w_kind yield mh_min =
       interp_o = (+) <$> interp_osn <*> interp_ow
 
       -- ICs are set assuming very small baryon fraction in the structures,
+      -- with M_ISM/M_IGM ~ 0.01 (stellar mass is negligible at this redshift)
       -- following the prescription of [Daigne et al. 2006]
       (n_steps, t_init, igm_ini, ism_ini) =
-        (20 :: Int, interp_t (maximum z_arr), m_tot, 1e-6 * m_tot)
+        (20 :: Int, interp_t (maximum z_arr), m_tot, 1e-2 * m_tot)
 
       igm_ode t y =
         let z = interp_z t
          in V.fromList
               [ -interp_mar m_tot z + interp_o z,
-                (-interp_sfrd z + interp_e z) + (interp_mar m_tot z - interp_o z),
-                1 / (y V.! 0) * (interp_ow z * (y V.! 3 - y V.! 2) + (interp_osni z - interp_osn z * y V.! 2)),
-                1 / (y V.! 1) * ((interp_ei z - interp_e z * y V.! 3) + interp_mar m_tot z * (y V.! 2 - y V.! 3) - (interp_osni z - interp_osn z * y V.! 3))
+                (-interp_sfrd z + interp_e z) + (interp_mar m_tot z - interp_o z)
               ]
-      -- CHANGE ICs to SOMETHING APPROPRIATE
+
       result =
-        rk4Solve igm_ode t_init ((interp_t 0 - t_init) / fromIntegral n_steps) n_steps (V.fromList [igm_ini, ism_ini, igm_ini * 1e-8, ism_ini * 1e-8])
-   in result
+        rk4Solve igm_ode t_init ((interp_t 0 - t_init) / fromIntegral n_steps) n_steps (V.fromList [igm_ini, ism_ini])
+   in unzip result

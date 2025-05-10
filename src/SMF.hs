@@ -97,8 +97,10 @@ massAccretionHistory mh z =
 massAccretionRate :: ReferenceCosmology -> Mhalo -> Redshift -> Double
 massAccretionRate cosmology mh z =
   let (h0, om0, ob0, _, _, _, _) = unpackCosmology cosmology
-   in 25.3 * (mh / 1e12) ** 1.1
-        + (1 + 1.65 * z) * sqrt (om0 * (1 + z) ** 3 + 1 - om0)
+   in 25.3
+        * (mh / 1e12) ** 1.1
+        * (1 + 1.65 * z)
+        * sqrt (om0 * (1 + z) ** 3 + 1 - om0)
 
 -- | Star formation rate, derived simply as a normalised halo mass accretion rate
 -- eps_star converts baryonic mass to a stellar mass, while factor Om0/Ob0 converts
