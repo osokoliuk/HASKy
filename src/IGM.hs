@@ -34,7 +34,7 @@ data IMF_kind
 
 data Remnant_Kind
   = Pereira
-  | WossleyWeaver
+  | WoosleyWeaver
   deriving (Eq, Show)
 
 initialMassFunction :: IMF_kind -> Mstar -> Double
@@ -76,7 +76,9 @@ normalisedInitialMassFunction i_kind mup m =
 massRemnant :: Mstar -> Remnant_Kind -> Metallicity -> Double
 massRemnant m r_kind metal_frac =
   case r_kind of
-    WossleyWeaver
+    -- Remnant masses taken from the [Woosley & Weaver 95]
+    -- and [Hoek & Groenewegen 1996]
+    WoosleyWeaver
       | m < 0.9 -> 0
       | m <= 8 ->
           let (mi, mr) = (unzip . M.toList) (remnantMediumMass metal_frac)
@@ -94,6 +96,8 @@ massRemnant m r_kind metal_frac =
                   metal_frac
             )
             [35, 40]
+    -- Remnant masses from the [Pereira & Miranda 2010]
+    -- Note that unlike WW95 work, these are metallicity-independent
     Pereira
       | m < 1 -> 0
       | m <= 8 -> 0.1156 * m + 0.4551
@@ -174,10 +178,10 @@ interGalacticMediumTerms cosmology pk r_kind i_kind s_kind h_kind w_kind yield m
 --    * Xi_IGM    (4)
 --    * Xi_ISM    (5)
 -- with all equations being taken from the [Daigne et al. 2004]
-igmIsmEvolution :: ReferenceCosmology -> PowerSpectrum -> Remnant_Kind -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Yield -> Metallicity -> Mhalo -> ([Double], [V.Vector Double])
-igmIsmEvolution cosmology pk r_kind i_kind s_kind h_kind w_kind yield metal_frac mh_min =
+igmIsmEvolution :: ReferenceCosmology -> PowerSpectrum -> Remnant_Kind -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Yield -> Element -> Metallicity -> Mhalo -> ([Double], [V.Vector Double])
+igmIsmEvolution cosmology pk r_kind i_kind s_kind h_kind w_kind yield elem metal_frac mh_min =
   let (h0, om0, ob0, _, gn, _, _) = unpackCosmology cosmology
-      z_arr = [19.0, 19.0 - 0.1 .. 0]
+      z_arr = [20.0, 20.0 - 0.1 .. 0]
 
       terms_arr =
         interGalacticMediumTerms cosmology pk r_kind i_kind s_kind h_kind w_kind yield metal_frac mh_min z_arr
@@ -196,8 +200,14 @@ igmIsmEvolution cosmology pk r_kind i_kind s_kind h_kind w_kind yield metal_frac
       -- ICs are set assuming very small baryon fraction in the structures,
       -- with M_ISM/M_IGM ~ 0.01 (stellar mass is negligible at this redshift)
       -- following the prescription of [Daigne et al. 2006]
+      -- Finally, we also adopt the BBN abundances for H (He),
+      -- such that the ICs for Xi_ISM/Xi_IGM = 0.76 (0.24) M_tot
       (n_steps, t_init, a_ini, mass_tot, igm_ini, ism_ini, xi_igm_ini, xi_ism_ini) =
-        (20 :: Int, interp_t (maximum z_arr), 0.01, 1e11, (1 - a_ini) * mass_tot, a_ini * mass_tot, 0, 0)
+        let ini_abundance
+              | element elem == "H" && isotope elem == 1 = 0.76
+              | element elem == "He" && isotope elem == 3 = 0.24
+              | otherwise = 0
+         in (100 :: Int, interp_t (maximum z_arr), 0.01, 1e11, (1 - a_ini) * mass_tot, a_ini * mass_tot, ini_abundance * igm_ini, ini_abundance * ism_ini)
 
       -- Convert Differential-Algebraic system into a system of ODEs
       igm_ode t y =
@@ -218,4 +228,25 @@ igmIsmEvolution cosmology pk r_kind i_kind s_kind h_kind w_kind yield metal_frac
       result = (\v -> V.map (/ mass_tot) $ V.snoc v (mass_tot - v V.! 0 - v V.! 1)) <$> masses
    in (times, result)
 
--- igmMetallicity
+-- | Derive the metallicity of the IGM from outflow/inflow rates of metals,
+-- currently using an approach presented in [Tan et al. 2018]
+igmMetallicity :: ReferenceCosmology -> PowerSpectrum -> Remnant_Kind -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Yield -> Metallicity -> Mhalo -> ([Double], [Double])
+igmMetallicity cosmology pk r_kind i_kind s_kind h_kind w_kind yield metal_frac mh_min =
+  let (h0, om0, ob0, _, gn, _, _) = unpackCosmology cosmology
+      z_arr = [20.0, 20.0 - 0.1 .. 0]
+      rho_cr = 3 * h0 ** 2 / (8 * pi * gn)
+
+      terms_arr =
+        interGalacticMediumTerms cosmology pk r_kind i_kind s_kind h_kind w_kind yield metal_frac mh_min z_arr
+      mar_arr =
+        parMap rpar (\z -> 1e9 * baryonFormationRateDensity cosmology pk h_kind w_kind z) z_arr
+      t_arr =
+        parMap rpar (\z -> cosmicTime cosmology z) z_arr
+
+      (_, osn_arr, _, ow_arr, _, _) = terms_arr
+      o_arr = zipWith (+) osn_arr ow_arr
+
+      numerator = cumulativeTrapezoid t_arr o_arr
+      denominator = zipWith (\x y -> rho_cr * ob0 + x - y) (cumulativeTrapezoid t_arr mar_arr) numerator
+      result = zipWith (\x y -> x / y) numerator denominator
+   in (z_arr, result)

@@ -13,14 +13,17 @@ A module that defines lots of functions to be used by other modules.
 Kind of useless by itself.
 -}
 
+import Control.Applicative (liftA2)
 import Control.Monad (unless)
 import Control.Monad.State
 import Control.Parallel.Strategies (parTuple4, parTuple6, rpar, using, withStrategy)
 import Data.Bifunctor
 import Data.Char (isDigit, isSpace, toLower, toUpper)
+import Data.Foldable (toList)
 import Data.List (dropWhileEnd, elemIndex, transpose)
 import qualified Data.Map as M
 import qualified Data.Map.Strict as M'
+import Data.Traversable (mapAccumL)
 import qualified Data.Vector as V
 import System.IO
 import Text.Read (readMaybe)
@@ -150,27 +153,19 @@ sinc x =
   where
     taylor_n_bound = sqrt $ sqrt epsilon
 
--- | Cumulative trapezoid rule (reversed),
--- mainly used to calculate n(>Mh,z) from dn/dMh
-cumulativeTrapezoid :: [Double] -> [Double] -> [Double]
-cumulativeTrapezoid x y
-  | length x /= length y = error "Input lists must be of equal length"
-  | otherwise = reverse $ scanl1 (+) trapezoidsRev
-  where
-    xRev = reverse x
-    yRev = reverse y
-    trapezoidsRev = zipWith3 trapArea xRev (tail xRev) yRev
-
-    -- Compute area of trapezoid between two x values and corresponding y values
-    trapArea x1 x2 y1 =
-      let i = indexOf x1 xRev
-          y2 = yRev !! (i + 1)
-       in 0.5 * (y1 + y2) * (x1 - x2)
-
-    -- Helper: index lookup (simple linear search)
-    indexOf x xs = case elemIndex x xs of
-      Just i -> i
-      Nothing -> error "Value not found in x array"
+-- | Cumulative trapezoidal integrator
+-- Takes two equally-sized traversables of x and y values
+-- Returns a traversable of cumulative integrals
+cumulativeTrapezoid :: (Fractional a) => [a] -> [a] -> [a]
+cumulativeTrapezoid xs ys
+  | length xs /= length ys = error "x and y must be the same length"
+  | length xs < 2 = replicate (length xs) 0
+  | otherwise =
+      let dxs = zipWith (-) (tail xs) xs
+          avgs = zipWith (\y1 y2 -> (y1 + y2) / 2) ys (tail ys)
+          areas = zipWith (*) dxs avgs
+          cum = scanl (+) 0 areas
+       in 0 : cum
 
 -- | Heaveside step function
 heaviside :: (Ord a, Num a) => a -> a

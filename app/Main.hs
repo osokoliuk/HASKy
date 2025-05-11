@@ -14,7 +14,8 @@ args = []
 main :: IO ()
 main =
   do
-    (mass_arr, yield_arr) <- yieldsHighMass 1 $ Element "Fe" 56
+    let elem = Element "H" 1
+    (mass_arr, yield_arr) <- yieldsHighMass 1 elem
 
     let interp_yield :: Yield
         interp_yield = makeInterp mass_arr yield_arr
@@ -27,7 +28,7 @@ main =
         -- x = (\mh -> sqrt $ escapeVelocitySq planck18 pk ST Smooth mh 0) <$> ((10 **) <$> [6, 6 + 0.1 .. 16])
         -- x = (\z -> baryonFormationRateDensity planck18 pk ST Smooth z) <$> z_arr
         -- x = (\m -> m - massRemnant m 0.1) <$> [0.1, 1.1 .. 100]
-        x = igmIsmEvolution planck18 pk Pereira Kroupa Behroozi ST Smooth interp_yield 0 1e7
+        x = igmIsmEvolution planck18 pk Pereira Kroupa Behroozi ST Smooth interp_yield elem 0 1e7
     -- x = (\z -> baryonAccretionRate planck18 pk ST Smooth 1e6 z) <$> z_arr
 
     print $ x
