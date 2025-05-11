@@ -25,12 +25,19 @@ import qualified Data.Map as M
 import qualified Data.Map.Strict as M'
 import Data.Traversable (mapAccumL)
 import qualified Data.Vector as V
+import Math.GaussianQuadratureIntegration
 import System.IO
 import Text.Read (readMaybe)
 
+-- Data type that describes the precision that you want to achieve with the
+-- Gaussian quadrature integration, the only plausible choices are:
+--  * 128, 256, 512, 1024
+--   (fast) ------> (slow)
 data Precision = Precision Int
   deriving (Eq, Show, Ord)
 
+-- Data type that will describe an element that we want to focus on
+-- while deriving the mass fractions (mainly it will be a kind of metal)
 data Element
   = Element
   { element :: String,
@@ -54,6 +61,18 @@ data Table = Table
     values :: [(Element, [Double])]
   }
   deriving (Show)
+
+-- | Generate an integrator based on the given precision,
+-- note that in this code we are only using Gaussian quadratures
+-- as an integration method
+integrator :: Precision -> ((Double -> Double) -> Double -> Double -> Double)
+integrator precision =
+  case precision of
+    Precision 128 -> nIntegrate128
+    Precision 256 -> nIntegrate256
+    Precision 512 -> nIntegrate512
+    Precision 1024 -> nIntegrate1024
+    _ -> error "Incorrect precision given"
 
 -- | We define a log10 function (which is apparenly absent from the Prelude)
 -- just for our convenience
