@@ -14,7 +14,7 @@ args = []
 main :: IO ()
 main =
   do
-    (mass_arr, yield_arr) <- yieldsHighMass 1 $ Element "O" 16
+    (mass_arr, yield_arr) <- yieldsHighMass 1 $ Element "Fe" 56
 
     let interp_yield :: Yield
         interp_yield = makeInterp mass_arr yield_arr
@@ -22,7 +22,7 @@ main =
         pk = powerSpectrumEisensteinHu planck18
         coeff = 1.988 * 1e43
         z_arr = [20, 20 - 1 .. 0]
-        -- x = map (\z -> 0.05 / 0.315 * massAccretionRate planck18 1e6 z) z_arr
+        -- x = map (\z -> 1e9 * baryonFormationRateDensity planck18 pk ST Smooth z) z_arr
         -- x = interGalacticMediumTerms planck18 (powerSpectrumEisensteinHu planck18) Kroupa DoublePower ST Smooth interp_yield 1e6 [20, 20 - 1 .. 0]
         -- x = (\mh -> sqrt $ escapeVelocitySq planck18 pk ST Smooth mh 0) <$> ((10 **) <$> [6, 6 + 0.1 .. 16])
         -- x = (\z -> baryonFormationRateDensity planck18 pk ST Smooth z) <$> z_arr

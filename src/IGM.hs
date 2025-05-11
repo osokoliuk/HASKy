@@ -143,15 +143,15 @@ interGalacticMediumTerms cosmology pk i_kind s_kind h_kind w_kind yield mh_min z
       integrand_ISM_Element = integrand_SNe_Element
 
       result_SNe =
-        parMap rpar (\z -> yr_Gyr * e_sn * nIntegrate256 (integrand_SNe z) (m_down z) m_up) z_arr
+        parMap rpar (\z -> e_sn * nIntegrate256 (integrand_SNe z) (m_down z) m_up) z_arr
       result_SNe_Element =
-        parMap rpar (\z -> yr_Gyr * e_sn * nIntegrate256 (integrand_SNe_Element z) (m_down z) m_up) z_arr
+        parMap rpar (\z -> e_sn * nIntegrate256 (integrand_SNe_Element z) (m_down z) m_up) z_arr
       result_Wind =
-        parMap rpar (\z -> yr_Gyr * e_w * nIntegrate256 (integrand_Wind z) (m_down z) m_up) z_arr
+        parMap rpar (\z -> e_w * nIntegrate256 (integrand_Wind z) (m_down z) m_up) z_arr
       result_ISM =
-        parMap rpar (\z -> yr_Gyr * nIntegrate256 (integrand_SNe z) (massDynamical (cosmicTime cosmology z)) m_up) z_arr
+        parMap rpar (\z -> nIntegrate256 (integrand_SNe z) (massDynamical (cosmicTime cosmology z)) m_up) z_arr
       result_ISM_Element =
-        parMap rpar (\z -> yr_Gyr * nIntegrate256 (integrand_ISM_Element z) (massDynamical (cosmicTime cosmology z)) m_up) z_arr
+        parMap rpar (\z -> nIntegrate256 (integrand_ISM_Element z) (massDynamical (cosmicTime cosmology z)) m_up) z_arr
    in (sfrd_arr, result_SNe, result_SNe_Element, result_Wind, result_ISM, result_ISM_Element)
 
 -- | Solve four copled first-order differential equations that govern the evolution of:
@@ -165,7 +165,7 @@ igmIsmEvolution cosmology pk i_kind s_kind h_kind w_kind yield mh_min =
   let (h0, om0, ob0, _, gn, _, _) = unpackCosmology cosmology
       z_arr = [20.0, 20.0 - 0.1 .. 0]
       rho_mean z = 3 * h0 ** 2 * ob0 / (8 * pi * gn) * (1 + z) ** (-4)
-      rho_tot = rho_mean 0
+      rho_tot = 1e10
 
       terms_arr =
         interGalacticMediumTerms cosmology pk i_kind s_kind h_kind w_kind yield mh_min z_arr
@@ -184,8 +184,8 @@ igmIsmEvolution cosmology pk i_kind s_kind h_kind w_kind yield mh_min =
       -- ICs are set assuming very small baryon fraction in the structures,
       -- with M_ISM/M_IGM ~ 0.01 (stellar mass is negligible at this redshift)
       -- following the prescription of [Daigne et al. 2006]
-      (n_steps, t_init, rho_init, igm_ini, ism_ini) =
-        (20 :: Int, interp_t (maximum z_arr), rho_mean (maximum z_arr), rho_init, 0)
+      (n_steps, t_init, igm_ini, ism_ini) =
+        (20 :: Int, interp_t (maximum z_arr), rho_tot, 0)
 
       -- Convert Differential-Algebraic system into ODE via Lagrangian multipliers
       -- We are using an approach laid out in [van der Houwen & de Swart 1997]
@@ -202,5 +202,5 @@ igmIsmEvolution cosmology pk i_kind s_kind h_kind w_kind yield mh_min =
 
       (migm_arr, mstar_arr) = splitXY masses
       -- M_ISM = M_IGM - Mstar - rho_tot from the conservation equation
-      mism_arr = zipWith (\x y -> x - y - rho_init) migm_arr mstar_arr
+      mism_arr = zipWith (\x y -> rho_tot - x - y) migm_arr mstar_arr
    in (times, migm_arr, mism_arr, mstar_arr)
