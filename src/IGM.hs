@@ -32,6 +32,11 @@ data IMF_kind
   | Chabrier
   deriving (Eq, Show)
 
+data Remnant_Kind
+  = Pereira
+  | WossleyWeaver
+  deriving (Eq, Show)
+
 initialMassFunction :: IMF_kind -> Mstar -> Double
 initialMassFunction i_kind m =
   let (alpha0, alpha1, alpha2, m1, m2, k0, k1, k2) =
@@ -68,25 +73,35 @@ normalisedInitialMassFunction i_kind mup m =
 -- calculated according to various works in the units of [Msol].
 -- Note that below a certain mass, stellar lifetimes are higher than the
 -- t_0 (age of the universe), so there will be no remnant
-massRemnant :: Mstar -> Metallicity -> Double
-massRemnant m metal_frac
-  | m < 0.9 = 0
-  | m >= 0.9 && m <= 8 =
-      let (mi, mr) = (unzip . M.toList) (remnantMediumMass metal_frac)
-       in makeInterp mi mr $ m
-  | m <= 40 =
-      let (mi, mr) = (unzip . M.toList) (remnantHighMass metal_frac)
-       in makeInterp mi mr $ m
-  | otherwise =
-      extrapolate
-        m
-        ( (\x y -> [x, y])
-            <$> M.findWithDefault 0.0 35
-            <*> M.findWithDefault 0.0 40
-            $ remnantHighMass
-              metal_frac
-        )
-        [35, 40]
+massRemnant :: Mstar -> Remnant_Kind -> Metallicity -> Double
+massRemnant m r_kind metal_frac =
+  case r_kind of
+    WossleyWeaver
+      | m < 0.9 -> 0
+      | m <= 8 ->
+          let (mi, mr) = (unzip . M.toList) (remnantMediumMass metal_frac)
+           in makeInterp mi mr $ m
+      | m <= 40 ->
+          let (mi, mr) = (unzip . M.toList) (remnantHighMass metal_frac)
+           in makeInterp mi mr $ m
+      | otherwise ->
+          extrapolate
+            m
+            ( (\x y -> [x, y])
+                <$> M.findWithDefault 0.0 35
+                <*> M.findWithDefault 0.0 40
+                $ remnantHighMass
+                  metal_frac
+            )
+            [35, 40]
+    Pereira
+      | m < 1 -> 0
+      | m <= 8 -> 0.1156 * m + 0.4551
+      | m <= 10 -> 1.35
+      | m < 25 -> 1.4
+      | m < 140 -> 13 / 24 * (m - 20)
+      | m <= 260 -> 0
+      | m <= 500 -> m
 
 -- | Lifetime of a main sequence star in relation to it's mass,
 -- taken from the work of [Maeder & Meynet 1989] and the extrapolation to
@@ -102,8 +117,8 @@ tauMS m
 
 -- | Some of the terms (IGM/ISM outflows for all mass and a specific element yield, SFRD),
 -- to be used in the next function
-interGalacticMediumTerms :: ReferenceCosmology -> PowerSpectrum -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Yield -> Mhalo -> [Redshift] -> ([Double], [Double], [Double], [Double], [Double], [Double])
-interGalacticMediumTerms cosmology pk i_kind s_kind h_kind w_kind yield mh_min z_arr =
+interGalacticMediumTerms :: ReferenceCosmology -> PowerSpectrum -> Remnant_Kind -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Yield -> Metallicity -> Mhalo -> [Redshift] -> ([Double], [Double], [Double], [Double], [Double], [Double])
+interGalacticMediumTerms cosmology pk r_kind i_kind s_kind h_kind w_kind yield metal_frac mh_min z_arr =
   let (e_w, e_sn, kms_ergMsol, yr_Gyr, energy, m_up) =
         (0.02, 0.005, 1.989 * 1e43, 1e9, 2 * 1e51, 100)
 
@@ -130,12 +145,11 @@ interGalacticMediumTerms cosmology pk i_kind s_kind h_kind w_kind yield mh_min z
       integrand_SNe z m =
         norm_imf m
           * sfrd (z_target z m)
-          * (m - massRemnant m 0.1)
+          * (m - massRemnant m r_kind metal_frac)
       integrand_SNe_Element z m =
         norm_imf m
           * sfrd (z_target z m)
-          * yield m
-          * (m - massRemnant m 0.1)
+          * (m - yield m * massRemnant m r_kind metal_frac)
       integrand_Wind z m =
         norm_imf m
           * sfrd (z_target z m)
@@ -160,15 +174,13 @@ interGalacticMediumTerms cosmology pk i_kind s_kind h_kind w_kind yield mh_min z
 --    * Xi_IGM    (4)
 --    * Xi_ISM    (5)
 -- with all equations being taken from the [Daigne et al. 2004]
-igmIsmEvolution :: ReferenceCosmology -> PowerSpectrum -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Yield -> Mhalo -> ([Double], [V.Vector Double])
-igmIsmEvolution cosmology pk i_kind s_kind h_kind w_kind yield mh_min =
+igmIsmEvolution :: ReferenceCosmology -> PowerSpectrum -> Remnant_Kind -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Yield -> Metallicity -> Mhalo -> ([Double], [V.Vector Double])
+igmIsmEvolution cosmology pk r_kind i_kind s_kind h_kind w_kind yield metal_frac mh_min =
   let (h0, om0, ob0, _, gn, _, _) = unpackCosmology cosmology
       z_arr = [19.0, 19.0 - 0.1 .. 0]
-      rho_mean z = 3 * h0 ** 2 * ob0 / (8 * pi * gn) * (1 + z) ** (-4)
-      rho_tot = 1e11
 
       terms_arr =
-        interGalacticMediumTerms cosmology pk i_kind s_kind h_kind w_kind yield mh_min z_arr
+        interGalacticMediumTerms cosmology pk r_kind i_kind s_kind h_kind w_kind yield metal_frac mh_min z_arr
       mar_arr =
         parMap rpar (\z -> 1e9 * baryonFormationRateDensity cosmology pk h_kind w_kind z) z_arr
       t_arr =
@@ -184,11 +196,10 @@ igmIsmEvolution cosmology pk i_kind s_kind h_kind w_kind yield mh_min =
       -- ICs are set assuming very small baryon fraction in the structures,
       -- with M_ISM/M_IGM ~ 0.01 (stellar mass is negligible at this redshift)
       -- following the prescription of [Daigne et al. 2006]
-      (n_steps, t_init, a_ini, igm_ini, ism_ini, xi_igm_ini, xi_ism_ini) =
-        (20 :: Int, interp_t (maximum z_arr), 0.01, (1 - a_ini) * rho_tot, a_ini * rho_tot, 0, 0)
+      (n_steps, t_init, a_ini, mass_tot, igm_ini, ism_ini, xi_igm_ini, xi_ism_ini) =
+        (20 :: Int, interp_t (maximum z_arr), 0.01, 1e11, (1 - a_ini) * mass_tot, a_ini * mass_tot, 0, 0)
 
-      -- Convert Differential-Algebraic system into ODE via Lagrangian multipliers
-      -- We are using an approach laid out in [van der Houwen & de Swart 1997]
+      -- Convert Differential-Algebraic system into a system of ODEs
       igm_ode t y =
         let z = interp_z t
          in V.fromList
@@ -202,6 +213,9 @@ igmIsmEvolution cosmology pk i_kind s_kind h_kind w_kind yield mh_min =
         unzip $
           rk4Solve igm_ode t_init ((interp_t 0 - t_init) / fromIntegral n_steps) n_steps (V.fromList [igm_ini, ism_ini, xi_igm_ini, xi_ism_ini])
 
-      -- M_ISM = M_IGM - Mstar - rho_tot from the conservation equation
-      result = (\v -> V.snoc v (rho_tot - v V.! 0 - v V.! 1)) <$> masses
+      -- M_star = rho_tot - M_IGM - Mstar from the conservation equation
+      -- In addition, we also normalise each mass by the total mass
+      result = (\v -> V.map (/ mass_tot) $ V.snoc v (mass_tot - v V.! 0 - v V.! 1)) <$> masses
    in (times, result)
+
+-- igmMetallicity
