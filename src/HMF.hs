@@ -57,7 +57,7 @@ type PowerSpectrum = Redshift -> Wavenumber -> Double
 -- | Define a radius for the uniform density sphere in terms of it's mass
 rh :: ReferenceCosmology -> W_kind -> Mhalo -> Rhalo
 rh cosmology w_kind mh =
-  let (h0, om0, ob0, _, gn, _, _) = unpackCosmology cosmology
+  let (h0, om0, ob0, _, gn, _, _, _) = unpackCosmology cosmology
       rho_mean = 3 * h0 ** 2 * om0 / (8 * pi * gn)
       c_smooth = 3.3
       c_sharp = 2.5
@@ -96,13 +96,15 @@ windowFunction cosmology w_kind k mh =
 -- Derived by integrating a matter power spectrum and a window function
 cosmicVarianceSq :: ReferenceCosmology -> PowerSpectrum -> Mhalo -> Redshift -> W_kind -> Double
 cosmicVarianceSq cosmology pk mh z w_kind =
-  let integrand :: Wavenumber -> Double
+  let (_, _, _, _, _, _, _, prec) = unpackCosmology cosmology
+
       integrand k =
         (k ** 2 / (2 * pi ** 2))
           * (pk z k)
           * (windowFunction cosmology w_kind k mh) ** 2
+      integrator = makeIntegrator (Precision prec)
 
-      result = nIntegrate128 integrand 1e-3 1e3
+      result = integrator integrand 1e-3 1e3
    in result
 
 -- | First-crossing distribution, crucial for the derivation of a
@@ -115,7 +117,7 @@ cosmicVarianceSq cosmology pk mh z w_kind =
 -- We are planning to add more options in the near future
 firstCrossing :: ReferenceCosmology -> PowerSpectrum -> HMF_kind -> W_kind -> Mhalo -> Redshift -> Double
 firstCrossing cosmology pk h_kind w_kind mh z =
-  let (h0, om0, ob0, _, _, _, _) = unpackCosmology cosmology
+  let (h0, om0, ob0, _, _, _, _, _) = unpackCosmology cosmology
       sigma = sqrt $ cosmicVarianceSq cosmology pk mh z w_kind
 
       -- Critical linear overdensity threshold with
@@ -137,7 +139,7 @@ firstCrossing cosmology pk h_kind w_kind mh z =
 -- defined within this module and a differentiation library
 haloMassFunction :: ReferenceCosmology -> PowerSpectrum -> HMF_kind -> W_kind -> Mhalo -> Redshift -> Double
 haloMassFunction cosmology pk h_kind w_kind mh z =
-  let (h0, om0, ob0, _, gn, _, _) = unpackCosmology cosmology
+  let (h0, om0, ob0, _, gn, _, _, _) = unpackCosmology cosmology
       rho_mean = 3 * h0 ** 2 * om0 / (8 * pi * gn)
 
       sigma = \mh -> cosmicVarianceSq cosmology pk mh z w_kind
@@ -153,7 +155,7 @@ haloMassFunction cosmology pk h_kind w_kind mh z =
 -- in the units of [km^2 s^-2], taken from the [Tan et al. 2018]
 escapeVelocitySq :: ReferenceCosmology -> PowerSpectrum -> HMF_kind -> W_kind -> Mhalo -> Redshift -> Double
 escapeVelocitySq cosmology pk h_kind w_kind mh_min z =
-  let (h0, om0, ob0, _, gn, _, _) = unpackCosmology cosmology
+  let (h0, om0, ob0, _, gn, _, _, prec) = unpackCosmology cosmology
 
       first_crossing =
         (\mh -> firstCrossing cosmology pk h_kind w_kind mh z)
@@ -162,8 +164,9 @@ escapeVelocitySq cosmology pk h_kind w_kind mh_min z =
         mh * (2 * gn * mh / rh cosmology w_kind mh) * first_crossing mh
       integrand_2 mh =
         mh * first_crossing mh
+      integrator = makeIntegrator (Precision prec)
 
       result =
-        (nIntegrate128 integrand_1 mh_min 1e17)
-          / (nIntegrate128 integrand_2 mh_min 1e17)
+        (integrator integrand_1 mh_min 1e17)
+          / (integrator integrand_2 mh_min 1e17)
    in result

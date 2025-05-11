@@ -9,7 +9,7 @@ import Helper
 -- implementation is essentially adapted from the SkyPy package
 transferEinsensteinHu :: Wavenumber -> ReferenceCosmology -> Double
 transferEinsensteinHu k cosmology =
-  let (h0, om0, ob0, tcmb0, gn, as, ns) = unpackCosmology cosmology
+  let (h0, om0, ob0, tcmb0, gn, as, ns, _) = unpackCosmology cosmology
       little_h = h0 / 100
       om0h2 = om0 * little_h ** 2
       ob0h2 = ob0 * little_h ** 2
@@ -88,7 +88,7 @@ transferEinsensteinHu k cosmology =
 
 powerSpectrumEisensteinHu :: ReferenceCosmology -> Redshift -> Wavenumber -> Double
 powerSpectrumEisensteinHu cosmology z k =
-  let (h0, om0, ob0, tcmb0, gn, as, ns) = unpackCosmology cosmology
+  let (h0, om0, ob0, tcmb0, gn, as, ns, _) = unpackCosmology cosmology
       transfer = transferEinsensteinHu k cosmology
 
       om = om0 * (1 + z) ** (-3)

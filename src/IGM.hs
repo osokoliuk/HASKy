@@ -60,15 +60,17 @@ initialMassFunction i_kind m =
 
 -- | Next two functions normalise IMF between m_inf = 0.1 Msol and m_sup = 100 Msol
 -- so that it can acts as a PDF in that range
-imfNormalisation :: IMF_kind -> Mstar -> Double
-imfNormalisation i_kind mup =
-  let m_arr = [0.1, 0.1 + 0.1 .. mup]
+imfNormalisation :: ReferenceCosmology -> IMF_kind -> Mstar -> Double
+imfNormalisation cosmology i_kind mup =
+  let (_, _, _, _, _, _, _, prec) = unpackCosmology cosmology
+      m_arr = [0.1, 0.1 + 0.1 .. mup]
       integrand m = m * initialMassFunction i_kind m
-   in nIntegrate256 integrand (head m_arr) (last m_arr)
+      integrator = makeIntegrator (Precision prec)
+   in integrator integrand (head m_arr) (last m_arr)
 
-normalisedInitialMassFunction :: IMF_kind -> Mstar -> Mstar -> Double
-normalisedInitialMassFunction i_kind mup m =
-  let norm = imfNormalisation i_kind mup
+normalisedInitialMassFunction :: ReferenceCosmology -> IMF_kind -> Mstar -> Mstar -> Double
+normalisedInitialMassFunction cosmology i_kind mup m =
+  let norm = imfNormalisation cosmology i_kind mup
    in (initialMassFunction i_kind m) / norm
 
 -- | Mass of a remnant produced by the supernova,
@@ -125,7 +127,9 @@ tauMS m
 -- to be used in the next function
 interGalacticMediumTerms :: ReferenceCosmology -> PowerSpectrum -> Remnant_Kind -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Yield -> Metallicity -> Mhalo -> [Redshift] -> ([Double], [Double], [Double], [Double], [Double], [Double])
 interGalacticMediumTerms cosmology pk r_kind i_kind s_kind h_kind w_kind yield metal_frac mh_min z_arr =
-  let (e_w, e_sn, kms_ergMsol, yr_Gyr, energy, m_up) =
+  let (_, _, _, _, _, _, _, prec) = unpackCosmology cosmology
+
+      (e_w, e_sn, kms_ergMsol, yr_Gyr, energy, m_up) =
         (0.02, 0.005, 1.989 * 1e43, 1e9, 2 * 1e51, 100)
 
       t_arr =
@@ -146,7 +150,7 @@ interGalacticMediumTerms cosmology pk r_kind i_kind s_kind h_kind w_kind yield m
 
       z_target z m = time (cosmicTime cosmology z - tauMS m)
       m_down z = maximum [8, (massDynamical (cosmicTime cosmology z))]
-      norm_imf = normalisedInitialMassFunction i_kind m_up
+      norm_imf = normalisedInitialMassFunction cosmology i_kind m_up
 
       integrand_SNe z m =
         norm_imf m
@@ -162,6 +166,7 @@ interGalacticMediumTerms cosmology pk r_kind i_kind s_kind h_kind w_kind yield m
           * sfrd (z_target z m)
           * (2 * energy / (kms_ergMsol * vesc_sq z))
       integrand_ISM_Element = integrand_SNe_Element
+      integrator = makeIntegrator (Precision prec)
 
       result_SNe =
         parMap rpar (\z -> e_sn * nIntegrate128 (integrand_SNe z) (m_down z) m_up) z_arr
@@ -183,7 +188,7 @@ interGalacticMediumTerms cosmology pk r_kind i_kind s_kind h_kind w_kind yield m
 -- with all equations being taken from the [Daigne et al. 2004]
 igmIsmEvolution :: ReferenceCosmology -> PowerSpectrum -> Remnant_Kind -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Yield -> Element -> Metallicity -> Mhalo -> ([Double], [V.Vector Double])
 igmIsmEvolution cosmology pk r_kind i_kind s_kind h_kind w_kind yield elem metal_frac mh_min =
-  let (h0, om0, ob0, _, gn, _, _) = unpackCosmology cosmology
+  let (h0, om0, ob0, _, gn, _, _, _) = unpackCosmology cosmology
       z_arr = [20.0, 20.0 - 0.25 .. 0]
 
       terms_arr =
@@ -247,7 +252,7 @@ igmIsmEvolution cosmology pk r_kind i_kind s_kind h_kind w_kind yield elem metal
 -- currently using an approach presented in [Tan et al. 2018]
 igmMetallicity :: ReferenceCosmology -> PowerSpectrum -> Remnant_Kind -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Yield -> Metallicity -> Mhalo -> ([Double], [Double])
 igmMetallicity cosmology pk r_kind i_kind s_kind h_kind w_kind yield metal_frac mh_min =
-  let (h0, om0, ob0, _, gn, _, _) = unpackCosmology cosmology
+  let (h0, om0, ob0, _, gn, _, _, _) = unpackCosmology cosmology
       z_arr = [20.0, 20.0 - 0.25 .. 0]
       rho_cr = 3 * h0 ** 2 / (8 * pi * gn)
 

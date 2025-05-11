@@ -15,6 +15,7 @@ every other module in this library.
 
 -- Some of the imports
 
+import Helper
 import Math.GaussianQuadratureIntegration
 import System.Environment
 
@@ -34,7 +35,8 @@ data ReferenceCosmology
     tcmb0' :: Double,
     gn' :: Double,
     as' :: Double,
-    ns' :: Double
+    ns' :: Double,
+    prec' :: Double
   }
   deriving (Eq, Show)
 
@@ -43,9 +45,9 @@ type Redshift = Double
 type CosmicTime = Double
 
 -- | Unpack the values in the cosmology_record into variables
-unpackCosmology :: ReferenceCosmology -> (Double, Double, Double, Double, Double, Double, Double)
+unpackCosmology :: ReferenceCosmology -> (Double, Double, Double, Double, Double, Double, Double, Double)
 unpackCosmology cosmology =
-  (,,,,,,) <$> h0' <*> om0' <*> ob0' <*> tcmb0' <*> gn' <*> as' <*> ns' $ cosmology
+  (,,,,,,,) <$> h0' <*> om0' <*> ob0' <*> tcmb0' <*> gn' <*> as' <*> ns' <*> prec' $ cosmology
 
 -- | Example Planck 2018 cosmology
 planck18 :: ReferenceCosmology
@@ -57,28 +59,29 @@ planck18 =
       tcmb0' = 2.7255,
       gn' = 4.301 * 10 ** (-9),
       as' = 2.105,
-      ns' = 0.9665
+      ns' = 0.9665,
+      prec' = 128
     }
 
 -- | Initialise cosmological model from the args, to be provided from the CLI
 initialiseCosmology :: [String] -> ReferenceCosmology
 initialiseCosmology args =
   case args of
-    [h0, om0, ob0, tcmb0, gn, as, ns] ->
-      let [h0, om0, ob0, tcmb0, gn, as, ns] = read <$> args
-       in MkCosmology h0 om0 ob0 tcmb0 gn as ns
-    _ -> MkCosmology 0 0 0 0 0 0 0
+    [h0, om0, ob0, tcmb0, gn, as, ns, prec] ->
+      let [h0, om0, ob0, tcmb0, gn, as, ns, prec] = read <$> args
+       in MkCosmology h0 om0 ob0 tcmb0 gn as ns prec
+    _ -> MkCosmology 0 0 0 0 0 0 0 0
 
 -- | Fiducial Lambda CDM Hubble parameter, in the units of [km s^-1 Mpc^-1]
 hubbleParameter :: ReferenceCosmology -> Redshift -> Double
 hubbleParameter cosmology z =
-  let (h0, om0, ob0, _, _, _, _) = unpackCosmology cosmology
+  let (h0, om0, ob0, _, _, _, _, _) = unpackCosmology cosmology
    in h0 * sqrt (om0 * (1 + z) ** 3 + 1 - om0)
 
 -- | dt/dz, will be used as an integrand to derive cosmic time
 dtdz :: ReferenceCosmology -> Redshift -> Double
 dtdz cosmology z =
-  let (h0, om0, ob0, _, _, _, _) = unpackCosmology cosmology
+  let (h0, om0, ob0, _, _, _, _, _) = unpackCosmology cosmology
       km_Mpc = 3.24 * 1e-20
       s_Gyr = 3.15 * 1e16
    in (km_Mpc * s_Gyr * (1 + z) * hubbleParameter cosmology z) ** (-1)

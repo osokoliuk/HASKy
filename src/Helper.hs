@@ -33,7 +33,9 @@ import Text.Read (readMaybe)
 -- Gaussian quadrature integration, the only plausible choices are:
 --  * 128, 256, 512, 1024
 --   (fast) ------> (slow)
-data Precision = Precision Int
+data Precision
+  = Precision
+  {prec :: Double}
   deriving (Eq, Show, Ord)
 
 -- Data type that will describe an element that we want to focus on
@@ -65,8 +67,8 @@ data Table = Table
 -- | Generate an integrator based on the given precision,
 -- note that in this code we are only using Gaussian quadratures
 -- as an integration method
-integrator :: Precision -> ((Double -> Double) -> Double -> Double -> Double)
-integrator precision =
+makeIntegrator :: Precision -> ((Double -> Double) -> Double -> Double -> Double)
+makeIntegrator precision =
   case precision of
     Precision 128 -> nIntegrate128
     Precision 256 -> nIntegrate256
