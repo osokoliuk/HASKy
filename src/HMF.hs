@@ -102,7 +102,7 @@ cosmicVarianceSq cosmology pk mh z w_kind =
           * (pk z k)
           * (windowFunction cosmology w_kind k mh) ** 2
 
-      result = nIntegrate256 integrand 1e-3 1e3
+      result = nIntegrate128 integrand 1e-3 1e3
    in result
 
 -- | First-crossing distribution, crucial for the derivation of a
@@ -164,6 +164,6 @@ escapeVelocitySq cosmology pk h_kind w_kind mh_min z =
         mh * first_crossing mh
 
       result =
-        (nIntegrate256 integrand_1 mh_min 1e17)
-          / (nIntegrate256 integrand_2 mh_min 1e17)
+        (nIntegrate128 integrand_1 mh_min 1e17)
+          / (nIntegrate128 integrand_2 mh_min 1e17)
    in result

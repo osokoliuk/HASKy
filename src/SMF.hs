@@ -152,7 +152,7 @@ baryonFormationRateDensity cosmology pk h_kind w_kind z =
           * (ob0 / om0 * massAccretionRate cosmology mh z)
 
       result :: Double
-      result = nIntegrate256 integrand (minimum mh_arr) (maximum mh_arr)
+      result = nIntegrate128 integrand (minimum mh_arr) (maximum mh_arr)
    in result
 
 -- | Similarly, we also define a star formation rate density in [Msol yr^-1 Mpc^-3],
@@ -174,5 +174,5 @@ starFormationRateDensity cosmology pk s_kind h_kind w_kind z =
           * (starFormationRate s_kind cosmology mh z)
 
       result :: Double
-      result = nIntegrate256 integrand (minimum mh_arr) (maximum mh_arr)
+      result = nIntegrate128 integrand (minimum mh_arr) (maximum mh_arr)
    in result

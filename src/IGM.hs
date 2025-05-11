@@ -164,15 +164,15 @@ interGalacticMediumTerms cosmology pk r_kind i_kind s_kind h_kind w_kind yield m
       integrand_ISM_Element = integrand_SNe_Element
 
       result_SNe =
-        parMap rpar (\z -> e_sn * nIntegrate256 (integrand_SNe z) (m_down z) m_up) z_arr
+        parMap rpar (\z -> e_sn * nIntegrate128 (integrand_SNe z) (m_down z) m_up) z_arr
       result_SNe_Element =
-        parMap rpar (\z -> e_sn * nIntegrate256 (integrand_SNe_Element z) (m_down z) m_up) z_arr
+        parMap rpar (\z -> e_sn * nIntegrate128 (integrand_SNe_Element z) (m_down z) m_up) z_arr
       result_Wind =
-        parMap rpar (\z -> e_w * nIntegrate256 (integrand_Wind z) (m_down z) m_up) z_arr
+        parMap rpar (\z -> e_w * nIntegrate128 (integrand_Wind z) (m_down z) m_up) z_arr
       result_ISM =
-        parMap rpar (\z -> nIntegrate256 (integrand_SNe z) (massDynamical (cosmicTime cosmology z)) m_up) z_arr
+        parMap rpar (\z -> nIntegrate128 (integrand_SNe z) (massDynamical (cosmicTime cosmology z)) m_up) z_arr
       result_ISM_Element =
-        parMap rpar (\z -> nIntegrate256 (integrand_ISM_Element z) (massDynamical (cosmicTime cosmology z)) m_up) z_arr
+        parMap rpar (\z -> nIntegrate128 (integrand_ISM_Element z) (massDynamical (cosmicTime cosmology z)) m_up) z_arr
    in (sfrd_arr, result_SNe, result_SNe_Element, result_Wind, result_ISM, result_ISM_Element)
 
 -- | Solve four copled first-order differential equations that govern the evolution of:
@@ -184,7 +184,7 @@ interGalacticMediumTerms cosmology pk r_kind i_kind s_kind h_kind w_kind yield m
 igmIsmEvolution :: ReferenceCosmology -> PowerSpectrum -> Remnant_Kind -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Yield -> Element -> Metallicity -> Mhalo -> ([Double], [V.Vector Double])
 igmIsmEvolution cosmology pk r_kind i_kind s_kind h_kind w_kind yield elem metal_frac mh_min =
   let (h0, om0, ob0, _, gn, _, _) = unpackCosmology cosmology
-      z_arr = [20.0, 20.0 - 0.1 .. 0]
+      z_arr = [20.0, 20.0 - 0.25 .. 0]
 
       terms_arr =
         interGalacticMediumTerms cosmology pk r_kind i_kind s_kind h_kind w_kind yield metal_frac mh_min z_arr
@@ -233,6 +233,7 @@ igmIsmEvolution cosmology pk r_kind i_kind s_kind h_kind w_kind yield elem metal
                 1 / (y V.! 1) * ((interp_ei z - interp_e z * y V.! 3) + interp_mar z * (y V.! 2 - y V.! 3) - (interp_osni z - interp_osn z * y V.! 3))
               ]
 
+      -- Solve the system and unpack values
       (times, masses) =
         unzip $
           rk4Solve igm_ode t_init ((interp_t 0 - t_init) / fromIntegral n_steps) n_steps (V.fromList [igm_ini, ism_ini, xi_igm_ini, xi_ism_ini])
@@ -247,7 +248,7 @@ igmIsmEvolution cosmology pk r_kind i_kind s_kind h_kind w_kind yield elem metal
 igmMetallicity :: ReferenceCosmology -> PowerSpectrum -> Remnant_Kind -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Yield -> Metallicity -> Mhalo -> ([Double], [Double])
 igmMetallicity cosmology pk r_kind i_kind s_kind h_kind w_kind yield metal_frac mh_min =
   let (h0, om0, ob0, _, gn, _, _) = unpackCosmology cosmology
-      z_arr = [20.0, 20.0 - 0.1 .. 0]
+      z_arr = [20.0, 20.0 - 0.25 .. 0]
       rho_cr = 3 * h0 ** 2 / (8 * pi * gn)
 
       terms_arr =

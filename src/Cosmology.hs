@@ -86,4 +86,4 @@ dtdz cosmology z =
 -- | Define cosmic time t(z) in the units of [Gyr]
 cosmicTime :: ReferenceCosmology -> Redshift -> CosmicTime
 cosmicTime cosmology z =
-  nIntegrate512 (dtdz cosmology) z 20
+  nIntegrate128 (dtdz cosmology) z 20

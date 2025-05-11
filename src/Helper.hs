@@ -28,6 +28,9 @@ import qualified Data.Vector as V
 import System.IO
 import Text.Read (readMaybe)
 
+data Precision = Precision Int
+  deriving (Eq, Show, Ord)
+
 data Element
   = Element
   { element :: String,
