@@ -1,3 +1,5 @@
+{-# LANGUAGE MultiWayIf #-}
+
 module IGM where
 
 {-
@@ -153,7 +155,8 @@ interGalacticMediumTerms cosmology pk r_kind i_kind s_kind h_kind w_kind yield m
       integrand_SNe_Element z m =
         norm_imf m
           * sfrd (z_target z m)
-          * (m - yield m * massRemnant m r_kind metal_frac)
+          * yield m
+          * (m - massRemnant m r_kind metal_frac)
       integrand_Wind z m =
         norm_imf m
           * sfrd (z_target z m)
@@ -201,11 +204,22 @@ igmIsmEvolution cosmology pk r_kind i_kind s_kind h_kind w_kind yield elem metal
       -- with M_ISM/M_IGM ~ 0.01 (stellar mass is negligible at this redshift)
       -- following the prescription of [Daigne et al. 2006]
       -- Finally, we also adopt the BBN abundances for H (He),
-      -- such that the ICs for Xi_ISM/Xi_IGM = 0.76 (0.24) M_tot
+      -- such that the ICs for Xi_ISM/Xi_IGM = 0.76 (0.24) * M_ISM/M_IGM.
       (n_steps, t_init, a_ini, mass_tot, igm_ini, ism_ini, xi_igm_ini, xi_ism_ini) =
-        let ini_abundance
-              | element elem == "H" && isotope elem == 1 = 0.76
-              | element elem == "He" && isotope elem == 3 = 0.24
+        -- Nucleosynthesis abundances area taken from the [Coc et al. 2014]
+        let yp = 0.2464 -- Primordial Helium abundance
+            fh = 1 - yp -- Primordial hydrogen abudance
+            fd = 2.64 * 1e-5 -- Deuterium fraction
+            fh3 = 1.05 * 1e-5 * (1 - fd) * fh -- He3 abundance
+            ini_abundance
+              | element elem == "H" =
+                  if
+                    | isotope elem == 1 -> (1 - fd) * fh -- H1
+                    | otherwise -> fd * fh -- Deuterium
+              | element elem == "He" =
+                  if
+                    | isotope elem == 3 -> (1 - fh3) * yp -- He3
+                    | otherwise -> fh3 -- He4
               | otherwise = 0
          in (100 :: Int, interp_t (maximum z_arr), 0.01, 1e11, (1 - a_ini) * mass_tot, a_ini * mass_tot, ini_abundance * igm_ini, ini_abundance * ism_ini)
 
