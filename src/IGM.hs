@@ -160,12 +160,12 @@ interGalacticMediumTerms cosmology pk i_kind s_kind h_kind w_kind yield mh_min z
 --    * Xi_IGM    (4)
 --    * Xi_ISM    (5)
 -- with all equations being taken from the [Daigne et al. 2004]
-igmIsmEvolution :: ReferenceCosmology -> PowerSpectrum -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Yield -> Mhalo -> ([Double], [Double], [Double], [Double])
+igmIsmEvolution :: ReferenceCosmology -> PowerSpectrum -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Yield -> Mhalo -> ([Double], [V.Vector Double])
 igmIsmEvolution cosmology pk i_kind s_kind h_kind w_kind yield mh_min =
   let (h0, om0, ob0, _, gn, _, _) = unpackCosmology cosmology
-      z_arr = [20.0, 20.0 - 0.1 .. 0]
+      z_arr = [19.0, 19.0 - 0.1 .. 0]
       rho_mean z = 3 * h0 ** 2 * ob0 / (8 * pi * gn) * (1 + z) ** (-4)
-      rho_tot = 1e10
+      rho_tot = 1e11
 
       terms_arr =
         interGalacticMediumTerms cosmology pk i_kind s_kind h_kind w_kind yield mh_min z_arr
@@ -184,8 +184,8 @@ igmIsmEvolution cosmology pk i_kind s_kind h_kind w_kind yield mh_min =
       -- ICs are set assuming very small baryon fraction in the structures,
       -- with M_ISM/M_IGM ~ 0.01 (stellar mass is negligible at this redshift)
       -- following the prescription of [Daigne et al. 2006]
-      (n_steps, t_init, igm_ini, ism_ini) =
-        (20 :: Int, interp_t (maximum z_arr), rho_tot, 0)
+      (n_steps, t_init, a_ini, igm_ini, ism_ini, xi_igm_ini, xi_ism_ini) =
+        (20 :: Int, interp_t (maximum z_arr), 0.01, (1 - a_ini) * rho_tot, a_ini * rho_tot, 0, 0)
 
       -- Convert Differential-Algebraic system into ODE via Lagrangian multipliers
       -- We are using an approach laid out in [van der Houwen & de Swart 1997]
@@ -193,14 +193,15 @@ igmIsmEvolution cosmology pk i_kind s_kind h_kind w_kind yield mh_min =
         let z = interp_z t
          in V.fromList
               [ -interp_mar z + interp_o z,
-                interp_sfrd z - interp_e z
+                (-interp_sfrd z + interp_e z) + (interp_mar z - interp_o z),
+                1 / (y V.! 0) * (interp_ow z * (y V.! 3 - y V.! 2) + (interp_osni z - interp_osn z * y V.! 2)),
+                1 / (y V.! 1) * ((interp_ei z - interp_e z * y V.! 3) + interp_mar z * (y V.! 2 - y V.! 3) - (interp_osni z - interp_osn z * y V.! 3))
               ]
 
       (times, masses) =
         unzip $
-          rk4Solve igm_ode t_init ((interp_t 0 - t_init) / fromIntegral n_steps) n_steps (V.fromList [igm_ini, ism_ini])
+          rk4Solve igm_ode t_init ((interp_t 0 - t_init) / fromIntegral n_steps) n_steps (V.fromList [igm_ini, ism_ini, xi_igm_ini, xi_ism_ini])
 
-      (migm_arr, mstar_arr) = splitXY masses
       -- M_ISM = M_IGM - Mstar - rho_tot from the conservation equation
-      mism_arr = zipWith (\x y -> rho_tot - x - y) migm_arr mstar_arr
-   in (times, migm_arr, mism_arr, mstar_arr)
+      result = (\v -> V.snoc v (rho_tot - v V.! 0 - v V.! 1)) <$> masses
+   in (times, result)
