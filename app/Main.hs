@@ -14,7 +14,7 @@ args = []
 main :: IO ()
 main =
   do
-    let elem = Element "H" 1
+    let elem = Element "He" 4
     (mass_arr, yield_arr) <- yieldsHighMass 1 elem
 
     let interp_yield :: Yield

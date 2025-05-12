@@ -129,8 +129,8 @@ interGalacticMediumTerms :: ReferenceCosmology -> PowerSpectrum -> Remnant_Kind 
 interGalacticMediumTerms cosmology pk r_kind i_kind s_kind h_kind w_kind yield metal_frac mh_min z_arr =
   let (_, _, _, _, _, _, _, prec) = unpackCosmology cosmology
 
-      (e_w, e_sn, kms_ergMsol, yr_Gyr, energy, m_up) =
-        (0.02, 0.005, 1.989 * 1e43, 1e9, 2 * 1e51, 100)
+      (m_CO, e_w, e_sn, kms_ergMsol, yr_Gyr, energy, m_up) =
+        (1.38, 0.02, 0.005, 1.989 * 1e43, 1e9, 2 * 1e51, 100)
 
       t_arr =
         parMap rpar (\z -> cosmicTime cosmology z) z_arr
@@ -152,20 +152,34 @@ interGalacticMediumTerms cosmology pk r_kind i_kind s_kind h_kind w_kind yield m
       m_down z = maximum [8, (massDynamical (cosmicTime cosmology z))]
       norm_imf = normalisedInitialMassFunction cosmology i_kind m_up
 
-      integrand_SNe z m =
+      -- CCSNe = SNe II + NHe + ECSNe + MRSNe
+      integrand_SNe_Ia z m = m_CO * R_Ia
+
+      integrand_SNe_Ia_Element z m = 
+      
+      -- Ejecta by mass loss and SNe II
+      integrand_SNe_loss z m =
         norm_imf m
           * sfrd (z_target z m)
           * (m - massRemnant m r_kind metal_frac)
-      integrand_SNe_Element z m =
+      -- Ejecta per element from mass loss 
+      integrand_SNe_loss_Element z m =
+
+      -- Ejecta per element from SNe II
+      integrand_SNe_II_Element z m =
         norm_imf m
           * sfrd (z_target z m)
           * yield m
           * (m - massRemnant m r_kind metal_frac)
+
       integrand_Wind z m =
         norm_imf m
           * sfrd (z_target z m)
           * (2 * energy / (kms_ergMsol * vesc_sq z))
-      integrand_ISM_Element = integrand_SNe_Element
+
+      integrand_ISM_SNe_II_Element = integrand_SNe_II_Element
+      integrand_ISM_SNe_Ia_Element = integrand_SNe_Ia_Element
+
       integrator = makeIntegrator (Precision prec)
 
       result_SNe =
@@ -216,16 +230,18 @@ igmIsmEvolution cosmology pk r_kind i_kind s_kind h_kind w_kind yield elem metal
             fh = 1 - yp -- Primordial hydrogen abudance
             fd = 2.64 * 1e-5 -- Deuterium fraction
             fh3 = 1.05 * 1e-5 * (1 - fd) * fh -- He3 abundance
+            fli7 = 5.18 * 1e-10 * (1 - fd) * fh -- Li7 abundance
             ini_abundance
               | element elem == "H" =
                   if
                     | isotope elem == 1 -> (1 - fd) * fh -- H1
-                    | otherwise -> fd * fh -- Deuterium
+                    | otherwise -> fd * fh -- H2
               | element elem == "He" =
                   if
-                    | isotope elem == 3 -> (1 - fh3) * yp -- He3
-                    | otherwise -> fh3 -- He4
-              | otherwise = 0
+                    | isotope elem == 4 -> (1 - fh3) * yp -- He4
+                    | otherwise -> fh3 -- He3
+              | element elem == "Li" && isotope elem == 7 = fli7 -- Li7
+              | otherwise = 0 -- Other metals
          in (100 :: Int, interp_t (maximum z_arr), 0.01, 1e11, (1 - a_ini) * mass_tot, a_ini * mass_tot, ini_abundance * igm_ini, ini_abundance * ism_ini)
 
       -- Convert Differential-Algebraic system into a system of ODEs
