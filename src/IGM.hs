@@ -32,6 +32,7 @@ data IMF_kind
   = Salpeter
   | Kroupa
   | Chabrier
+  | SN_Ia
   deriving (Eq, Show)
 
 data Remnant_Kind
@@ -57,20 +58,21 @@ initialMassFunction i_kind m =
         Chabrier
           | m < 1 -> a_Ch * exp (-(log m - log center_Ch) ** 2 / (2 * sigma_Ch ** 2))
           | otherwise -> b_Ch * m ** (-1.3)
+        SN_Ia -> m ** (-0.35)
 
 -- | Next two functions normalise IMF between m_inf = 0.1 Msol and m_sup = 100 Msol
 -- so that it can acts as a PDF in that range
-imfNormalisation :: ReferenceCosmology -> IMF_kind -> Mstar -> Double
-imfNormalisation cosmology i_kind mup =
+imfNormalisation :: ReferenceCosmology -> IMF_kind -> Mstar -> Mstar -> Double
+imfNormalisation cosmology i_kind m_down m_up =
   let (_, _, _, _, _, _, _, prec) = unpackCosmology cosmology
-      m_arr = [0.1, 0.1 + 0.1 .. mup]
+      m_arr = [m_down, m_down + 0.1 .. m_up]
       integrand m = m * initialMassFunction i_kind m
       integrator = makeIntegrator (Precision prec)
-   in integrator integrand (head m_arr) (last m_arr)
+   in integrator integrand m_down m_up
 
-normalisedInitialMassFunction :: ReferenceCosmology -> IMF_kind -> Mstar -> Mstar -> Double
-normalisedInitialMassFunction cosmology i_kind mup m =
-  let norm = imfNormalisation cosmology i_kind mup
+normalisedInitialMassFunction :: ReferenceCosmology -> IMF_kind -> Mstar -> Mstar -> Mstar -> Double
+normalisedInitialMassFunction cosmology i_kind m_down m_up m =
+  let norm = imfNormalisation cosmology i_kind m_down m_up
    in (initialMassFunction i_kind m) / norm
 
 -- | Mass of a remnant produced by the supernova,
@@ -125,12 +127,27 @@ tauMS m
 
 -- | Some of the terms (IGM/ISM outflows for all mass and a specific element yield, SFRD),
 -- to be used in the next function
-interGalacticMediumTerms :: ReferenceCosmology -> PowerSpectrum -> Remnant_Kind -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Yield -> Metallicity -> Mhalo -> [Redshift] -> ([Double], [Double], [Double], [Double], [Double], [Double])
-interGalacticMediumTerms cosmology pk r_kind i_kind s_kind h_kind w_kind yield metal_frac mh_min z_arr =
+interGalacticMediumTerms :: ReferenceCosmology -> PowerSpectrum -> Remnant_Kind -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Yield_II -> Yield_Ia -> Metallicity -> Mhalo -> [Redshift] -> ([Double], [Double], [Double], [Double], [Double], [Double])
+interGalacticMediumTerms cosmology pk r_kind i_kind s_kind h_kind w_kind yield_ia yield_ii metal_frac mh_min z_arr =
   let (_, _, _, _, _, _, _, prec) = unpackCosmology cosmology
 
-      (m_CO, e_w, e_sn, kms_ergMsol, yr_Gyr, energy, m_up) =
-        (1.38, 0.02, 0.005, 1.989 * 1e43, 1e9, 2 * 1e51, 100)
+      (m_CO, e_w, e_sn, kms_ergMsol, yr_Gyr, energy, m_up, m_pu, m_pl, m_du_rg, m_dl_rg, m_du_ms, m_dl_ms, b_rg, b_ms) =
+        ( 1.38, -- Mass of the CO white dwarf
+          0.02, -- Fraction of the mass that contributes to the galactic winds
+          0.005, -- Fraction of the mass that contributes to the SNe outflow to the IGM
+          1.989 * 1e43, -- Conversion factor from [km^2/s^2] to [erg/Msol]
+          1e9, -- Conversion factor from [yr] to [Gyr]
+          2 * 1e51, -- Typical kinetic energy in [erg] released by a supernovae explosion
+          100, -- Upper mass limit for an IMF, in [Msol]
+          8, -- MS SN Ia progenitor upper mass, all variables in below are in [Msol]
+          3, -- Same, but lower mass
+          1.5, -- RG+WD pair progenitor upper mass
+          0.9, -- Same,  but lower mass
+          2.6, -- MS+WD pair progenitor upper mas
+          1.8, -- Same, but lower mass
+          0.02, -- Fraction of primary progenitors that produce SN Ia for RG+WD pair
+          0.05 -- Same but for MS+WD pair
+        )
 
       t_arr =
         parMap rpar (\z -> cosmicTime cosmology z) z_arr
@@ -144,55 +161,76 @@ interGalacticMediumTerms cosmology pk r_kind i_kind s_kind h_kind w_kind yield m
       time = makeInterp t_arr z_arr
 
       massDynamical t =
-        let mass_range = [0.1, 0.1 + 0.5 .. 100]
+        let mass_range = [0.1, 0.1 + 0.5 .. m_up]
             interp_tau = makeInterp (tauMS <$> mass_range) mass_range
          in interp_tau t
 
       z_target z m = time (cosmicTime cosmology z - tauMS m)
       m_down z = maximum [8, (massDynamical (cosmicTime cosmology z))]
-      norm_imf = normalisedInitialMassFunction cosmology i_kind m_up
+      norm_imf = normalisedInitialMassFunction cosmology i_kind 0.1 m_up
+      norm_imf_sn md mu = normalisedInitialMassFunction cosmology SN_Ia md mu
 
       -- CCSNe = SNe II + NHe + ECSNe + MRSNe
-      integrand_SNe_Ia z m = m_CO * R_Ia
 
-      integrand_SNe_Ia_Element z m = 
-      
       -- Ejecta by mass loss and SNe II
-      integrand_SNe_loss z m =
+      integrand_loss z m =
         norm_imf m
           * sfrd (z_target z m)
           * (m - massRemnant m r_kind metal_frac)
-      -- Ejecta per element from mass loss 
-      integrand_SNe_loss_Element z m =
+
+      -- Ejecta per element from mass loss
+      integrand_loss_Element z m =
+        norm_imf m
+          * sfrd (z_target z m)
+          * (m - massRemnant m r_kind metal_frac - m * yield_ii m)
+          * metal_frac -- ISM metal fraction at t - tauMS
 
       -- Ejecta per element from SNe II
       integrand_SNe_II_Element z m =
         norm_imf m
           * sfrd (z_target z m)
-          * yield m
-          * (m - massRemnant m r_kind metal_frac)
+          * yield_ii m
 
+      -- IGM outflows from galactic winds
       integrand_Wind z m =
         norm_imf m
           * sfrd (z_target z m)
           * (2 * energy / (kms_ergMsol * vesc_sq z))
 
       integrand_ISM_SNe_II_Element = integrand_SNe_II_Element
-      integrand_ISM_SNe_Ia_Element = integrand_SNe_Ia_Element
 
+      -- Ejecta from SNe Ia
+      integrand_SNe_Ia_1 z m =
+        norm_imf m
+          * (1 / m)
+      integrand_SNe_Ia_2 z md mu m =
+        norm_imf_sn md mu m
+          * sfrd (z_target z m)
+          * (1 / m)
       integrator = makeIntegrator (Precision prec)
 
-      result_SNe =
-        parMap rpar (\z -> e_sn * nIntegrate128 (integrand_SNe z) (m_down z) m_up) z_arr
-      result_SNe_Element =
-        parMap rpar (\z -> e_sn * nIntegrate128 (integrand_SNe_Element z) (m_down z) m_up) z_arr
+      result_loss =
+        parMap rpar (\z -> integrator (integrand_loss z) (m_down z) m_up) z_arr
+      result_loss_Element =
+        parMap rpar (\z -> integrator (integrand_loss_Element z) (m_down z) m_up) z_arr
       result_Wind =
-        parMap rpar (\z -> e_w * nIntegrate128 (integrand_Wind z) (m_down z) m_up) z_arr
-      result_ISM =
-        parMap rpar (\z -> nIntegrate128 (integrand_SNe z) (massDynamical (cosmicTime cosmology z)) m_up) z_arr
-      result_ISM_Element =
-        parMap rpar (\z -> nIntegrate128 (integrand_ISM_Element z) (massDynamical (cosmicTime cosmology z)) m_up) z_arr
-   in (sfrd_arr, result_SNe, result_SNe_Element, result_Wind, result_ISM, result_ISM_Element)
+        parMap rpar (\z -> integrator (integrand_Wind z) (m_down z) m_up) z_arr
+      result_SNe_II_Element =
+        parMap rpar (\z -> integrator (integrand_SNe_II_Element z) (m_down z) m_up) z_arr
+      result_SNe_Ia =
+        parMap
+          rpar
+          ( \z ->
+              m_CO
+                * integrator (integrand_SNe_Ia_1 z) (maximum [m_pl, massDynamical (time z)]) m_pu
+                * ( b_rg * integrator (integrand_SNe_Ia_2 z m_dl_rg m_du_rg) (maximum [m_dl_rg, massDynamical (time z)]) m_du_rg
+                      + b_ms * integrator (integrand_SNe_Ia_2 z m_dl_ms m_du_ms) (maximum [m_dl_ms, massDynamical (time z)]) m_du_ms
+                  )
+          )
+          z_arr
+      result_SNe_Ia_Element =
+        yield_ia * result_SNe_Ia
+   in (sfrd_arr, result_loss, result_loss_Element, result_SNe_II_Element, result_SNe_Ia, result_SNe_Ia_Element)
 
 -- | Solve four copled first-order differential equations that govern the evolution of:
 --    * M_IGM     (1)

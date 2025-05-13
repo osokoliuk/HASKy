@@ -23,7 +23,9 @@ import Text.Read (Read (..))
 
 type Metallicity = Double
 
-type Yield = Double -> Double
+type Yield_II = Double -> Double
+
+type Yield_Ia = Double
 
 yieldsHighMass :: Metallicity -> Element -> IO ([Double], [Double])
 yieldsHighMass metal_frac elem =
