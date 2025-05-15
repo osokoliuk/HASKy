@@ -23,7 +23,7 @@ import Text.Read (Read (..))
 
 type Metallicity = Double -> Double
 
-type Yield_II = Double -> Double
+type Yield_II = Double -> Double -> Double
 
 type Yield_Ia = Double
 
@@ -36,9 +36,16 @@ yieldsHighMass metal_frac elem =
         | otherwise = "z1"
    in let filepath = "data/WW95/" ++ metal_str ++ "/" ++ (toLower <$> element elem) ++ ".dat"
        in do
-            table <- parseFileToTable filepath
+            table <- parseFile_II filepath
             let yields_arr = lookup elem (values table)
             return $ (masses table, fromMaybe [] yields_arr)
+
+yields_Ia :: Element -> IO Double
+yields_Ia elem =
+  let filepath = "data/iwamoto99/W7/" ++ (toLower <$> element elem) ++ ".dat"
+   in do
+        table <- parseFile_Ia filepath (toLower <$> show elem)
+        return table
 
 -- | Stellar remnant mass for a white dwarf, taken from the [Hoek & Groenewegen 1996]
 remnantMediumMass :: Double -> M.Map Double Double

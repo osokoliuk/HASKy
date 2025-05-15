@@ -16,19 +16,23 @@ main =
   do
     let elem = Element "He" 4
     (mass_arr, yield_arr) <- yieldsHighMass 1 elem
+    yield_ia <- yields_Ia elem
 
-    let interp_yield :: Yield
-        interp_yield = makeInterp mass_arr yield_arr
+    let interp_yield_ii :: Yield_II
+        interp_yield_ii m aa = (makeInterp mass_arr yield_arr) m
 
         pk = powerSpectrumEisensteinHu planck18
         coeff = 1.988 * 1e43
         z_arr = [20, 20 - 1 .. 0]
         -- x = map (\z -> 1e9 * baryonFormationRateDensity planck18 pk ST Smooth z) z_arr
-        -- x = interGalacticMediumTerms planck18 (powerSpectrumEisensteinHu planck18) Kroupa DoublePower ST Smooth interp_yield 1e6 [20, 20 - 1 .. 0]
-        -- x = (\mh -> sqrt $ escapeVelocitySq planck18 pk ST Smooth mh 0) <$> ((10 **) <$> [6, 6 + 0.1 .. 16])
-        -- x = (\z -> baryonFormationRateDensity planck18 pk ST Smooth z) <$> z_arr
-        -- x = (\m -> m - massRemnant m 0.1) <$> [0.1, 1.1 .. 100]
-        x = igmIsmEvolution planck18 pk Pereira Kroupa Behroozi ST Smooth interp_yield elem 0 1e7
+        metal_frac :: Metallicity
+        metal_frac x = 1
+        x = interGalacticMediumTerms planck18 pk Pereira Kroupa Behroozi ST Smooth interp_yield_ii yield_ia metal_frac 1e6 0
+    -- x = (\mh -> sqrt $ escapeVelocitySq planck18 pk ST Smooth mh 0) <$> ((10 **) <$> [6, 6 + 0.1 .. 16])
+    -- x = (\z -> baryonFormationRateDensity planck18 pk ST Smooth z) <$> z_arr
+    -- x = (\m -> m - massRemnant m 0.1) <$> [0.1, 1.1 .. 100]
+    -- x = igmIsmEvolution planck18 pk Pereira Kroupa Behroozi ST Smooth interp_yield_ii yield_ia elem 1e7
+
     -- x = igmMetallicity planck18 pk Pereira Kroupa Behroozi ST Smooth interp_yield 0 1e7
     -- x = (\z -> baryonAccretionRate planck18 pk ST Smooth 1e6 z) <$> z_arr
 

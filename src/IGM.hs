@@ -183,14 +183,15 @@ interGalacticMediumTerms cosmology pk r_kind i_kind s_kind h_kind w_kind yield_i
       integrand_loss_Element m =
         norm_imf m
           * sfrd (z_target z m)
-          * (1 - massRemnant m r_kind (metal_frac (z_target z m)) - yield_ii m)
+          * (1 - massRemnant m r_kind (metal_frac (z_target z m)) - yield_ii m (metal_frac (z_target z m)) / m)
           * metal_frac (z_target z m) -- ISM metal fraction at t - tauMS
 
       -- Ejecta per element from SNe II
       integrand_SNe_II_Element m =
         norm_imf m
           * sfrd (z_target z m)
-          * yield_ii m
+          * yield_ii m (metal_frac (z_target z m))
+          / m
 
       -- Ejecta from SNe Ia
       integrand_SNe_Ia_1 m =
@@ -233,10 +234,10 @@ interGalacticMediumTerms cosmology pk r_kind i_kind s_kind h_kind w_kind yield_i
 --    * Xi_IGM    (4)
 --    * Xi_ISM    (5)
 -- with all equations being taken from the [Daigne et al. 2004]
-igmIsmEvolution :: ReferenceCosmology -> PowerSpectrum -> Remnant_Kind -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Yield_II -> Yield_Ia -> Element -> Metallicity -> Mhalo -> ([Double], [V.Vector Double])
-igmIsmEvolution cosmology pk r_kind i_kind s_kind h_kind w_kind yield_ii yield_ia elem metal_frac mh_min =
+igmIsmEvolution :: ReferenceCosmology -> PowerSpectrum -> Remnant_Kind -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Yield_II -> Yield_Ia -> Element -> Mhalo -> ([Double], [V.Vector Double])
+igmIsmEvolution cosmology pk r_kind i_kind s_kind h_kind w_kind yield_ii yield_ia elem mh_min =
   let (h0, om0, ob0, _, gn, _, _, _) = unpackCosmology cosmology
-      z_arr = [20.0, 20.0 - 0.25 .. 0]
+      z_arr = [20.0, 20.0 - 1 .. 0]
 
       terms_arr metal_frac z =
         interGalacticMediumTerms cosmology pk r_kind i_kind s_kind h_kind w_kind yield_ii yield_ia metal_frac mh_min z

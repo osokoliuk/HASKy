@@ -20,9 +20,10 @@ import Control.Parallel.Strategies (parTuple4, parTuple6, rpar, using, withStrat
 import Data.Bifunctor
 import Data.Char (isDigit, isSpace, toLower, toUpper)
 import Data.Foldable (toList)
-import Data.List (dropWhileEnd, elemIndex, transpose)
+import Data.List (dropWhileEnd, elemIndex, isPrefixOf, transpose)
 import qualified Data.Map as M
 import qualified Data.Map.Strict as M'
+import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Traversable (mapAccumL)
 import qualified Data.Vector as V
 import Math.GaussianQuadratureIntegration
@@ -116,8 +117,9 @@ parseLine line =
     Just [x, y] -> (x, y) -- If both are parsed, return the tuple
     _ -> error ("Invalid line: " ++ line)
 
-parseFileToTable :: FilePath -> IO Table
-parseFileToTable path = do
+-- | Parse SNe II yields (specifically, WW95)
+parseFile_II :: FilePath -> IO Table
+parseFile_II path = do
   content <- readFile path
   let ls = lines content
   case ls of
@@ -135,6 +137,27 @@ parseFileToTable path = do
           return $ Table massCol namedCols
         _ -> error "Invalid header format"
     _ -> error "File too short"
+
+-- | Parse SNe Ia yields
+parseFile_Ia_Helper :: [String] -> M.Map String Double
+parseFile_Ia_Helper contents =
+  M.fromList (mapMaybe parseLine contents)
+  where
+    parseLine line
+      | null line = Nothing
+      | "#" `isPrefixOf` line = Nothing
+      | otherwise = case words line of
+          [iso, valStr] -> case readMaybe valStr of
+            Just val -> Just (iso, val)
+            Nothing -> Nothing
+          _ -> Nothing
+
+parseFile_Ia :: FilePath -> String -> IO Double
+parseFile_Ia path isotope = do
+  content <- readFile path
+  let ls = lines content
+      isoMap = parseFile_Ia_Helper ls
+  return $ fromMaybe 0 (M.lookup isotope isoMap)
 
 type History = [(Double, V.Vector Double)]
 
