@@ -21,13 +21,13 @@ import Data.Maybe (fromMaybe)
 import Helper
 import Text.Read (Read (..))
 
-type Metallicity = Double
+type Metallicity = Double -> Double
 
 type Yield_II = Double -> Double
 
 type Yield_Ia = Double
 
-yieldsHighMass :: Metallicity -> Element -> IO ([Double], [Double])
+yieldsHighMass :: Double -> Element -> IO ([Double], [Double])
 yieldsHighMass metal_frac elem =
   let metal_str
         | metal_frac <= 0.001 = "z0001"
@@ -41,7 +41,7 @@ yieldsHighMass metal_frac elem =
             return $ (masses table, fromMaybe [] yields_arr)
 
 -- | Stellar remnant mass for a white dwarf, taken from the [Hoek & Groenewegen 1996]
-remnantMediumMass :: Metallicity -> M.Map Double Double
+remnantMediumMass :: Double -> M.Map Double Double
 remnantMediumMass metal_frac
   | metal_frac <= 0.001 =
       fromList $
@@ -60,7 +60,7 @@ remnantMediumMass metal_frac
         [(0.9, 0.55), (1.0, 0.55), (1.3, 0.56), (1.5, 0.57), (1.7, 0.58), (2.0, 0.59), (2.5, 0.60), (3.0, 0.61), (4.0, 0.68), (5.0, 0.77), (7.0, 0.98), (8.0, 1.09)]
 
 -- | Stellar remnant masses for either black hole or a neutron star, taken from the [Woosley & Weaver 1995]
-remnantHighMass :: Metallicity -> M.Map Double Double
+remnantHighMass :: Double -> M.Map Double Double
 remnantHighMass metal_frac
   | metal_frac <= 0.001 =
       fromList $

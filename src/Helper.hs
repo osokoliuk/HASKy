@@ -136,6 +136,8 @@ parseFileToTable path = do
         _ -> error "Invalid header format"
     _ -> error "File too short"
 
+type History = [(Double, V.Vector Double)]
+
 vecAdd :: (Num a) => V.Vector a -> V.Vector a -> V.Vector a
 vecAdd = V.zipWith (+)
 
@@ -143,27 +145,41 @@ vecMultiply :: (Num a) => a -> V.Vector a -> V.Vector a
 vecMultiply x = V.map (x *)
 
 -- | Somewhat parallel Runge-Kutta constant step solver
-rk4Step :: (Double -> V.Vector Double -> V.Vector Double) -> Double -> Double -> V.Vector Double -> V.Vector Double
-rk4Step f t h y =
-  let (k1, k2, k3, k4) = (k1', k2', k3', k4') `using` parTuple4 rpar rpar rpar rpar
-
-      k1' = vecMultiply h (f t y)
-      k2' = vecMultiply h (f (t + h / 2) (vecAdd y (vecMultiply 0.5 k1')))
-      k3' = vecMultiply h (f (t + h / 2) (vecAdd y (vecMultiply 0.5 k2')))
-      k4' = vecMultiply h (f (t + h) (vecAdd y k3'))
+-- The inner RK4 with history
+rk4StepHist ::
+  ([(Double, V.Vector Double)] -> Double -> V.Vector Double -> V.Vector Double) ->
+  [(Double, V.Vector Double)] -> -- history
+  Double -> -- current time
+  Double -> -- step size
+  V.Vector Double -> -- current y
+  V.Vector Double
+rk4StepHist f hist t h y =
+  let k1 = vecMultiply h (f hist t y)
+      k2 = vecMultiply h (f hist (t + h / 2) (vecAdd y (vecMultiply 0.5 k1)))
+      k3 = vecMultiply h (f hist (t + h / 2) (vecAdd y (vecMultiply 0.5 k2)))
+      k4 = vecMultiply h (f hist (t + h) (vecAdd y k3))
    in vecAdd y $
         vecMultiply (1 / 6) $
           vecAdd k1 $
             vecAdd (vecMultiply 2 k2) $
               vecAdd (vecMultiply 2 k3) k4
 
--- | Run the solver for the specific set of initial conditions and a step size
-rk4Solve :: (Double -> V.Vector Double -> V.Vector Double) -> Double -> Double -> Int -> V.Vector Double -> [(Double, V.Vector Double)]
-rk4Solve f t0 h n y0 = take (n + 1) $ iterate step (t0, y0)
+-- Solver that builds up the history
+rk4SolveHist ::
+  ([(Double, V.Vector Double)] -> Double -> V.Vector Double -> V.Vector Double) ->
+  Double -> -- initial time
+  Double -> -- step size
+  Int -> -- number of steps
+  V.Vector Double -> -- initial state
+  [(Double, V.Vector Double)]
+rk4SolveHist f t0 h n y0 = go 0 t0 y0 []
   where
-    step (t, y) =
-      let y' = rk4Step f t h y
-       in (t + h, y')
+    go i t y hist
+      | i > n = reverse hist
+      | otherwise =
+          let y' = rk4StepHist f hist t h y
+              hist' = (t, y) : hist
+           in go (i + 1) (t + h) y' hist'
 
 epsilon :: (RealFloat a) => a
 epsilon = encodeFloat 1 (fromIntegral $ 1 - floatDigits epsilon)
