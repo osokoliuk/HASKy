@@ -14,7 +14,7 @@ args = []
 main :: IO ()
 main =
   do
-    let elem = Element "He" 4
+    let elem = Element "H" 1
     (mass_arr, yield_arr) <- yieldsHighMass 1 elem
     yield_ia <- yields_Ia elem
 

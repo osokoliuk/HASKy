@@ -28,6 +28,7 @@ import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Traversable (mapAccumL)
 import qualified Data.Vector as V
 import Math.GaussianQuadratureIntegration
+import System.Directory (doesFileExist)
 import System.IO
 import Text.Read (readMaybe)
 
@@ -154,11 +155,18 @@ parseFile_Ia_Helper contents =
           _ -> Nothing
 
 parseFile_Ia :: FilePath -> String -> IO Double
-parseFile_Ia path isotope = do
-  content <- readFile path
-  let ls = lines content
-      isoMap = parseFile_Ia_Helper ls
-  return $ fromMaybe 0 (M.lookup isotope isoMap)
+parseFile_Ia path isotope =
+  do
+    exists <- doesFileExist path
+    content <-
+      if exists
+        then
+          readFile path
+        else
+          return "0"
+    let ls = lines content
+        isoMap = parseFile_Ia_Helper ls
+    return $ fromMaybe 0 (M.lookup isotope isoMap)
 
 type History = [(Double, V.Vector Double)]
 

@@ -78,7 +78,7 @@ library
       GaussQuadIntegration,
       mtl,
       parallel,
-      deepseq 
+      directory 
 
     -- Directories containing source files.
     hs-source-dirs:   src

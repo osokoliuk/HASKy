@@ -235,7 +235,7 @@ interGalacticMediumTerms cosmology pk r_kind i_kind s_kind h_kind w_kind yield_i
 igmIsmEvolution :: ReferenceCosmology -> PowerSpectrum -> Remnant_Kind -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Yield_II -> Yield_Ia -> Element -> Mhalo -> ([Double], [V.Vector Double])
 igmIsmEvolution cosmology pk r_kind i_kind s_kind h_kind w_kind yield_ii yield_ia elem mh_min =
   let (h0, om0, ob0, _, gn, _, _, _) = unpackCosmology cosmology
-      z_arr = [20.0, 20.0 - 1 .. 0]
+      z_arr = [20.0, 20.0 - 0.5 .. 0]
 
       terms_arr metal_frac sfrd z =
         interGalacticMediumTerms cosmology pk r_kind i_kind s_kind h_kind w_kind yield_ii yield_ia metal_frac mh_min sfrd z
@@ -275,7 +275,7 @@ igmIsmEvolution cosmology pk r_kind i_kind s_kind h_kind w_kind yield_ii yield_i
                     | otherwise -> fh3
               | element elem == "Li" && isotope elem == 7 = fli7
               | otherwise = 0
-         in (100 :: Int, interp_t (maximum z_arr), 0.01, 1e11, (1 - a_ini) * mass_tot, a_ini * mass_tot, ini_abundance * igm_ini, ini_abundance * ism_ini)
+         in (10 :: Int, interp_t (maximum z_arr), 0.01, 1e11, (1 - a_ini) * mass_tot, a_ini * mass_tot, ini_abundance * igm_ini, ini_abundance * ism_ini)
 
       -- Convert Differential-Algebraic system into a system of ODEs
       igm_ode :: History -> Double -> V.Vector Double -> V.Vector Double
@@ -289,8 +289,8 @@ igmIsmEvolution cosmology pk r_kind i_kind s_kind h_kind w_kind yield_ii yield_i
                 else
                   (makeInterp times metals) t
 
+            -- Unpack all rates at z(t)
             z = interp_z t
-
             (e_loss, e_loss_Element, e_SNe_II_Element, e_SNe_Ia, e_SNe_Ia_Element, o_Wind) =
               (terms_arr interp_metal interp_sfrd z)
 
