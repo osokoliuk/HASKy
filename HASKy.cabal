@@ -78,7 +78,8 @@ library
       GaussQuadIntegration,
       mtl,
       parallel,
-      directory 
+      directory,
+      lens
 
     -- Directories containing source files.
     hs-source-dirs:   src

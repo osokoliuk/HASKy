@@ -50,6 +50,16 @@
   (major1) == 1 && (major2) <  3 || \
   (major1) == 1 && (major2) == 3 && (minor) <= 7)
 #endif /* MIN_VERSION_directory */
+/* package lens-5.3.4 */
+#ifndef VERSION_lens
+#define VERSION_lens "5.3.4"
+#endif /* VERSION_lens */
+#ifndef MIN_VERSION_lens
+#define MIN_VERSION_lens(major1,major2,minor) (\
+  (major1) <  5 || \
+  (major1) == 5 && (major2) <  3 || \
+  (major1) == 5 && (major2) == 3 && (minor) <= 4)
+#endif /* MIN_VERSION_lens */
 /* package mtl-2.2.2 */
 #ifndef VERSION_mtl
 #define VERSION_mtl "2.2.2"
