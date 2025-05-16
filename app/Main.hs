@@ -27,11 +27,13 @@ main =
         -- x = map (\z -> 1e9 * baryonFormationRateDensity planck18 pk ST Smooth z) z_arr
         metal_frac :: Metallicity
         metal_frac x = 1
-        x = interGalacticMediumTerms planck18 pk Pereira Kroupa Behroozi ST Smooth interp_yield_ii yield_ia metal_frac 1e6 0
-    -- x = (\mh -> sqrt $ escapeVelocitySq planck18 pk ST Smooth mh 0) <$> ((10 **) <$> [6, 6 + 0.1 .. 16])
-    -- x = (\z -> baryonFormationRateDensity planck18 pk ST Smooth z) <$> z_arr
-    -- x = (\m -> m - massRemnant m 0.1) <$> [0.1, 1.1 .. 100]
-    -- x = igmIsmEvolution planck18 pk Pereira Kroupa Behroozi ST Smooth interp_yield_ii yield_ia elem 1e7
+        sfrd :: SFRD
+        sfrd x = 1e-3
+        -- x = interGalacticMediumTerms planck18 pk Pereira Kroupa Behroozi ST Smooth interp_yield_ii yield_ia metal_frac 1e6 0
+        -- x = (\mh -> sqrt $ escapeVelocitySq planck18 pk ST Smooth mh 0) <$> ((10 **) <$> [6, 6 + 0.1 .. 16])
+        -- x = (\z -> baryonFormationRateDensity planck18 pk ST Smooth z) <$> z_arr
+        -- x = (\m -> m - massRemnant m 0.1) <$> [0.1, 1.1 .. 100]
+        x = igmIsmEvolution planck18 pk Pereira Kroupa Behroozi ST Smooth interp_yield_ii yield_ia elem 1e7
 
     -- x = igmMetallicity planck18 pk Pereira Kroupa Behroozi ST Smooth interp_yield 0 1e7
     -- x = (\z -> baryonAccretionRate planck18 pk ST Smooth 1e6 z) <$> z_arr

@@ -135,16 +135,15 @@ massDynamical t m_up =
 
 -- | Some of the terms (IGM/ISM outflows for all mass and a specific element yield, SFRD),
 -- to be used in the next function
-interGalacticMediumTerms :: ReferenceCosmology -> PowerSpectrum -> Remnant_Kind -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Yield_II -> Yield_Ia -> Metallicity -> Mhalo -> Redshift -> (Double, Double, Double, Double, Double, Double, Double)
-interGalacticMediumTerms cosmology pk r_kind i_kind s_kind h_kind w_kind yield_ii yield_ia metal_frac mh_min z =
+interGalacticMediumTerms :: ReferenceCosmology -> PowerSpectrum -> Remnant_Kind -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Yield_II -> Yield_Ia -> Metallicity -> Mhalo -> SFRD -> Redshift -> (Double, Double, Double, Double, Double, Double)
+interGalacticMediumTerms cosmology pk r_kind i_kind s_kind h_kind w_kind yield_ii yield_ia metal_frac mh_min sfrd z =
   let (_, _, _, _, _, _, _, prec) = unpackCosmology cosmology
 
-      (m_CO, eps_w, eps_sn, kms_ergMsol, yr_Gyr, energy, m_up, m_pu, m_pl, m_du_rg, m_dl_rg, m_du_ms, m_dl_ms, b_rg, b_ms) =
+      (m_CO, eps_w, eps_sn, kms_ergMsol, energy, m_up, m_pu, m_pl, m_du_rg, m_dl_rg, m_du_ms, m_dl_ms, b_rg, b_ms) =
         ( 1.38, -- Mass of the CO white dwarf
           0.02, -- Fraction of the mass that contributes to the galactic winds
           0.005, -- Fraction of the mass that contributes to the SNe outflow to the IGM
           1.989 * 1e43, -- Conversion factor from [km^2/s^2] to [erg/Msol]
-          1e9, -- Conversion factor from [yr] to [Gyr]
           2 * 1e51, -- Typical kinetic energy in [erg] released by a supernovae explosion
           100, -- Upper mass limit for an IMF, in [Msol]
           8, -- MS SN Ia progenitor upper mass, all variables in below are in [Msol]
@@ -157,9 +156,8 @@ interGalacticMediumTerms cosmology pk r_kind i_kind s_kind h_kind w_kind yield_i
           0.05 -- Same but for MS+WD pair
         )
 
-      z_arr = [20, 20 - 0.1 .. 0]
-      sfrd z =
-        yr_Gyr * starFormationRateDensity cosmology pk s_kind h_kind w_kind z
+      z_arr = [20, 20 - 0.5 .. 0]
+
       vesc_sq =
         escapeVelocitySq cosmology pk h_kind w_kind mh_min z
       t_arr =
@@ -167,11 +165,11 @@ interGalacticMediumTerms cosmology pk r_kind i_kind s_kind h_kind w_kind yield_i
 
       interp_t = makeInterp z_arr t_arr
       z_target z m = interp_t (cosmicTime cosmology z - tauMS m)
-      m_down z = maximum [8, (massDynamical (cosmicTime cosmology z) m_up)]
+
+      mdyn = massDynamical (interp_t z) m_up
+      m_down z = maximum [8, mdyn]
       norm_imf = normalisedInitialMassFunction cosmology i_kind 0.1 m_up
       norm_imf_sn md mu = normalisedInitialMassFunction cosmology SN_Ia md mu
-
-      -- CCSNe = SNe II + NHe + ECSNe + MRSNe
 
       -- Ejecta by mass loss and SNe II
       integrand_loss m =
@@ -220,13 +218,13 @@ interGalacticMediumTerms cosmology pk r_kind i_kind s_kind h_kind w_kind yield_i
       e_SNe_II_Element = integrator integrand_SNe_II_Element (m_down z) m_up
       e_SNe_Ia =
         m_CO
-          * integrator integrand_SNe_Ia_1 (maximum [m_pl, massDynamical (interp_t z) m_up]) m_pu
-          * ( b_rg * integrator (integrand_SNe_Ia_2 m_dl_rg m_du_rg) (maximum [m_dl_rg, massDynamical (interp_t z) m_up]) m_du_rg
-                + b_ms * integrator (integrand_SNe_Ia_2 m_dl_ms m_du_ms) (maximum [m_dl_ms, massDynamical (interp_t z) m_up]) m_du_ms
+          * integrator integrand_SNe_Ia_1 (maximum [m_pl, mdyn]) m_pu
+          * ( b_rg * integrator (integrand_SNe_Ia_2 m_dl_rg m_du_rg) (maximum [m_dl_rg, mdyn]) m_du_rg
+                + b_ms * integrator (integrand_SNe_Ia_2 m_dl_ms m_du_ms) (maximum [m_dl_ms, mdyn]) m_du_ms
             )
       e_SNe_Ia_Element =
-        yield_ia * e_SNe_Ia
-   in (sfrd z, e_loss, e_loss_Element, e_SNe_II_Element, e_SNe_Ia, e_SNe_Ia_Element, o_Wind)
+        yield_ia / m_CO * e_SNe_Ia
+   in (e_loss, e_loss_Element, e_SNe_II_Element, e_SNe_Ia, e_SNe_Ia_Element, o_Wind)
 
 -- | Solve four copled first-order differential equations that govern the evolution of:
 --    * M_IGM     (1)
@@ -239,15 +237,18 @@ igmIsmEvolution cosmology pk r_kind i_kind s_kind h_kind w_kind yield_ii yield_i
   let (h0, om0, ob0, _, gn, _, _, _) = unpackCosmology cosmology
       z_arr = [20.0, 20.0 - 1 .. 0]
 
-      terms_arr metal_frac z =
-        interGalacticMediumTerms cosmology pk r_kind i_kind s_kind h_kind w_kind yield_ii yield_ia metal_frac mh_min z
+      terms_arr metal_frac sfrd z =
+        interGalacticMediumTerms cosmology pk r_kind i_kind s_kind h_kind w_kind yield_ii yield_ia metal_frac mh_min sfrd z
       mar_arr =
         parMap rpar (\z -> 1e9 * baryonFormationRateDensity cosmology pk h_kind w_kind z) z_arr
       t_arr =
         parMap rpar (\z -> cosmicTime cosmology z) z_arr
+      sfrd_arr =
+        parMap rpar (\z -> 1e9 * starFormationRateDensity cosmology pk s_kind h_kind w_kind z) z_arr
 
       -- Unpack outflow/inflow rates and interpolate over our redshift range
       interp_mar = makeInterp z_arr mar_arr
+      interp_sfrd = makeInterp z_arr sfrd_arr
       interp_z = makeInterp t_arr z_arr
       interp_t = makeInterp z_arr t_arr
 
@@ -257,23 +258,23 @@ igmIsmEvolution cosmology pk r_kind i_kind s_kind h_kind w_kind yield_ii yield_i
       -- Finally, we also adopt the BBN abundances for H (He),
       -- such that the ICs for Xi_ISM/Xi_IGM = 0.76 (0.24) * M_ISM/M_IGM.
       (n_steps, t_init, a_ini, mass_tot, igm_ini, ism_ini, xi_igm_ini, xi_ism_ini) =
-        -- Nucleosynthesis abundances area taken from the [Coc et al. 2014]
+        -- Nucleosynthesis abundances are taken from the [Coc et al. 2014]
         let yp = 0.2464 -- Primordial Helium abundance
             fh = 1 - yp -- Primordial hydrogen abudance
             fd = 2.64 * 1e-5 -- Deuterium fraction
-            fh3 = 1.05 * 1e-5 * (1 - fd) * fh -- He3 abundance
-            fli7 = 5.18 * 1e-10 * (1 - fd) * fh -- Li7 abundance
+            fh3 = 1.05 * 1e-5 * (1 - fd) * fh
+            fli7 = 5.18 * 1e-10 * (1 - fd) * fh
             ini_abundance
               | element elem == "H" =
                   if
-                    | isotope elem == 1 -> (1 - fd) * fh -- H1
-                    | otherwise -> fd * fh -- H2
+                    | isotope elem == 1 -> (1 - fd) * fh
+                    | otherwise -> fd * fh
               | element elem == "He" =
                   if
-                    | isotope elem == 4 -> (1 - fh3) * yp -- He4
-                    | otherwise -> fh3 -- He3
-              | element elem == "Li" && isotope elem == 7 = fli7 -- Li7
-              | otherwise = 0 -- Other metals
+                    | isotope elem == 4 -> (1 - fh3) * yp
+                    | otherwise -> fh3
+              | element elem == "Li" && isotope elem == 7 = fli7
+              | otherwise = 0
          in (100 :: Int, interp_t (maximum z_arr), 0.01, 1e11, (1 - a_ini) * mass_tot, a_ini * mass_tot, ini_abundance * igm_ini, ini_abundance * ism_ini)
 
       -- Convert Differential-Algebraic system into a system of ODEs
@@ -281,12 +282,17 @@ igmIsmEvolution cosmology pk r_kind i_kind s_kind h_kind w_kind yield_ii yield_i
       igm_ode history t y =
         let (times, metals) =
               unzip $
-                (\(t, v) -> (t, v V.! 2 / mass_tot)) <$> history
-            interp_metal = makeInterp times metals
+                [(t, metal) | (t, v) <- history, V.length v > 2, let metal = v V.! 2]
+            interp_metal t =
+              if length times < 1
+                then 0
+                else
+                  (makeInterp times metals) t
+
             z = interp_z t
 
-            (sfrd, e_loss, e_loss_Element, e_SNe_II_Element, e_SNe_Ia, e_SNe_Ia_Element, o_Wind) =
-              (terms_arr interp_metal z)
+            (e_loss, e_loss_Element, e_SNe_II_Element, e_SNe_Ia, e_SNe_Ia_Element, o_Wind) =
+              (terms_arr interp_metal interp_sfrd z)
 
             -- Ejecta
             e_tot = e_loss + e_SNe_Ia
@@ -299,7 +305,7 @@ igmIsmEvolution cosmology pk r_kind i_kind s_kind h_kind w_kind yield_ii yield_i
             o_tot = o_SNe + o_Wind
          in V.fromList
               [ -interp_mar z + o_tot,
-                (-sfrd + e_tot) + (interp_mar z - o_tot),
+                (-interp_sfrd z + e_tot) + (interp_mar z - o_tot),
                 1 / (y V.! 0) * (o_Wind * (y V.! 3 - y V.! 2) + (o_SNe_Element - o_SNe * y V.! 2)),
                 1 / (y V.! 1) * ((e_tot_Element - e_tot * y V.! 3) + interp_mar z * (y V.! 2 - y V.! 3) - (o_SNe_Element - o_SNe * y V.! 3))
               ]

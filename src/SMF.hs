@@ -34,6 +34,8 @@ data SMF_kind
 
 type Mstar = Double
 
+type SFRD = Mstar -> Double
+
 -- | Star formation efficiency, i.e. Star mass / Halo mass
 -- There are three possible choices for the SFE model:
 --    * Simple double power-law

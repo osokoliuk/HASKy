@@ -16,6 +16,7 @@ Kind of useless by itself.
 import Control.Applicative (liftA2)
 import Control.Monad (unless)
 import Control.Monad.State
+import Control.Parallel (par, pseq)
 import Control.Parallel.Strategies (parTuple4, parTuple6, rpar, using, withStrategy)
 import Data.Bifunctor
 import Data.Char (isDigit, isSpace, toLower, toUpper)
@@ -181,11 +182,15 @@ rk4StepHist f hist t h y =
       k2 = vecMultiply h (f hist (t + h / 2) (vecAdd y (vecMultiply 0.5 k1)))
       k3 = vecMultiply h (f hist (t + h / 2) (vecAdd y (vecMultiply 0.5 k2)))
       k4 = vecMultiply h (f hist (t + h) (vecAdd y k3))
-   in vecAdd y $
-        vecMultiply (1 / 6) $
-          vecAdd k1 $
-            vecAdd (vecMultiply 2 k2) $
-              vecAdd (vecMultiply 2 k3) k4
+   in k1 `par`
+        k2 `par`
+          k3 `par`
+            k4 `pseq`
+              vecAdd y $
+                vecMultiply (1 / 6) $
+                  vecAdd k1 $
+                    vecAdd (vecMultiply 2 k2) $
+                      vecAdd (vecMultiply 2 k3) k4
 
 -- Solver that builds up the history
 rk4SolveHist ::
