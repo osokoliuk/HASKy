@@ -59,7 +59,7 @@ initialMassFunction i_kind m =
         Chabrier
           | m < 1 -> a_Ch * exp (-(log m - log center_Ch) ** 2 / (2 * sigma_Ch ** 2))
           | otherwise -> b_Ch * m ** (-1.3)
-        SN_Ia -> m ** (-0.35)
+        SN_Ia -> m ** (-1.35)
 
 -- | Next two functions normalise IMF between m_inf = 0.1 Msol and m_sup = 100 Msol
 -- so that it can acts as a PDF in that range
@@ -136,11 +136,11 @@ massDynamical t m_up =
 
 -- | Some of the terms (IGM/ISM outflows for all mass and a specific element yield, SFRD),
 -- to be used in the next function
-interGalacticMediumTerms :: ReferenceCosmology -> PowerSpectrum -> Remnant_Kind -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Yield_II -> Yield_Ia -> Metallicity -> Mhalo -> SFRD -> Redshift -> (Double, Double, Double, Double, Double, Double)
+interGalacticMediumTerms :: ReferenceCosmology -> PowerSpectrum -> Remnant_Kind -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Yield_II -> Yield_Ia -> Yield_NSM -> Metallicity -> Mhalo -> SFRD -> Redshift -> (Double, Double, Double, Double, Double, Double)
 interGalacticMediumTerms cosmology pk r_kind i_kind s_kind h_kind w_kind yield_ii yield_ia metal_frac mh_min sfrd z =
   let (_, _, _, _, _, _, _, prec) = unpackCosmology cosmology
 
-      (m_CO, eps_w, eps_sn, yr_Gyr, kms_ergMsol, energy, m_up, m_pu, m_pl, m_du_rg, m_dl_rg, m_du_ms, m_dl_ms, b_rg, b_ms) =
+      (m_CO, eps_w, eps_sn, yr_Gyr, kms_ergMsol, energy, m_up, m_pu, m_pl, m_du_rg, m_dl_rg, m_du_ms, m_dl_ms, b_rg, b_ms, m_NSM_d, m_NSM_u, alpha_NSM, delta_t_NSM) =
         ( 1.38, -- Mass of the CO white dwarf
           0.02, -- Fraction of the mass that contributes to the galactic winds
           0.005, -- Fraction of the mass that contributes to the SNe outflow to the IGM
@@ -155,7 +155,11 @@ interGalacticMediumTerms cosmology pk r_kind i_kind s_kind h_kind w_kind yield_i
           2.6, -- MS+WD pair progenitor upper mas
           1.8, -- Same, but lower mass
           0.02, -- Fraction of primary progenitors that produce SN Ia for RG+WD pair
-          0.04 -- Same but for MS+WD pair
+          0.04, -- Same but for MS+WD pair
+          9, -- Minimum mass of a star that can leave NSM as a remnant in [Msol]
+          30, -- Similarly, maximum mass of a star that can leave an NSM in [Msol]
+          0.018, -- Fraction of NS that will give rise to NS-NS system and eventually coalesce
+          1e7 -- Time delay between the formation of NSM and its collapse in [yr]
         )
 
       z_arr = [20, 20 - 0.5 .. 0]
@@ -183,26 +187,26 @@ interGalacticMediumTerms cosmology pk r_kind i_kind s_kind h_kind w_kind yield_i
       integrand_loss_Element m =
         norm_imf m
           * sfrd (z_target z m)
-          * ( (m - massRemnant m r_kind (metal_frac (z_target z m)))
-                * metal_frac (z_target z m)
-                + yield_ii m (metal_frac (z_target z m)) -- ISM metal fraction at t - tauMS
-            )
+          * (m - massRemnant m r_kind (metal_frac (z_target z m)) - yield_ii m (metal_frac (z_target z m)))
+          * metal_frac (z_target z m)
 
       -- Ejecta per element from SNe II
       integrand_SNe_II_Element m =
         norm_imf m
           * sfrd (z_target z m)
           * yield_ii m (metal_frac (z_target z m))
-          / m
 
       -- Ejecta from SNe Ia
       integrand_SNe_Ia_1 m =
         norm_imf m
-          * (1 / m)
       integrand_SNe_Ia_2 md mu m =
         norm_imf_sn md mu m
           * sfrd (z_target z m)
-          * (1 / m)
+
+      -- Ejecta from Neutron Star Mergers
+      integrand_NSM m =
+        norm_imf m
+          * sfrd (z_target z m - delta_t_NSM)
 
       -- IGM outflows from galactic winds
       integrand_Wind m =
@@ -234,9 +238,11 @@ interGalacticMediumTerms cosmology pk r_kind i_kind s_kind h_kind w_kind yield_i
               * (first_term + second_term)
       e_SNe_Ia_Element =
         yield_ia * e_SNe_Ia
+      e_NSM = alpha_NSM * integrator integrand_NSM m_NSM_d m_NSM_u
+      e_NSM_Element = yield_nsm * e_NSM
    in (over each)
         (* yr_Gyr)
-        (e_loss, e_loss_Element, e_SNe_II_Element, e_SNe_Ia, e_SNe_Ia_Element, o_Wind)
+        (e_loss, e_loss_Element, e_SNe_II_Element, e_SNe_Ia, e_SNe_Ia_Element, e_NSM, e_NSM_Element, o_Wind)
 
 -- | Solve four copled first-order differential equations that govern the evolution of:
 --    * M_IGM     (1)
@@ -244,7 +250,7 @@ interGalacticMediumTerms cosmology pk r_kind i_kind s_kind h_kind w_kind yield_i
 --    * Xi_IGM    (4)
 --    * Xi_ISM    (5)
 -- with all equations being taken from the [Daigne et al. 2004]
-igmIsmEvolution :: ReferenceCosmology -> PowerSpectrum -> Remnant_Kind -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Yield_II -> Yield_Ia -> Element -> Mhalo -> ([Double], [V.Vector Double])
+igmIsmEvolution :: ReferenceCosmology -> PowerSpectrum -> Remnant_Kind -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Yield_II -> Yield_Ia -> Element -> Mhalo -> ([Double], [Double], [V.Vector Double])
 igmIsmEvolution cosmology pk r_kind i_kind s_kind h_kind w_kind yield_ii yield_ia elem mh_min =
   let (h0, om0, ob0, _, gn, _, _, _) = unpackCosmology cosmology
       z_arr = [20.0, 20.0 - 0.5 .. 0]
@@ -294,7 +300,7 @@ igmIsmEvolution cosmology pk r_kind i_kind s_kind h_kind w_kind yield_ii yield_i
       igm_ode history t y =
         let (times, metals) =
               unzip $
-                [(t, metal) | (t, v) <- history, V.length v > 2, let metal = v V.! 2]
+                [(t, metal) | (t, v) <- history, V.length v > 2, let metal = v V.! 2 / mass_tot]
             interp_metal t =
               if length times < 1
                 then 0
@@ -329,8 +335,8 @@ igmIsmEvolution cosmology pk r_kind i_kind s_kind h_kind w_kind yield_ii yield_i
 
       -- M_star = rho_tot - M_IGM - Mstar from the conservation equation
       -- In addition, we also normalise each mass by the total mass
-      result = (\v -> V.map (/ mass_tot) $ V.snoc v (mass_tot - v V.! 0 - v V.! 1)) <$> masses
-   in (times, result)
+      result = (\v -> V.zipWith ($) (V.fromList [(/ mass_tot), (/ mass_tot), (/ mass_tot), (/ mass_tot), (/ mass_tot)]) $ V.snoc v (mass_tot - v V.! 0 - v V.! 1)) <$> masses
+   in (times, sfrd_arr, result)
 
 {-
 -- | Derive the metallicity of the IGM from outflow/inflow rates of metals,

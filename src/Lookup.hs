@@ -27,6 +27,8 @@ type Yield_II = Double -> Double -> Double
 
 type Yield_Ia = Double
 
+type Yield_NSM = Double
+
 yieldsHighMass :: Double -> Element -> IO ([Double], [Double])
 yieldsHighMass metal_frac elem =
   let metal_str
