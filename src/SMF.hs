@@ -157,11 +157,11 @@ baryonFormationRateDensity cosmology pk h_kind w_kind z =
 
 -- | Similarly, we also define a star formation rate density in [Msol yr^-1 Mpc^-3],
 -- to be used in the IGM/ISM mass fraction differential equations
-starFormationRateDensity :: ReferenceCosmology -> PowerSpectrum -> SMF_kind -> HMF_kind -> W_kind -> Redshift -> Double
-starFormationRateDensity cosmology pk s_kind h_kind w_kind z =
+starFormationRateDensity :: ReferenceCosmology -> PowerSpectrum -> SMF_kind -> HMF_kind -> W_kind -> Redshift -> Mhalo -> Double
+starFormationRateDensity cosmology pk s_kind h_kind w_kind z mh_min =
   let (_, _, _, _, _, _, _, prec) = unpackCosmology cosmology
 
-      mh_arr = (10 **) <$> [6, 6 + 0.25 .. 16]
+      mh_arr = (10 **) <$> [log10 mh_min, log10 mh_min + 0.25 .. 16]
 
       hmf_arr =
         (\mh -> haloMassFunction cosmology pk h_kind w_kind mh z) <$> mh_arr

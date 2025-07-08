@@ -21,6 +21,8 @@ main =
     let interp_yield_ii :: Yield_II
         interp_yield_ii m aa = (makeInterp mass_arr yield_arr) m
 
+        yield_nsm = 0
+
         pk = powerSpectrumEisensteinHu planck18
         coeff = 1.988 * 1e43
         z_arr = [20, 20 - 1 .. 0]
@@ -35,7 +37,7 @@ main =
         -- x = (\mh -> sqrt $ escapeVelocitySq planck18 pk ST Smooth mh 0) <$> ((10 **) <$> [6, 6 + 0.1 .. 16])
         -- x = (\z -> baryonFormationRateDensity planck18 pk ST Smooth z) <$> z_arr
         -- x = (\m -> m - massRemnant m 0.1) <$> [0.1, 1.1 .. 100]
-        x = igmIsmEvolution planck18 pk Pereira Kroupa Behroozi ST Smooth interp_yield_ii yield_ia elem 1e7
+        x = igmIsmEvolution planck18 pk Pereira Kroupa Behroozi ST Smooth interp_yield_ii yield_ia yield_nsm elem 1e11
 
     -- x = igmMetallicity planck18 pk Pereira Kroupa Behroozi ST Smooth interp_yield 0 1e7
     -- x = (\z -> baryonAccretionRate planck18 pk ST Smooth 1e6 z) <$> z_arr
