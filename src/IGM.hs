@@ -305,7 +305,7 @@ igmIsmEvolution cosmology pk r_kind i_kind s_kind h_kind w_kind yield_ii yield_i
       igm_ode history t y =
         let (times, metals) =
               unzip $
-                [(t, metal) | (t, v) <- history, V.length v > 2, let metal = v V.! 4 / (rho_cr (interp_z t) * ob0 - v V.! 1)]
+                [(t, metal) | (t, v) <- history, V.length v > 2, let metal = (v V.! 0 + v V.! 1 + v V.! 4) / (rho_cr (interp_z t) * ob0 - v V.! 1)]
             interp_metal t =
               if length times < 1
                 then 0
