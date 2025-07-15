@@ -1,4 +1,5 @@
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE BangPatterns #-}
 
 module IGM where
 
@@ -28,6 +29,7 @@ import Helper
 import Lookup
 import Math.GaussianQuadratureIntegration
 import SMF
+import Debug.Trace
 
 data IMF_kind
   = Salpeter
@@ -282,9 +284,9 @@ igmIsmEvolution cosmology pk r_kind i_kind s_kind h_kind w_kind yield_ii yield_i
       -- such that the ICs for Xi_ISM/Xi_IGM = 0.76 (0.24) * M_ISM/M_IGM.
       (n_steps, t_init, a_ini, mass_tot, igm_ini, ism_ini, xi_igm_ini, xi_ism_ini, sfrd_ini) =
         -- Nucleosynthesis abundances are taken from the [Coc et al. 2014]
-        let yp = 0.2464 -- Primordial Helium abundance
-            fh = 1 - yp -- Primordial hydrogen abudance
-            fd = 2.64 * 1e-5 -- Deuterium fraction
+        let yp = 0.2464 
+            fh = 1 - yp 
+            fd = 2.64 * 1e-5 
             fh3 = 1.05 * 1e-5 * (1 - fd) * fh
             fli7 = 5.18 * 1e-10 * (1 - fd) * fh
             ini_abundance
@@ -305,12 +307,16 @@ igmIsmEvolution cosmology pk r_kind i_kind s_kind h_kind w_kind yield_ii yield_i
       igm_ode history t y =
         let (times, metals) =
               unzip $
-                [(t, metal) | (t, v) <- history, V.length v > 2, let metal = (v V.! 0 + v V.! 1 + v V.! 4) / (rho_cr (interp_z t) * ob0 - v V.! 1)]
+                [(t, metal) | (t, v) <- history, V.length v > 2, let metal = (v V.! 4) / v V.! 1]
+            
+            !result_ = trace ("metallicity: " ++ show metals) ()
+            
             interp_metal t =
               if length times < 1
                 then 0
                 else
                   (makeInterp times metals) t
+
 
             -- Unpack all rates at z(t)
             z = interp_z t
@@ -331,7 +337,7 @@ igmIsmEvolution cosmology pk r_kind i_kind s_kind h_kind w_kind yield_ii yield_i
                 (-1e9 * interp_sfrd t + e_tot) + (interp_mar z - o_tot),
                 1 / (y V.! 0) * (o_Wind * (y V.! 3 - y V.! 2) + (o_SNe_Element - o_SNe * y V.! 2)),
                 1 / (y V.! 1) * ((e_tot_Element - e_tot * y V.! 3) + interp_mar z * (y V.! 2 - y V.! 3) - (o_SNe_Element - o_SNe * y V.! 3)),
-                1e9 * interp_sfrd t
+                e_tot 
               ]
 
       -- Solve the system and unpack values
