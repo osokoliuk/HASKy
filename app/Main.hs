@@ -11,17 +11,28 @@ import SMF
 args :: [Double]
 args = []
 
+
 main :: IO ()
 main =
   do
     let elem = Element "Fe" 56
-    (mass_arr, yield_arr) <- yieldsHighMass 1 elem
+        metal_fracs = [1e-3,1e-2,1e-1,1e0]
+        masses = [1, 5 .. 350]
+        argument = [(x,elem) | x <- metal_fracs]
+    yield_ii <- mapM (uncurry yieldsHighMass) argument
+
     yield_ia <- yields_Ia elem
 
-    let interp_yield_ii :: Yield_II
-        interp_yield_ii m aa = (makeInterp mass_arr yield_arr) m
-
-        yield_nsm = 0
+    -- Fix this interpolation later, this code is not prod ready...
+    let yield_nsm = 0
+        interp_yield_ii m metal_frac = 
+          let (masses, yields) 
+                | metal_frac <= 0.001 = yield_ii !! 0 
+                | metal_frac <= 0.01 = yield_ii !! 1
+                | metal_frac <= 0.1 = yield_ii !! 2 
+                | otherwise = yield_ii !! 3
+              interp_mass = makeInterp masses yields 
+          in interp_mass m
 
         pk = powerSpectrumEisensteinHu planck18
         coeff = 1.988 * 1e43
@@ -37,9 +48,11 @@ main =
         -- x = (\mh -> sqrt $ escapeVelocitySq planck18 pk ST Smooth mh 0) <$> ((10 **) <$> [6, 6 + 0.1 .. 16])
         -- x = (\z -> baryonFormationRateDensity planck18 pk ST Smooth z) <$> z_arr
         -- x = (\m -> m - massRemnant m 0.1) <$> [0.1, 1.1 .. 100]
+      
+    
         x = igmIsmEvolution planck18 pk Pereira Kroupa Behroozi ST Smooth interp_yield_ii yield_ia yield_nsm elem 1e11
 
     -- x = igmMetallicity planck18 pk Pereira Kroupa Behroozi ST Smooth interp_yield 0 1e7
     -- x = (\z -> baryonAccretionRate planck18 pk ST Smooth 1e6 z) <$> z_arr
 
-    print $ x
+     in print x
