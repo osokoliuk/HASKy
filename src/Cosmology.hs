@@ -1,8 +1,8 @@
 module Cosmology where
 
 {-
-Module      : HASKy.Helper
-Description : Helper module
+Module      : HASKy.Cosmology
+Description : Cosmology module
 Copyright   : (c) Oleksii Sokoliuk, 20256
 License     : MIT
 Maintainer  : oleksii.sokoliuk@mao.kiev.ua
@@ -12,8 +12,6 @@ Portability : portable
 A module that defines reference cosmology. Pretty much used by
 every other module in this library.
 -}
-
--- Some of the imports
 
 import Helper
 import Math.GaussianQuadratureIntegration

@@ -214,6 +214,10 @@ interGalacticMediumTerms cosmology pk r_kind i_kind s_kind h_kind w_kind yield_i
       integrand_NSBH m =
         1
 
+      -- Ejecta from AGB stars via stellar winds
+      integrand_AGB m =
+        1
+
       -- IGM outflows from galactic winds
       integrand_Wind m =
         norm_imf m
@@ -354,8 +358,8 @@ igmIsmEvolution cosmology pk r_kind i_kind s_kind h_kind w_kind yield_ii yield_i
 
 -- | Derive the metallicity of the IGM/ISM from outflow/inflow rates of metals,
 -- currently using an approach presented in [Tan et al. 2018]
-igmIsmMetallicity :: ReferenceCosmology -> PowerSpectrum -> Remnant_Kind -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Yield_II -> Yield_Ia -> Yield_NSM -> Metallicity -> Mhalo -> ([Double], [Double], [Double])
-igmIsmMetallicity cosmology pk r_kind i_kind s_kind h_kind w_kind yield_ii yield_ia yield_nsm metal_frac mh_min =
+igmIsmMetallicity :: ReferenceCosmology -> PowerSpectrum -> Remnant_Kind -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Yield_II -> Yield_Ia -> Yield_NSM -> Mhalo -> ([Double], [Double], [Double])
+igmIsmMetallicity cosmology pk r_kind i_kind s_kind h_kind w_kind yield_ii yield_ia yield_nsm mh_min =
   let elem = Element "H" 1
 
       (times, densities) =

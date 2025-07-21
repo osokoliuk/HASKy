@@ -23,31 +23,52 @@ import Text.Read (Read (..))
 
 type Metallicity = Double -> Double
 
-type Yield_II = Double -> Double -> Double
+-- | Datatype for stellar yields, including:
+-- * SN Ia
+-- * CCSNe
+-- * AGB
+-- * NS-NS mergers
+data Yield
+  = Yield
+  { model_ia :: [Char],
+    model_ccsn :: [Char],
+    model_agb :: [Char],
+    model_nsm :: [Char]
+  }
+  deriving (Eq, Show, Ord)
 
-type Yield_Ia = Double
+retrieveYieldIa :: Yield -> Element -> IO Double
+retrieveYieldIa yield elem =
+  let filepath = "data/Ia/" ++ show (model_ia yield) ++ "/" ++ (toLower <$> element elem) ++ ".dat"
+   in do
+        table <- parseFile_Ia filepath (toLower <$> show elem)
+        return table
 
-type Yield_NSM = Double
-
-yieldsHighMass :: Double -> Element -> IO ([Double], [Double])
-yieldsHighMass metal_frac elem =
+retrieveYieldCCSN :: Yield -> Element -> Double -> IO ([Double], [Double])
+retrieveYieldCCSN yield elem metal_frac =
   let metal_str
         | metal_frac <= 0.001 = "z0001"
         | metal_frac <= 0.01 = "z001"
         | metal_frac <= 0.1 = "z01"
         | otherwise = "z1"
-   in let filepath = "data/WW95/" ++ metal_str ++ "/" ++ (toLower <$> element elem) ++ ".dat"
+   in let filepath = "data/CCSNe/" ++ show (model_ccsn yield) ++ "/" ++ metal_str ++ "/" ++ (toLower <$> element elem) ++ ".dat"
        in do
             table <- parseFile_II filepath
             let yields_arr = lookup elem (values table)
             return $ (masses table, fromMaybe [] yields_arr)
 
-yields_Ia :: Element -> IO Double
-yields_Ia elem =
-  let filepath = "data/iwamoto99/W7/" ++ (toLower <$> element elem) ++ ".dat"
-   in do
-        table <- parseFile_Ia filepath (toLower <$> show elem)
-        return table
+retrieveYieldAGB :: Yield -> Element -> Double -> IO ([Double], [Double])
+retrieveYieldAGB yield elem metal_frac =
+  let metal_str
+        | metal_frac <= 0.001 = "z0001"
+        | metal_frac <= 0.01 = "z001"
+        | metal_frac <= 0.1 = "z01"
+        | otherwise = "z1"
+   in let filepath = "data/AGB/" ++ show (model_agb yield) ++ "/" ++ metal_str ++ "/" ++ (toLower <$> element elem) ++ ".dat"
+       in do
+            table <- parseFile_II filepath
+            let yields_arr = lookup elem (values table)
+            return $ (masses table, fromMaybe [] yields_arr)
 
 -- | Stellar remnant mass for a white dwarf, taken from the [Hoek & Groenewegen 1996]
 remnantMediumMass :: Double -> M.Map Double Double
