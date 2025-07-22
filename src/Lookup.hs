@@ -37,6 +37,7 @@ data Yield
   }
   deriving (Eq, Show, Ord)
 
+-- Functions to extract yields from Yield datatype
 retrieveYieldIa :: Yield -> Element -> IO Double
 retrieveYieldIa yield elem =
   let filepath = "data/Ia/" ++ show (model_ia yield) ++ "/" ++ (toLower <$> element elem) ++ ".dat"
@@ -69,6 +70,10 @@ retrieveYieldAGB yield elem metal_frac =
             table <- parseFile_II filepath
             let yields_arr = lookup elem (values table)
             return $ (masses table, fromMaybe [] yields_arr)
+
+retrieveYieldNSM :: Yield -> Element -> IO Double
+retrieveYieldNSM yield elem =
+  pure 1.0
 
 -- | Stellar remnant mass for a white dwarf, taken from the [Hoek & Groenewegen 1996]
 remnantMediumMass :: Double -> M.Map Double Double

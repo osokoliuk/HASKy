@@ -138,11 +138,11 @@ massDynamical t m_up =
 
 -- | Some of the terms (IGM/ISM outflows for all mass and a specific element yield, SFRD),
 -- to be used in the next function
-interGalacticMediumTerms :: ReferenceCosmology -> PowerSpectrum -> Remnant_Kind -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Yield_II -> Yield_Ia -> Yield_NSM -> Metallicity -> Mhalo -> SFRD -> Redshift -> (Double, Double, Double, Double, Double, Double, Double, Double)
+interGalacticMediumTerms :: ReferenceCosmology -> PowerSpectrum -> Remnant_Kind -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Yield_II -> Yield_Ia -> Yield_NSM -> Metallicity -> Mhalo -> SFRD -> Redshift -> (Double, Double, Double, Double, Double, Double, Double, Double, Double)
 interGalacticMediumTerms cosmology pk r_kind i_kind s_kind h_kind w_kind yield_ii yield_ia yield_nsm metal_frac mh_min sfrd z =
   let (_, _, _, _, _, _, _, prec) = unpackCosmology cosmology
 
-      (m_CO, eps_w, eps_sn, yr_Gyr, kms_ergMsol, energy, m_up, m_pu, m_pl, m_du_rg, m_dl_rg, m_du_ms, m_dl_ms, b_rg, b_ms, m_NSM_d, m_NSM_u, alpha_NSM, delta_t_NSM) =
+      (m_CO, eps_w, eps_sn, yr_Gyr, kms_ergMsol, energy, m_up, m_pu, m_pl, m_du_rg, m_dl_rg, m_du_ms, m_dl_ms, b_rg, b_ms, m_NSM_d, m_NSM_u, alpha_NSM, delta_t_NSM, eps_HNe) =
         ( 1.38, -- Mass of the CO white dwarf
           0.02, -- Fraction of the mass that contributes to the galactic winds
           0.005, -- Fraction of the mass that contributes to the SNe outflow to the IGM
@@ -161,7 +161,8 @@ interGalacticMediumTerms cosmology pk r_kind i_kind s_kind h_kind w_kind yield_i
           9, -- Minimum mass of a star that can leave NSM as a remnant in [Msol]
           30, -- Similarly, maximum mass of a star that can leave an NSM in [Msol]
           0.018, -- Fraction of NS that will give rise to NS-NS system and eventually coalesce
-          1e7 -- Time delay between the formation of NSM and its collapse in [yr]
+          1e7, -- Time delay between the formation of NSM and its collapse in [yr]
+          0.5 -- Fraction of HNe among CCSN with M >= 20 Msol
         )
 
       z_arr = [20, 20 - 0.5 .. 0]
@@ -179,21 +180,21 @@ interGalacticMediumTerms cosmology pk r_kind i_kind s_kind h_kind w_kind yield_i
       norm_imf = normalisedInitialMassFunction cosmology i_kind 0.1 m_up
       norm_imf_sn md mu = normalisedInitialMassFunction cosmology SN_Ia md mu
 
-      -- Ejecta by mass loss and SNe II
-      integrand_loss m =
+      -- Ejecta from AGB stars via stellar winds
+      integrand_AGB m =
         norm_imf m
           * sfrd (z_target z m)
           * (m - massRemnant m r_kind (metal_frac (z_target z m)))
 
-      -- Ejecta per element from mass loss
-      integrand_loss_Element m =
+      -- Ejecta per element from AGBs
+      integrand_AGB_Element m =
         norm_imf m
           * sfrd (z_target z m)
           * (m - massRemnant m r_kind (metal_frac (z_target z m)) - yield_ii m (metal_frac (z_target z m)))
           * metal_frac (z_target z m)
 
-      -- Ejecta per element from SNe II
-      integrand_SNe_II_Element m =
+      -- Ejecta per element from CCSN
+      integrand_CCSN_Element m =
         norm_imf m
           * sfrd (z_target z m)
           * yield_ii m (metal_frac (z_target z m))
@@ -214,8 +215,8 @@ interGalacticMediumTerms cosmology pk r_kind i_kind s_kind h_kind w_kind yield_i
       integrand_NSBH m =
         1
 
-      -- Ejecta from AGB stars via stellar winds
-      integrand_AGB m =
+      -- Ejecta from HNe
+      integrand_HNe m =
         1
 
       -- IGM outflows from galactic winds
@@ -227,13 +228,14 @@ interGalacticMediumTerms cosmology pk r_kind i_kind s_kind h_kind w_kind yield_i
       integrator = makeIntegrator (Precision prec)
 
       -- Integrate the integrands provided above with the chosen precision
-      e_loss =
+      e_AGB =
         integrator integrand_loss (m_down z) m_up
-      e_loss_Element =
+      e_AGB_Element =
         integrator integrand_loss_Element (m_down z) m_up
       o_Wind =
         eps_w * integrator integrand_Wind (m_down z) m_up
-      e_SNe_II_Element = integrator integrand_SNe_II_Element (m_down z) m_up
+      e_CCSN_Element = (1 - eps_HNe) * integrator integrand_SNe_II_Element (m_down z) m_up
+      e_HNe_Element = eps_HNe * integrator integrand_HNe (m_down z) m_up
       e_SNe_Ia =
         let first_term =
               b_rg
@@ -252,7 +254,7 @@ interGalacticMediumTerms cosmology pk r_kind i_kind s_kind h_kind w_kind yield_i
       e_NSM_Element = yield_nsm * e_NSM
    in (over each)
         (* yr_Gyr)
-        (e_loss, e_loss_Element, e_SNe_II_Element, e_SNe_Ia, e_SNe_Ia_Element, e_NSM, e_NSM_Element, o_Wind)
+        (e_AGB, e_AGB_Element, e_CCSN_Element, e_HNe_Element, e_SNe_Ia, e_SNe_Ia_Element, e_NSM, e_NSM_Element, o_Wind)
 
 -- | Solve four copled first-order differential equations that govern the evolution of:
 --    * rho_IGM (1)
