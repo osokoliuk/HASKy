@@ -150,7 +150,7 @@ interGalacticMediumTerms cosmology pk r_kind i_kind s_kind h_kind w_kind yield_i
           1.989 * 1e43, -- Conversion factor from [km^2/s^2] to [erg/Msol]
           2 * 1e51, -- Typical kinetic energy in [erg] released by a supernovae explosion
           100, -- Upper mass limit for an IMF, in [Msol]
-          8, -- MS SN Ia progenitor upper mass, all variables in below are in [Msol]
+          8, -- MS SN Ia progenitor upper mass, all variables below are in [Msol]
           3, -- Same, but lower mass
           1.5, -- RG+WD pair progenitor upper mass
           0.9, -- Same,  but lower mass
@@ -179,6 +179,10 @@ interGalacticMediumTerms cosmology pk r_kind i_kind s_kind h_kind w_kind yield_i
       m_down z = maximum [8, mdyn]
       norm_imf = normalisedInitialMassFunction cosmology i_kind 0.1 m_up
       norm_imf_sn md mu = normalisedInitialMassFunction cosmology SN_Ia md mu
+
+      -- Construct yield of SNe type II by interpolating over AGB, SAGB and CCSNe yields
+      yield_ii m =
+        1
 
       -- Ejecta from AGB stars via stellar winds
       integrand_AGB m =
@@ -211,12 +215,16 @@ interGalacticMediumTerms cosmology pk r_kind i_kind s_kind h_kind w_kind yield_i
         norm_imf m
           * sfrd (z_target z m - delta_t_NSM)
 
-      -- Ejecta from Neutron Star - Black Hole Mergers
-      integrand_NSBH m =
-        1
-
       -- Ejecta from HNe
       integrand_HNe m =
+        1
+
+      -- Ejecta from Novae
+      integrand_Nova m =
+        1
+
+      -- Ejecta from Wolf-Rayet stars
+      integrand_WR m =
         1
 
       -- IGM outflows from galactic winds

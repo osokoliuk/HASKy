@@ -29,6 +29,7 @@ data ReferenceStarFormationModel
     model_ccsn :: [Char],
     model_hne :: [Char],
     model_agb :: [Char],
+    model_sagb :: [Char],
     model_nsm :: [Char]
   }
   deriving (Eq, Show, Ord)
@@ -62,6 +63,20 @@ retrieveYieldAGB yield elem metal_frac =
         | metal_frac <= 0.1 = "z01"
         | otherwise = "z1"
    in let filepath = "data/AGB/" ++ show (model_agb yield) ++ "/" ++ metal_str ++ "/" ++ (toLower <$> element elem) ++ ".dat"
+       in do
+            table <- parseFile_II filepath
+            let yields_arr = lookup elem (values table)
+                yields_corrected = [if x >= 0 then x else 0 | x <- fromMaybe [] yields_arr]
+            return $ (masses table, yields_corrected)
+
+retrieveYieldSAGB :: Yield -> Element -> Double -> IO ([Double], [Double])
+retrieveYieldSAGB yield elem metal_frac =
+  let metal_str
+        | metal_frac <= 0.001 = "z0001"
+        | metal_frac <= 0.01 = "z001"
+        | metal_frac <= 0.1 = "z01"
+        | otherwise = "z1"
+   in let filepath = "data/SAGB/" ++ show (model_agb yield) ++ "/" ++ metal_str ++ "/" ++ (toLower <$> element elem) ++ ".dat"
        in do
             table <- parseFile_II filepath
             let yields_arr = lookup elem (values table)
