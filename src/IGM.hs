@@ -30,6 +30,7 @@ import Helper
 import Lookup
 import Math.GaussianQuadratureIntegration
 import SMF
+import StarFormation
 
 data IMF_kind
   = Salpeter
@@ -138,8 +139,8 @@ massDynamical t m_up =
 
 -- | Some of the terms (IGM/ISM outflows for all mass and a specific element yield, SFRD),
 -- to be used in the next function
-interGalacticMediumTerms :: ReferenceCosmology -> PowerSpectrum -> Remnant_Kind -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Yield_II -> Yield_Ia -> Yield_NSM -> Metallicity -> Mhalo -> SFRD -> Redshift -> (Double, Double, Double, Double, Double, Double, Double, Double, Double)
-interGalacticMediumTerms cosmology pk r_kind i_kind s_kind h_kind w_kind yield_ii yield_ia yield_nsm metal_frac mh_min sfrd z =
+interGalacticMediumTerms :: ReferenceCosmology -> ReferenceStarFormationModel -> PowerSpectrum -> Remnant_Kind -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Metallicity -> Mhalo -> SFRD -> Redshift -> (Double, Double, Double, Double, Double, Double, Double, Double, Double)
+interGalacticMediumTerms cosmology yields pk r_kind i_kind s_kind h_kind w_kind metal_frac mh_min sfrd z =
   let (_, _, _, _, _, _, _, prec) = unpackCosmology cosmology
 
       (m_CO, eps_w, eps_sn, yr_Gyr, kms_ergMsol, energy, m_up, m_pu, m_pl, m_du_rg, m_dl_rg, m_du_ms, m_dl_ms, b_rg, b_ms, m_NSM_d, m_NSM_u, alpha_NSM, delta_t_NSM, eps_HNe) =
@@ -181,8 +182,13 @@ interGalacticMediumTerms cosmology pk r_kind i_kind s_kind h_kind w_kind yield_i
       norm_imf_sn md mu = normalisedInitialMassFunction cosmology SN_Ia md mu
 
       -- Construct yield of SNe type II by interpolating over AGB, SAGB and CCSNe yields
-      yield_ii m =
-        1
+      yield_ii m
+        | m < 8 = yield_agb yields
+        | m < 11 && null y_sagb = yield_ccsn yields
+        | m < 11 = (m, y_sagb)
+        | otherwise = yield_ccsn yields
+        where
+          (m, y_sagb) = yield_sagb yields
 
       -- Ejecta from AGB stars via stellar winds
       integrand_AGB m =
