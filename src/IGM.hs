@@ -49,6 +49,10 @@ data HNe_Kind
   | Grimmett
   deriving (Eq, Show)
 
+-- | Models for the Initial Mass Function:
+--  * Single power-law [Salpeter et al. 1995]
+--  * Broken power-law [Kroupa et al. 2001]
+--  * Log-normal [Chabrier et al. 2003] converted to [Mpc^-3]
 initialMassFunction :: IMF_kind -> Mstar -> Double
 initialMassFunction i_kind m =
   let (alpha0, alpha1, alpha2, m1, m2, k0, k1, k2) =
@@ -56,14 +60,11 @@ initialMassFunction i_kind m =
       (a_Ch, b_Ch, center_Ch, sigma_Ch) =
         (0.85, 0.24, 0.079, 0.69)
    in case i_kind of
-        -- Salpeter et al. 1955 IMF (single power-law)
         Salpeter -> m ** (-2.35)
-        -- Kroupa et al. 2001 IMF (broken power-law)
         Kroupa
           | m < m1 -> k0 * m ** alpha0
           | m >= m2 && m < m2 -> k1 * m ** alpha1
           | otherwise -> k2 * m ** alpha2
-        -- Chabrier et al. 2003 (log-normal) converted to [Mpc^-3]
         Chabrier
           | m < 1 -> a_Ch * exp (-(log m - log center_Ch) ** 2 / (2 * sigma_Ch ** 2))
           | otherwise -> b_Ch * m ** (-1.3)
@@ -142,6 +143,10 @@ massDynamical t m_up =
       interp_tau = makeInterp (tauMS <$> mass_range) mass_range
    in interp_tau t
 
+-- | Fraction of CCSNe that are HNe for higher masses (fiducially, for M >= 20 Msol)
+-- There are two models:
+--  * Constant fraction, a toy model
+--  * More complicated, metallicity dependent [Grimmett et al. 2020] model
 fractionHNe :: HNe_Kind -> Double -> Double -> Double
 fractionHNe hne_kind eps_hne0 metal_frac =
   case HNe_Kind of
