@@ -44,6 +44,11 @@ data Remnant_Kind
   | WoosleyWeaver
   deriving (Eq, Show)
 
+data HNe_Kind
+  = Constant_HNe
+  | Grimmett
+  deriving (Eq, Show)
+
 initialMassFunction :: IMF_kind -> Mstar -> Double
 initialMassFunction i_kind m =
   let (alpha0, alpha1, alpha2, m1, m2, k0, k1, k2) =
@@ -137,13 +142,19 @@ massDynamical t m_up =
       interp_tau = makeInterp (tauMS <$> mass_range) mass_range
    in interp_tau t
 
+fractionHNe :: HNe_Kind -> Double -> Double -> Double
+fractionHNe hne_kind eps_hne0 metal_frac =
+  case HNe_Kind of
+    Constant_HNe -> eps_hne0
+    Grimmett -> maximum (eps_hne0 * exp (-metal_frac / 0.001), 0.001)
+
 -- | Some of the terms (IGM/ISM outflows for all mass and a specific element yield, SFRD),
 -- to be used in the next function
-interGalacticMediumTerms :: ReferenceCosmology -> ReferenceStarFormationModel -> PowerSpectrum -> Remnant_Kind -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Metallicity -> Mhalo -> SFRD -> Redshift -> (Double, Double, Double, Double, Double, Double, Double, Double, Double)
-interGalacticMediumTerms cosmology yields pk r_kind i_kind s_kind h_kind w_kind metal_frac mh_min sfrd z =
+interGalacticMediumTerms :: ReferenceCosmology -> ReferenceStarFormationModel -> PowerSpectrum -> Remnant_Kind -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> HNe_Kind -> Metallicity -> Mhalo -> SFRD -> Redshift -> (Double, Double, Double, Double, Double, Double, Double, Double, Double)
+interGalacticMediumTerms cosmology yields pk r_kind i_kind s_kind h_kind w_kind hne_kind metal_frac mh_min sfrd z =
   let (_, _, _, _, _, _, _, prec) = unpackCosmology cosmology
 
-      (m_CO, eps_w, eps_sn, yr_Gyr, kms_ergMsol, energy, m_up, m_pu, m_pl, m_du_rg, m_dl_rg, m_du_ms, m_dl_ms, b_rg, b_ms, m_NSM_d, m_NSM_u, alpha_NSM, delta_t_NSM, eps_HNe) =
+      (m_CO, eps_w, eps_sn, yr_Gyr, kms_ergMsol, energy, m_up, m_pu, m_pl, m_du_rg, m_dl_rg, m_du_ms, m_dl_ms, b_rg, b_ms, m_NSM_d, m_NSM_u, alpha_NSM, delta_t_NSM, eps_hne0) =
         ( 1.38, -- Mass of the CO white dwarf
           0.02, -- Fraction of the mass that contributes to the galactic winds
           0.005, -- Fraction of the mass that contributes to the SNe outflow to the IGM
@@ -222,6 +233,7 @@ interGalacticMediumTerms cosmology yields pk r_kind i_kind s_kind h_kind w_kind 
           * sfrd (z_target z m - delta_t_NSM)
 
       -- Ejecta from HNe
+      eps_HNe = fractionHNe hne_kind eps_hne0 (metal_frac (z_target z m))
       integrand_HNe m =
         1
 
@@ -270,12 +282,13 @@ interGalacticMediumTerms cosmology yields pk r_kind i_kind s_kind h_kind w_kind 
         (* yr_Gyr)
         (e_AGB, e_AGB_Element, e_CCSN_Element, e_HNe_Element, e_SNe_Ia, e_SNe_Ia_Element, e_NSM, e_NSM_Element, o_Wind)
 
--- | Solve four copled first-order differential equations that govern the evolution of:
+-- | Solve four coupled first-order differential equations that govern the evolution of:
 --    * rho_IGM (1)
---    * rho_ISM     (3)
---    * Xi_IGM    (4)
---    * Xi_ISM    (5)
+--    * rho_ISM (3)
+--    * Xi_IGM  (4)
+--    * Xi_ISM  (5)
 -- with all equations being taken from the [Daigne et al. 2004]
+{-# INLINE igmIsmEvolution #-}
 igmIsmEvolution :: ReferenceCosmology -> PowerSpectrum -> Remnant_Kind -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Yield_II -> Yield_Ia -> Yield_NSM -> Element -> Mhalo -> ([Double], [V.Vector Double])
 igmIsmEvolution cosmology pk r_kind i_kind s_kind h_kind w_kind yield_ii yield_ia yield_nsm elem mh_min =
   let (h0, om0, ob0, _, gn, _, _, _) = unpackCosmology cosmology

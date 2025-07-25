@@ -137,6 +137,7 @@ firstCrossing cosmology pk h_kind w_kind mh z =
 
 -- | The Halo Mass Function (HMF) itself, uses most of the functions
 -- defined within this module and a differentiation library
+{-# INLINE haloMassFunction #-}
 haloMassFunction :: ReferenceCosmology -> PowerSpectrum -> HMF_kind -> W_kind -> Mhalo -> Redshift -> Double
 haloMassFunction cosmology pk h_kind w_kind mh z =
   let (h0, om0, ob0, _, gn, _, _, _) = unpackCosmology cosmology
