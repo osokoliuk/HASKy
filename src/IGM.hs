@@ -49,6 +49,11 @@ data HNe_Kind
   | Grimmett
   deriving (Eq, Show)
 
+-- PNS mass - progenitor mass relationship kind
+data PNS_Kind 
+  = 
+  deriving (Eq, Show)
+
 -- | Models for the Initial Mass Function:
 --  * Single power-law [Salpeter et al. 1995]
 --  * Broken power-law [Kroupa et al. 2001]
@@ -143,6 +148,10 @@ massDynamical t m_up =
       interp_tau = makeInterp (tauMS <$> mass_range) mass_range
    in interp_tau t
 
+-- | Progenitor mass - proto NS mass relation from []
+massPNS :: PNS_Kind -> Mstar -> Mstar 
+massPNS kind_PNS mprog = 
+
 -- | Fraction of CCSNe that are HNe for higher masses (fiducially, for M >= 20 Msol)
 -- There are two models:
 --  * Constant fraction, a toy model
@@ -159,7 +168,7 @@ interGalacticMediumTerms :: ReferenceCosmology -> ReferenceStarFormationModel ->
 interGalacticMediumTerms cosmology yields pk r_kind i_kind s_kind h_kind w_kind hne_kind metal_frac mh_min sfrd z =
   let (_, _, _, _, _, _, _, prec) = unpackCosmology cosmology
 
-      (m_CO, eps_w, eps_sn, yr_Gyr, kms_ergMsol, energy, m_up, m_pu, m_pl, m_du_rg, m_dl_rg, m_du_ms, m_dl_ms, b_rg, b_ms, m_NSM_d, m_NSM_u, alpha_NSM, delta_t_NSM, eps_hne0) =
+      (m_CO, eps_w, eps_sn, yr_Gyr, kms_ergMsol, energy, m_up, m_pu, m_pl, m_du_rg, m_dl_rg, m_du_ms, m_dl_ms, b_rg, b_ms, m_NSM_d, m_NSM_u, alpha_NSM, delta_t_NSM, eps_hne0, eps_MRSNe) =
         ( 1.38, -- Mass of the CO white dwarf
           0.02, -- Fraction of the mass that contributes to the galactic winds
           0.005, -- Fraction of the mass that contributes to the SNe outflow to the IGM
@@ -179,7 +188,8 @@ interGalacticMediumTerms cosmology yields pk r_kind i_kind s_kind h_kind w_kind 
           30, -- Similarly, maximum mass of a star that can leave an NSM in [Msol]
           0.018, -- Fraction of NS that will give rise to NS-NS system and eventually coalesce
           1e7, -- Time delay between the formation of NSM and its collapse in [yr]
-          0.5 -- Fraction of HNe among CCSN with M >= 20 Msol
+          0.5, -- Fraction of HNe among CCSN with M >= 20 Msol
+          0.03 -- Fraction of HNe that are turned into MRSNe
         )
 
       z_arr = [20, 20 - 0.5 .. 0]
@@ -197,14 +207,18 @@ interGalacticMediumTerms cosmology yields pk r_kind i_kind s_kind h_kind w_kind 
       norm_imf = normalisedInitialMassFunction cosmology i_kind 0.1 m_up
       norm_imf_sn md mu = normalisedInitialMassFunction cosmology SN_Ia md mu
 
-      -- Construct yield of SNe type II by interpolating over AGB, SAGB and CCSNe yields
-      yield_ii m
+      -- Construct yield of SNe type II by interpolating over AGB, SAGB, ECSNe and CCSNe yields
+      -- If neutrino-driven yields are turned on, add yields to SN II yields following the 
+      -- initial mass - NS mass relation 
+      yield_ii m = curry makeInterp 
         | m < 8 = yield_agb yields
+        | m > 8.8 && m < 9 && not null yield_ecsn = yield_ecsn yields
         | m < 11 && null y_sagb = yield_ccsn yields
-        | m < 11 = (m, y_sagb)
+        | m < 11 = (m_sagb, y_sagb)
         | otherwise = yield_ccsn yields
         where
-          (m, y_sagb) = yield_sagb yields
+          (m_sagb, y_sagb) = yield_sagb yields
+          (m_ecsn, y_escn) = yield_ecsn yields
 
       -- Ejecta from AGB stars via stellar winds
       integrand_AGB m =
@@ -242,6 +256,12 @@ interGalacticMediumTerms cosmology yields pk r_kind i_kind s_kind h_kind w_kind 
       integrand_HNe m =
         1
 
+      -- Ejecta from ECSNe
+      integrand_ECSNe m = 
+
+      -- Ejecta from nu-driven winds 
+      integrand_nu m = 
+
       -- Ejecta from Novae
       integrand_Nova m =
         1
@@ -260,13 +280,14 @@ interGalacticMediumTerms cosmology yields pk r_kind i_kind s_kind h_kind w_kind 
 
       -- Integrate the integrands provided above with the chosen precision
       e_AGB =
-        integrator integrand_loss (m_down z) m_up
+        integrator integrand_AGB (m_down z) m_up
       e_AGB_Element =
-        integrator integrand_loss_Element (m_down z) m_up
+        integrator integrand_AGB_Element (m_down z) m_up
       o_Wind =
         eps_w * integrator integrand_Wind (m_down z) m_up
       e_CCSN_Element = (1 - eps_HNe) * integrator integrand_SNe_II_Element (m_down z) m_up
       e_HNe_Element = eps_HNe * integrator integrand_HNe (m_down z) m_up
+      e_MRSNe_Element = eps_MRSNe * e_HNe_Element
       e_SNe_Ia =
         let first_term =
               b_rg

@@ -21,6 +21,7 @@ import System.Environment
 --    * yields_ia -> Element/Isotope yields model for SN type Ia, in [Msol]
 --    * yields_ccsn -> Element/Isotope yields model for CCSN, in [Msol]
 --    * yields_hne -> Element/Isotope yields model for HNe, in [Msol]
+--    * yields_ecsn -> Element/Isotope yields model for ECSN, in [Msol]
 --    * yields_agb -> Element/Isotope yields model for AGB stars, in [MSol]
 --    * yields_NSM  -> Element/Isotope yields model for NS-NS and NS-BH mergers, in [Msol]
 data ReferenceStarFormationModel
@@ -28,6 +29,7 @@ data ReferenceStarFormationModel
   { model_ia :: ([Double], [Double])
     model_ccsn ::([Double], [Double]), 
     model_hne :: ([Double], [Double]),
+    model_ecsn :: ([Double], [Double])
     model_agb :: ([Double],[Double]),
     model_sagb :: ([Double],[Double]),
     model_nsm :: ([Double], [Double])
