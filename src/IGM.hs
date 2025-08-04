@@ -270,6 +270,10 @@ interGalacticMediumTerms cosmology yields pk r_kind i_kind s_kind h_kind w_kind 
       integrand_WR m =
         1
 
+      -- Ejecta from Pair-Instability Supernovae 
+      integrand_PISNe m = 
+        1
+
       -- IGM outflows from galactic winds
       integrand_Wind m =
         norm_imf m
