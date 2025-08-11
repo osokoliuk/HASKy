@@ -24,18 +24,21 @@ import System.Environment
 --    * yields_ecsn -> Element/Isotope yields model for ECSN, in [Msol]
 --    * yields_agb -> Element/Isotope yields model for AGB stars, in [MSol]
 --    * yields_NSM  -> Element/Isotope yields model for NS-NS and NS-BH mergers, in [Msol]
+--    * yields_PSN -> Element/Isotope yields model for proto-NS neutrino-drived yields, in [Msol]
 data ReferenceStarFormationModel
   = MkStarFormation
-  { model_ia :: ([Double], [Double])
-    model_ccsn ::([Double], [Double]), 
+  { model_ia :: ([Double], [Double]),
+    model_ccsn :: ([Double], [Double]),
     model_hne :: ([Double], [Double]),
-    model_ecsn :: ([Double], [Double])
-    model_agb :: ([Double],[Double]),
-    model_sagb :: ([Double],[Double]),
-    model_nsm :: ([Double], [Double])
+    model_ecsn :: ([Double], [Double]),
+    model_agb :: ([Double], [Double]),
+    model_sagb :: ([Double], [Double]),
+    model_nsm :: ([Double], [Double]),
+    model_psn :: ([Double], [Double])
   }
   deriving (Eq, Show, Ord)
 
+{-
 -- Functions to extract yields from Yield datatype
 retrieveYieldIa :: ReferenceStarFormationModel -> Element -> IO Double
 retrieveYieldIa yield elem =
@@ -85,10 +88,12 @@ retrieveYieldSAGB yield elem metal_frac =
                 yields_corrected = [if x >= 0 then x else 0 | x <- fromMaybe [] yields_arr]
             return $ (masses table, yields_corrected)
 
-retrieveYieldNSM :: Yield -> Element -> IO Double
+retrieveYieldNSM :: ReferenceStarFormationModel -> Element -> IO Double
 retrieveYieldNSM yield elem =
   pure 1.0
 
-retrieveYieldHNe :: Yield -> Element -> IO Double
+retrieveYieldHNe :: ReferenceStarFormationModel -> Element -> IO Double
 retrieveYieldHNe yield elem =
   pure 1.0
+
+-}
