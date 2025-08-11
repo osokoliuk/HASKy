@@ -50,8 +50,8 @@ data HNe_Kind
   deriving (Eq, Show)
 
 -- PNS mass - progenitor mass relationship kind
-data PNS_Kind 
-  = Arcones 
+data PNS_Kind
+  = Arcones
   deriving (Eq, Show)
 
 -- | Models for the Initial Mass Function:
@@ -149,13 +149,13 @@ massDynamical t m_up =
    in interp_tau t
 
 -- | Progenitor mass - proto NS mass relation from []
-massPNS :: PNS_Kind -> Mstar -> Mstar 
-massPNS kind_PNS mprog = 
-  case kind_PNS of 
-    Arcones -> 
-      let masses_proto = [1.4,1.6,1.8,2.0]
-          masses_prog = [13,15,20,40]
-      in makeInterp masses_prog masses_proto
+massPNS :: PNS_Kind -> Mstar -> Mstar
+massPNS kind_PNS mprog =
+  case kind_PNS of
+    Arcones ->
+      let masses_proto = [1.4, 1.6, 1.8, 2.0]
+          masses_prog = [13, 15, 20, 40]
+       in makeInterp masses_prog masses_proto
 
 -- | Fraction of CCSNe that are HNe for higher masses (fiducially, for M >= 20 Msol)
 -- There are two models:
@@ -169,7 +169,7 @@ fractionHNe hne_kind eps_hne0 metal_frac =
 
 -- | Some of the terms (IGM/ISM outflows for all mass and a specific element yield, SFRD),
 -- to be used in the next function
-interGalacticMediumTerms :: ReferenceCosmology -> ReferenceStarFormationModel -> PowerSpectrum -> Remnant_Kind -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> HNe_Kind -> Metallicity -> Mhalo -> SFRD -> Redshift -> (Double, Double, Double, Double, Double, Double, Double, Double, Double)
+interGalacticMediumTerms :: ReferenceCosmology -> ReferenceStarFormationModel -> PowerSpectrum -> Remnant_Kind -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> HNe_Kind -> Metallicity -> Mhalo -> SFRD -> Redshift -> (Double, Double, Double, Double, Double, Double, Double, Double, Double, Double)
 interGalacticMediumTerms cosmology yields pk r_kind i_kind s_kind h_kind w_kind hne_kind metal_frac mh_min sfrd z =
   let (_, _, _, _, _, _, _, prec) = unpackCosmology cosmology
 
@@ -213,20 +213,20 @@ interGalacticMediumTerms cosmology yields pk r_kind i_kind s_kind h_kind w_kind 
       norm_imf_sn md mu = normalisedInitialMassFunction cosmology SN_Ia md mu
 
       -- Construct yield of SNe type II by interpolating over AGB, SAGB, ECSNe and CCSNe yields
-      -- If neutrino-driven yields are turned on, add yields to SN II yields following the 
-      -- initial mass - NS mass relation 
-      yield_ii m = 
+      -- If neutrino-driven yields are turned on, add yields to SN II yields following the
+      -- initial mass - NS mass relation
+      yield_ii m =
         curry makeInterp (m, y)
-          where
-            (m_sagb, y_sagb) = yield_sagb yields
-            (m_ecsn, y_escn) = yield_ecsn yields
-            (m, y) 
-              | m < 8 = yield_agb yields
-              | m > 8.8 && m < 9 && not null yield_ecsn = yield_ecsn yields
-              | m < 11 && null y_sagb = yield_ccsn yields
-              | m < 11 = (m_sagb, y_sagb)
-              | otherwise = yield_ccsn yields
-                  -- Ejecta from AGB stars via stellar winds
+        where
+          (m_sagb, y_sagb) = yield_sagb yields
+          (m_ecsn, y_escn) = yield_ecsn yields
+          (m, y)
+            | m < 8 = yield_agb yields
+            | m > 8.8 && m < 9 && not null yield_ecsn = yield_ecsn yields
+            | m < 11 && null y_sagb = yield_ccsn yields
+            | m < 11 = (m_sagb, y_sagb)
+            | otherwise = yield_ccsn yields
+      -- Ejecta from AGB stars via stellar winds
       integrand_AGB m =
         norm_imf m
           * sfrd (z_target z m)
@@ -262,12 +262,6 @@ interGalacticMediumTerms cosmology yields pk r_kind i_kind s_kind h_kind w_kind 
       integrand_HNe m =
         1
 
-      -- Ejecta from ECSNe
-      integrand_ECSNe m = 
-
-      -- Ejecta from nu-driven winds 
-      integrand_nu m = 
-
       -- Ejecta from Novae
       integrand_Nova m =
         1
@@ -276,8 +270,8 @@ interGalacticMediumTerms cosmology yields pk r_kind i_kind s_kind h_kind w_kind 
       integrand_WR m =
         1
 
-      -- Ejecta from Pair-Instability Supernovae 
-      integrand_PISNe m = 
+      -- Ejecta from Pair-Instability Supernovae
+      integrand_PISNe m =
         1
 
       -- IGM outflows from galactic winds
@@ -316,7 +310,7 @@ interGalacticMediumTerms cosmology yields pk r_kind i_kind s_kind h_kind w_kind 
       e_NSM_Element = yield_nsm * e_NSM
    in (over each)
         (* yr_Gyr)
-        (e_AGB, e_AGB_Element, e_CCSN_Element, e_HNe_Element, e_SNe_Ia, e_SNe_Ia_Element, e_NSM, e_NSM_Element, o_Wind)
+        (e_AGB, e_AGB_Element, e_CCSN_Element, e_HNe_Element, e_MRSNe_Element, e_SNe_Ia, e_SNe_Ia_Element, e_NSM, e_NSM_Element, o_Wind)
 
 -- | Solve four coupled first-order differential equations that govern the evolution of:
 --    * rho_IGM (1)
