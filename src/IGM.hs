@@ -315,10 +315,10 @@ interGalacticMediumTerms cosmology yields pk r_kind i_kind s_kind h_kind w_kind 
         integrator integrand_AGB_Element (m_down z) m_up
       o_Wind =
         eps_w * integrator integrand_Wind (m_down z) m_up
-      e_CCSN_Element = (1 - eps_HNe) * integrator integrand_SNe_II_Element (m_down z) m_up
-      e_HNe_Element = eps_HNe * integrator integrand_HNe (m_down z) m_up
+      e_CCSN_Element = (1 - eps_HNe - eps_MRSNe) * integrator integrand_SNe_II_Element (m_down z) m_up
+      e_HNe_Element = (eps_HNe - eps_MRSNe) * integrator integrand_HNe (m_down z) m_up
       e_MRSNe_Element = eps_MRSNe * e_HNe_Element
-      e_Novae_Element = eps_CO * e_
+      e_Novae_Element = integrator integrand_Nova_Element
       e_SNe_Ia =
         let first_term =
               b_rg
@@ -346,7 +346,20 @@ interGalacticMediumTerms cosmology yields pk r_kind i_kind s_kind h_kind w_kind 
 --    * Xi_ISM  (5)
 -- with all equations being taken from the [Daigne et al. 2004]
 {-# INLINE igmIsmEvolution #-}
-igmIsmEvolution :: ReferenceCosmology -> PowerSpectrum -> Remnant_Kind -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Yield_II -> Yield_Ia -> Yield_NSM -> Element -> Mhalo -> ([Double], [V.Vector Double])
+igmIsmEvolution ::
+  ReferenceCosmology ->
+  PowerSpectrum ->
+  Remnant_Kind ->
+  IMF_kind ->
+  SMF_kind ->
+  HMF_kind ->
+  W_kind ->
+  Yield_II ->
+  Yield_Ia ->
+  Yield_NSM ->
+  Element ->
+  Mhalo ->
+  ([Double], [V.Vector Double])
 igmIsmEvolution cosmology pk r_kind i_kind s_kind h_kind w_kind yield_ii yield_ia yield_nsm elem mh_min =
   let (h0, om0, ob0, _, gn, _, _, _) = unpackCosmology cosmology
       z_arr = [20.0, 20.0 - 0.5 .. 0]
@@ -444,7 +457,19 @@ igmIsmEvolution cosmology pk r_kind i_kind s_kind h_kind w_kind yield_ii yield_i
 
 -- | Derive the metallicity of the IGM/ISM from outflow/inflow rates of metals,
 -- currently using an approach presented in [Tan et al. 2018]
-igmIsmMetallicity :: ReferenceCosmology -> PowerSpectrum -> Remnant_Kind -> IMF_kind -> SMF_kind -> HMF_kind -> W_kind -> Yield_II -> Yield_Ia -> Yield_NSM -> Mhalo -> ([Double], [Double], [Double])
+igmIsmMetallicity ::
+  ReferenceCosmology ->
+  PowerSpectrum ->
+  Remnant_Kind ->
+  IMF_kind ->
+  SMF_kind ->
+  HMF_kind ->
+  W_kind ->
+  Yield_II ->
+  Yield_Ia ->
+  Yield_NSM ->
+  Mhalo ->
+  ([Double], [Double], [Double])
 igmIsmMetallicity cosmology pk r_kind i_kind s_kind h_kind w_kind yield_ii yield_ia yield_nsm mh_min =
   let elem = Element "H" 1
 

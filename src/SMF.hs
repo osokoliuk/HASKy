@@ -30,7 +30,7 @@ data SMF_kind
   = DoublePower
   | Behroozi
   | EMERGE
-  deriving (Eq, Show)
+  deriving (Eq, Show, Read)
 
 type Mstar = Double
 
@@ -114,7 +114,15 @@ starFormationRate s_kind cosmology mh z =
    in ep * ob0 / om0 * massAccretionRate cosmology mh z
 
 -- | Stellar mass function, derived from the HMF and SFE via a simple chain rule
-stellarMassFunction :: ReferenceCosmology -> PowerSpectrum -> SMF_kind -> HMF_kind -> W_kind -> [Mhalo] -> Redshift -> ([Mstar], [Double])
+stellarMassFunction ::
+  ReferenceCosmology ->
+  PowerSpectrum ->
+  SMF_kind ->
+  HMF_kind ->
+  W_kind ->
+  [Mhalo] ->
+  Redshift ->
+  ([Mstar], [Double])
 stellarMassFunction cosmology pk s_kind h_kind w_kind mh_arr z =
   let (h0, om0, ob0, _, _, _, _, _) = unpackCosmology cosmology
 
