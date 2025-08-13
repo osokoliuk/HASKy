@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE MultiWayIf #-}
 
 module IGM where
@@ -173,7 +172,7 @@ interGalacticMediumTerms :: ReferenceCosmology -> ReferenceStarFormationModel ->
 interGalacticMediumTerms cosmology yields pk r_kind i_kind s_kind h_kind w_kind hne_kind metal_frac mh_min sfrd z =
   let (_, _, _, _, _, _, _, prec) = unpackCosmology cosmology
 
-      (m_CO, eps_w, eps_sn, yr_Gyr, kms_ergMsol, energy, m_up, m_pu, m_pl, m_du_rg, m_dl_rg, m_du_ms, m_dl_ms, b_rg, b_ms, m_NSM_d, m_NSM_u, alpha_NSM, delta_t_NSM, eps_hne0, eps_MRSNe) =
+      (m_CO, eps_w, eps_sn, yr_Gyr, kms_ergMsol, energy, m_up, m_pu, m_pl, m_du_rg, m_dl_rg, m_du_ms, m_dl_ms, b_rg, b_ms, m_NSM_d, m_NSM_u, alpha_NSM, delta_t_NSM, eps_hne0, eps_MRSNe, delta_t_Novae, alpha_Novae) =
         ( 1.38, -- Mass of the CO white dwarf
           0.02, -- Fraction of the mass that contributes to the galactic winds
           0.005, -- Fraction of the mass that contributes to the SNe outflow to the IGM
@@ -194,7 +193,9 @@ interGalacticMediumTerms cosmology yields pk r_kind i_kind s_kind h_kind w_kind 
           0.018, -- Fraction of NS that will give rise to NS-NS system and eventually coalesce
           1e7, -- Time delay between the formation of NSM and its collapse in [yr]
           0.5, -- Fraction of HNe among CCSN with M >= 20 Msol
-          0.03 -- Fraction of HNe that are turned into MRSNe
+          0.03, -- Fraction of HNe that are turned into MRSNe
+          2e9, -- Time delay between the formation of a WD and a Novae explosion in [yr]
+          0.01 -- Fraction of WDs that belong to Nova systems
         )
 
       z_arr = [20, 20 - 0.5 .. 0]
@@ -216,7 +217,9 @@ interGalacticMediumTerms cosmology yields pk r_kind i_kind s_kind h_kind w_kind 
       -- If neutrino-driven yields are turned on, add yields to SN II yields following the
       -- initial mass - NS mass relation
       yield_ii m =
-        curry makeInterp (m, y)
+        (+)
+          <$> curry makeInterp yield_psn yields
+          <*> curry makeInterp (m, y)
         where
           (m_sagb, y_sagb) = yield_sagb yields
           (m_ecsn, y_escn) = yield_ecsn yields
@@ -262,9 +265,11 @@ interGalacticMediumTerms cosmology yields pk r_kind i_kind s_kind h_kind w_kind 
       integrand_HNe m =
         1
 
-      -- Ejecta from Novae
+      -- Ejecta from Novae from [Romano & Matteucci 2003]
       integrand_Nova m =
-        1
+        alpha_Novae
+          * norm_imf m
+          * sfrd (z_target z m - delta_t_Novae)
 
       -- Ejecta from Wolf-Rayet stars
       integrand_WR m =
