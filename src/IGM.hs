@@ -52,6 +52,21 @@ data PNS_Kind
   = Arcones
   deriving (Eq, Show, Read)
 
+data EjectaOutflow
+  = EjectaOutflow
+  { e_AGB :: Double,
+    e_AGB_Element :: Double,
+    e_CCSN_Element :: Double,
+    e_HNe_Element :: Double,
+    e_SN_Ia :: Double,
+    e_SN_Ia_Element :: Double,
+    e_Novae_Element :: Double,
+    e_NSM :: Double,
+    e_NSM_Element :: Double,
+    o_Wind :: Double
+  }
+  deriving (Eq, Show, Read, Functor)
+
 -- | Models for the Initial Mass Function:
 --  * Single power-law [Salpeter et al. 1995]
 --  * Broken power-law [Kroupa et al. 2001]
@@ -181,11 +196,11 @@ interGalacticMediumTerms ::
   Mhalo ->
   SFRD ->
   Redshift ->
-  (Double, Double, Double, Double, Double, Double, Double, Double, Double, Double)
+  EjectaOutflow
 interGalacticMediumTerms cosmology yields pk r_kind i_kind s_kind h_kind w_kind hne_kind metal_frac mh_min sfrd z =
   let (_, _, _, _, _, _, _, prec) = unpackCosmology cosmology
 
-      (m_CO, eps_w, eps_sn, yr_Gyr, kms_ergMsol, energy, m_up, m_pu, m_pl, m_du_rg, m_dl_rg, m_du_ms, m_dl_ms, b_rg, b_ms, m_NSM_d, m_NSM_u, alpha_NSM, delta_t_NSM, eps_hne0, eps_MRSNe, delta_t_Novae, alpha_Novae, eps_CO, m_ej_Novae, n_Novae) =
+      (m_CO, eps_w, eps_sn, yr_Gyr, kms_ergMsol, energy, mUp, m_pu, m_pl, m_du_rg, m_dl_rg, m_du_ms, m_dl_ms, b_rg, b_ms, m_NSM_d, m_NSM_u, alpha_NSM, delta_t_NSM, eps_hne0, eps_MRSNe, delta_t_Novae, alpha_Novae, eps_CO, m_ej_Novae, n_Novae) =
         ( 1.38, -- Mass of the CO white dwarf
           0.02, -- Fraction of the mass that contributes to the galactic winds
           0.005, -- Fraction of the mass that contributes to the SNe outflow to the IGM
@@ -214,25 +229,24 @@ interGalacticMediumTerms cosmology yields pk r_kind i_kind s_kind h_kind w_kind 
           1e4 -- Number of Nova explosions that fit in the lifetime of a WD
         )
 
-      z_arr = [20, 20 - 0.5 .. 0]
+      zs = [20, 20 - 0.5 .. 0]
+      ts = parMap rpar (\z -> cosmicTime cosmology z) zs
+      interp_t = makeInterp zs ts
+      zTarget z m = makeInterp zs interp_t (cosmicTime cosmology z - tauMS m)
 
-      vesc_sq =
+      vescSq =
         escapeVelocitySq cosmology pk h_kind w_kind mh_min z
-      t_arr =
-        parMap rpar (\z -> cosmicTime cosmology z) z_arr
 
-      interp_t = makeInterp z_arr t_arr
-      z_target z m = interp_t (cosmicTime cosmology z - tauMS m)
-
-      mdyn = massDynamical (interp_t z) m_up
-      m_down z = maximum [8, mdyn]
-      norm_imf = normalisedInitialMassFunction cosmology i_kind 0.1 m_up
-      norm_imf_sn md mu = normalisedInitialMassFunction cosmology SN_Ia md mu
+      mDyn = massDynamical (interp_t z) mUp
+      mDown z = maximum [8, mDyn]
+      normImf = normalisedInitialMassFunction cosmology i_kind 0.1 mUp
+      normImfSN md mu = normalisedInitialMassFunction cosmology SN_Ia md mu
+      metalFraction z m = metal_frac (zTarget z m)
 
       -- Construct yield of SNe type II by interpolating over AGB, SAGB, ECSNe and CCSNe yields
       -- If neutrino-driven yields are turned on, add yields to SN II yields following the
       -- initial mass - NS mass relation
-      yield_ii m =
+      yieldII m =
         (+)
           <$> curry makeInterp yield_psn yields
           <*> curry makeInterp (m, y)
@@ -241,56 +255,34 @@ interGalacticMediumTerms cosmology yields pk r_kind i_kind s_kind h_kind w_kind 
           (m_ecsn, y_escn) = yield_ecsn yields
           (m, y)
             | m < 8 = yield_agb yields
-            | m > 8.8 && m < 9 && not null yield_ecsn = yield_ecsn yields
+            | m > 8.8 && m < 9 && not . null $ y_ecsn = yield_ecsn yields
             | m < 11 && null y_sagb = yield_ccsn yields
             | m < 11 = (m_sagb, y_sagb)
             | otherwise = yield_ccsn yields
 
-      -- Ejecta from AGB stars via stellar winds
-      integrand_AGB m =
-        norm_imf m
-          * sfrd (z_target z m)
-          * (m - massRemnant m r_kind (metal_frac (z_target z m)))
+      mkIntegrand :: (Double -> Double) -> Double -> (Double -> Double) -> Double -> Double
+      mkIntegrand norm offset yield m =
+        norm m
+          * sfrd (zTarget z m - offset)
+          * yield m
 
-      -- Ejecta per element from AGBs
-      integrand_AGB_Element m =
-        norm_imf m
-          * sfrd (z_target z m)
-          * (m - massRemnant m r_kind (metal_frac (z_target z m)) - yield_ii m (metal_frac (z_target z m)))
-          * metal_frac (z_target z m)
-
-      -- Ejecta per element from CCSN
-      integrand_CCSN_Element m =
-        norm_imf m
-          * sfrd (z_target z m)
-          * yield_ii m (metal_frac (z_target z m))
-
-      -- Ejecta from SNe Ia
-      integrand_SNe_Ia_1 m =
-        norm_imf m
-      integrand_SNe_Ia_2 md mu m =
-        norm_imf_sn md mu m
-          * sfrd (z_target z m)
-
-      -- Ejecta from Neutron Star Mergers from [Matteucci et al. 2014]
-      integrand_NSM m =
-        norm_imf m
-          * sfrd (z_target z m - delta_t_NSM)
-
-      -- Ejecta from HNe
-      eps_HNe = fractionHNe hne_kind eps_hne0 (metal_frac (z_target z m))
-      integrand_HNe m =
-        1
-
-      -- Ejecta from Novae from [Romano & Matteucci 2003]
-      integrand_Nova_Element m =
-        alpha_Novae
-          * yield_Novae
-          * norm_imf m
-          * sfrd (z_target z m - delta_t_Novae)
+      integrand_AGB = mkIntegrand normImf 0 (\m -> m - massRemnant m r_kind (metalFraction z m))
+      integrand_AGB_Element =
+        mkIntegrand normImf 0 (\m -> (m - massRemnant m r_kind (metalFraction z m) - yieldII m (metalFraction z m)) * metalFraction z m)
+      integrand_NSM = mkIntegrand normImf delta_t_NSM (const 1)
+      integrand_Wind = mkIntegrand normImf 0 (\m -> 2 * energy / (kms_ergMsol * vescSq))
+      integrand_CCSN_Element = mkIntegrand normImf 0 (\m -> yieldII m (metalFraction z m))
+      integrand_Nova_Element = alpha_Novae * yield_Novae * mkIntegrand normImf delta_t_Novae (const 1)
         where
           yield_Novae =
             eps_CO * (yield_co yields) + (1 - eps_CO) * (yield_one yields)
+      integrand_SNe_Ia_1 m = norm_imf m
+      integrand_SNe_Ia_2 md mu m = mkIntegrand (normImfSN md mu) 0 (const 1)
+
+      -- Ejecta from HNe
+      eps_HNe = fractionHNe hne_kind eps_hne0 (metalFraction z m)
+      integrand_HNe m =
+        1
 
       -- Ejecta from Wolf-Rayet stars
       integrand_WR m =
@@ -300,36 +292,30 @@ interGalacticMediumTerms cosmology yields pk r_kind i_kind s_kind h_kind w_kind 
       integrand_PISNe m =
         1
 
-      -- IGM outflows from galactic winds
-      integrand_Wind m =
-        norm_imf m
-          * sfrd (z_target z m)
-          * (2 * energy / (kms_ergMsol * vesc_sq))
-
       integrator = makeIntegrator (Precision prec)
 
       -- Integrate the integrands provided above with the chosen precision
       e_AGB =
-        integrator integrand_AGB (m_down z) m_up
+        integrator integrand_AGB (mDown z) mUp
       e_AGB_Element =
-        integrator integrand_AGB_Element (m_down z) m_up
+        integrator integrand_AGB_Element (mDown z) mUp
       o_Wind =
-        eps_w * integrator integrand_Wind (m_down z) m_up
-      e_CCSN_Element = (1 - eps_HNe - eps_MRSNe) * integrator integrand_SNe_II_Element (m_down z) m_up
-      e_HNe_Element = (eps_HNe - eps_MRSNe) * integrator integrand_HNe (m_down z) m_up
+        eps_w * integrator integrand_Wind (mDown z) mUp
+      e_CCSN_Element = (1 - eps_HNe - eps_MRSNe) * integrator integrand_SNe_II_Element (mDown z) mUp
+      e_HNe_Element = (eps_HNe - eps_MRSNe) * integrator integrand_HNe (mDown z) mUp
       e_MRSNe_Element = eps_MRSNe * e_HNe_Element
       e_Novae_Element = integrator integrand_Nova_Element
       e_SNe_Ia =
         let first_term =
               b_rg
-                * integrator (norm_imf_sn m_dl_rg m_du_rg) (maximum [m_dl_rg, mdyn]) m_du_rg
+                * integrator (norm_imf_sn m_dl_rg m_du_rg) (maximum [m_dl_rg, mDyn]) m_du_rg
                 / integrator (norm_imf_sn m_dl_rg m_du_rg) m_dl_rg m_du_rg
             second_term =
               b_ms
-                * integrator (norm_imf_sn m_dl_ms m_du_ms) (maximum [m_dl_ms, mdyn]) m_du_ms
+                * integrator (norm_imf_sn m_dl_ms m_du_ms) (maximum [m_dl_ms, mDyn]) m_du_ms
                 / integrator (norm_imf_sn m_dl_ms m_du_ms) m_dl_ms m_du_ms
          in m_CO
-              * integrator integrand_SNe_Ia_1 (maximum [m_pl, mdyn]) m_pu
+              * integrator integrand_SNe_Ia_1 (maximum [m_pl, mDyn]) m_pu
               * (first_term + second_term)
       e_SNe_Ia_Element =
         yield_ia * e_SNe_Ia
@@ -337,7 +323,7 @@ interGalacticMediumTerms cosmology yields pk r_kind i_kind s_kind h_kind w_kind 
       e_NSM_Element = yield_nsm * e_NSM
    in (over each)
         (* yr_Gyr)
-        (e_AGB, e_AGB_Element, e_CCSN_Element, e_HNe_Element, e_MRSNe_Element, e_SNe_Ia, e_SNe_Ia_Element, e_NSM, e_NSM_Element, o_Wind)
+        (e_AGB, e_AGB_Element, e_CCSN_Element, e_HNe_Element, e_MRSNe_Element, e_SNe_Ia, e_SNe_Ia_Element, e_Novae_Element, e_NSM, e_NSM_Element, o_Wind)
 
 -- | Solve four coupled first-order differential equations that govern the evolution of:
 --    * rho_IGM (1)
