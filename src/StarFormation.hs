@@ -18,23 +18,27 @@ import Math.GaussianQuadratureIntegration
 import System.Environment
 
 -- | Define a star formation model datatype, which includes the following:
---    * yields_ia -> Element/Isotope yields model for SN type Ia, in [Msol]
---    * yields_ccsn -> Element/Isotope yields model for CCSN, in [Msol]
---    * yields_hne -> Element/Isotope yields model for HNe, in [Msol]
---    * yields_ecsn -> Element/Isotope yields model for ECSN, in [Msol]
---    * yields_agb -> Element/Isotope yields model for AGB stars, in [MSol]
---    * yields_NSM  -> Element/Isotope yields model for NS-NS and NS-BH mergers, in [Msol]
---    * yields_PSN -> Element/Isotope yields model for proto-NS neutrino-drived yields, in [Msol]
+--    * yield_ia -> Element/Isotope yields model for SN type Ia, in [Msol]
+--    * yield_ccsn -> Element/Isotope yields model for CCSN, in [Msol]
+--    * yield_hne -> Element/Isotope yields model for HNe, in [Msol]
+--    * yield_ecsn -> Element/Isotope yields model for ECSN, in [Msol]
+--    * yield_agb -> Element/Isotope yields model for AGB stars, in [MSol]
+--    * yield_NSM  -> Element/Isotope yields model for NS-NS and NS-BH mergers, in [Msol]
+--    * yield_PSN -> Element/Isotope yields model for proto-NS neutrino-drived yields, in [Msol]
+--    * yield_CO -> Element/Isotope yields model for CO WDs within a Nova system, in [Msol]
+--    * yield_ONe -> Element/Isotope yields model for ONe WDs within a Nova system, in [Msol]
 data ReferenceStarFormationModel
   = MkStarFormation
-  { model_ia :: ([Double], [Double]),
-    model_ccsn :: ([Double], [Double]),
-    model_hne :: ([Double], [Double]),
-    model_ecsn :: ([Double], [Double]),
-    model_agb :: ([Double], [Double]),
-    model_sagb :: ([Double], [Double]),
-    model_nsm :: ([Double], [Double]),
-    model_psn :: ([Double], [Double])
+  { yield_ia :: ([Double], [Double]),
+    yield_ccsn :: ([Double], [Double]),
+    yield_hne :: ([Double], [Double]),
+    yield_ecsn :: ([Double], [Double]),
+    yield_agb :: ([Double], [Double]),
+    yield_sagb :: ([Double], [Double]),
+    yield_nsm :: ([Double], [Double]),
+    yield_psn :: ([Double], [Double]),
+    yield_co :: Double,
+    yield_one :: Double
   }
   deriving (Eq, Show, Ord)
 

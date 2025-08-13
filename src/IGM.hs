@@ -172,7 +172,7 @@ interGalacticMediumTerms :: ReferenceCosmology -> ReferenceStarFormationModel ->
 interGalacticMediumTerms cosmology yields pk r_kind i_kind s_kind h_kind w_kind hne_kind metal_frac mh_min sfrd z =
   let (_, _, _, _, _, _, _, prec) = unpackCosmology cosmology
 
-      (m_CO, eps_w, eps_sn, yr_Gyr, kms_ergMsol, energy, m_up, m_pu, m_pl, m_du_rg, m_dl_rg, m_du_ms, m_dl_ms, b_rg, b_ms, m_NSM_d, m_NSM_u, alpha_NSM, delta_t_NSM, eps_hne0, eps_MRSNe, delta_t_Novae, alpha_Novae) =
+      (m_CO, eps_w, eps_sn, yr_Gyr, kms_ergMsol, energy, m_up, m_pu, m_pl, m_du_rg, m_dl_rg, m_du_ms, m_dl_ms, b_rg, b_ms, m_NSM_d, m_NSM_u, alpha_NSM, delta_t_NSM, eps_hne0, eps_MRSNe, delta_t_Novae, alpha_Novae, eps_CO, m_ej_Novae, n_Novae) =
         ( 1.38, -- Mass of the CO white dwarf
           0.02, -- Fraction of the mass that contributes to the galactic winds
           0.005, -- Fraction of the mass that contributes to the SNe outflow to the IGM
@@ -195,7 +195,10 @@ interGalacticMediumTerms cosmology yields pk r_kind i_kind s_kind h_kind w_kind 
           0.5, -- Fraction of HNe among CCSN with M >= 20 Msol
           0.03, -- Fraction of HNe that are turned into MRSNe
           2e9, -- Time delay between the formation of a WD and a Novae explosion in [yr]
-          0.01 -- Fraction of WDs that belong to Nova systems
+          0.01, -- Fraction of WDs that belong to Nova systems
+          0.7, -- Fraction of CO WDs that contribute towards the Nova ejecta
+          2e-5, -- Average ejected mass per Nova explosion
+          1e4 -- Number of Nova explosions that fit in the lifetime of a WD
         )
 
       z_arr = [20, 20 - 0.5 .. 0]
@@ -229,6 +232,7 @@ interGalacticMediumTerms cosmology yields pk r_kind i_kind s_kind h_kind w_kind 
             | m < 11 && null y_sagb = yield_ccsn yields
             | m < 11 = (m_sagb, y_sagb)
             | otherwise = yield_ccsn yields
+
       -- Ejecta from AGB stars via stellar winds
       integrand_AGB m =
         norm_imf m
@@ -266,10 +270,14 @@ interGalacticMediumTerms cosmology yields pk r_kind i_kind s_kind h_kind w_kind 
         1
 
       -- Ejecta from Novae from [Romano & Matteucci 2003]
-      integrand_Nova m =
+      integrand_Nova_Element m =
         alpha_Novae
+          * yield_Novae
           * norm_imf m
           * sfrd (z_target z m - delta_t_Novae)
+        where
+          yield_Novae =
+            eps_CO * (yield_co yields) + (1 - eps_CO) * (yield_one yields)
 
       -- Ejecta from Wolf-Rayet stars
       integrand_WR m =
@@ -297,6 +305,7 @@ interGalacticMediumTerms cosmology yields pk r_kind i_kind s_kind h_kind w_kind 
       e_CCSN_Element = (1 - eps_HNe) * integrator integrand_SNe_II_Element (m_down z) m_up
       e_HNe_Element = eps_HNe * integrator integrand_HNe (m_down z) m_up
       e_MRSNe_Element = eps_MRSNe * e_HNe_Element
+      e_Novae_Element = eps_CO * e_
       e_SNe_Ia =
         let first_term =
               b_rg
