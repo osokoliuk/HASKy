@@ -293,60 +293,63 @@ interGalacticMediumTerms cosmology yields pk r_kind i_kind s_kind h_kind w_kind 
       yield_Novae :: Double
       yield_Novae = eps_CO * (yield_co yields) + (1 - eps_CO) * (yield_one yields)
 
+      eps_HNe :: Double
+      eps_HNe = fractionHNe hne_kind eps_hne0 (metalFraction z m)
+
+      -- Integrands from all contributors towards ejecta and outflows
       integrand_AGB = integrand0 massEjectedAGB
       integrand_AGB_Element = integrand0 massEjectedAGB_Element
       integrand_Wind = mkIntegrand normImf 0 (\m -> 2 * energy / (kms_ergMsol * vescSq))
       integrand_CCSN_Element = mkIntegrand normImf 0 (\m -> yieldII m (metalFraction z m))
       integrand_NSM = mkIntegrand normImf delta_t_NSM (const 1)
       integrand_Nova_Element = alpha_Novae * yield_Novae * mkIntegrand normImf delta_t_Novae (const 1)
-      integrand_SNe_Ia_1 m = norm_imf m
+      integrand_SNe_Ia_1 = norm_imf
       integrand_SNe_Ia_2 md mu m = mkIntegrand (normImfSN md mu) 0 (const 1)
-
-      -- Ejecta from HNe
-      eps_HNe = fractionHNe hne_kind eps_hne0 (metalFraction z m)
-      integrand_HNe m =
-        1
-
-      -- Ejecta from Wolf-Rayet stars
-      integrand_WR m =
-        1
-
-      -- Ejecta from Pair-Instability Supernovae
-      integrand_PISNe m =
-        1
+      integrand_HNe m = 1
+      integrand_WR m = 1
+      integrand_PISNe m = 1
 
       integrator = makeIntegrator (Precision prec)
 
       -- Integrate the integrands provided above with the chosen precision
-      e_AGB =
-        integrator integrand_AGB (mDown z) mUp
-      e_AGB_Element =
-        integrator integrand_AGB_Element (mDown z) mUp
-      o_Wind =
-        eps_w * integrator integrand_Wind (mDown z) mUp
+      e_AGB = integrator integrand_AGB (mDown z) mUp
+      e_AGB_Element = integrator integrand_AGB_Element (mDown z) mUp
+      o_Wind = eps_w * integrator integrand_Wind (mDown z) mUp
       e_CCSN_Element = (1 - eps_HNe - eps_MRSNe) * integrator integrand_SNe_II_Element (mDown z) mUp
       e_HNe_Element = (eps_HNe - eps_MRSNe) * integrator integrand_HNe (mDown z) mUp
       e_MRSNe_Element = eps_MRSNe * e_HNe_Element
       e_Novae_Element = integrator integrand_Nova_Element
-      e_SNe_Ia =
-        let first_term =
-              b_rg
-                * integrator (norm_imf_sn m_dl_rg m_du_rg) (maximum [m_dl_rg, mDyn]) m_du_rg
-                / integrator (norm_imf_sn m_dl_rg m_du_rg) m_dl_rg m_du_rg
-            second_term =
-              b_ms
-                * integrator (norm_imf_sn m_dl_ms m_du_ms) (maximum [m_dl_ms, mDyn]) m_du_ms
-                / integrator (norm_imf_sn m_dl_ms m_du_ms) m_dl_ms m_du_ms
-         in m_CO
-              * integrator integrand_SNe_Ia_1 (maximum [m_pl, mDyn]) m_pu
-              * (first_term + second_term)
-      e_SNe_Ia_Element =
-        yield_ia * e_SNe_Ia
       e_NSM = alpha_NSM * integrator integrand_NSM m_NSM_d m_NSM_u
       e_NSM_Element = yield_nsm * e_NSM
-   in (over each)
+
+      first_term =
+        b_rg
+          * integrator (norm_imf_sn m_dl_rg m_du_rg) (maximum [m_dl_rg, mDyn]) m_du_rg
+          / integrator (norm_imf_sn m_dl_rg m_du_rg) m_dl_rg m_du_rg
+      second_term =
+        b_ms
+          * integrator (norm_imf_sn m_dl_ms m_du_ms) (maximum [m_dl_ms, mDyn]) m_du_ms
+          / integrator (norm_imf_sn m_dl_ms m_du_ms) m_dl_ms m_du_ms
+      e_SNe_Ia =
+        m_CO
+          * integrator integrand_SNe_Ia_1 (maximum [m_pl, mDyn]) m_pu
+          * (first_term + second_term)
+      e_SNe_Ia_Element = yield_ia * e_SNe_Ia
+   in fmap
         (* yr_Gyr)
-        (e_AGB, e_AGB_Element, e_CCSN_Element, e_HNe_Element, e_MRSNe_Element, e_SNe_Ia, e_SNe_Ia_Element, e_Novae_Element, e_NSM, e_NSM_Element, o_Wind)
+        Ejecta
+          { e_AGB,
+            e_AGB_Element,
+            e_CCSN_Element,
+            e_HNe_Element,
+            e_MRSNe_Element,
+            e_SNe_Ia,
+            e_SNe_Ia_Element,
+            e_Novae_Element,
+            e_NSM,
+            e_NSM_Element,
+            o_Wind
+          }
 
 -- | Solve four coupled first-order differential equations that govern the evolution of:
 --    * rho_IGM (1)
