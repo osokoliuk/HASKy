@@ -229,35 +229,50 @@ interGalacticMediumTerms cosmology yields pk r_kind i_kind s_kind h_kind w_kind 
           1e4 -- Number of Nova explosions that fit in the lifetime of a WD
         )
 
-      zs = [20, 20 - 0.5 .. 0]
-      ts = parMap rpar (\z -> cosmicTime cosmology z) zs
-      interp_t = makeInterp zs ts
-      zTarget z m = makeInterp zs interp_t (cosmicTime cosmology z - tauMS m)
+      interpT :: Double -> Double
+      interpT =
+        makeInterp zs $
+          parMap rpar (\z -> cosmicTime cosmology z) zs
+        where
+          zs = [20, 20 - 0.5 .. 0]
 
+      zTarget :: Double -> Double -> Double
+      zTarget z m = makeInterp zs interpT (cosmicTime cosmology z - tauMS m)
+        where
+          zs = [20, 20 - 0.5 .. 0]
+
+      vescSq :: Double -> Double
       vescSq =
         escapeVelocitySq cosmology pk h_kind w_kind mh_min z
 
-      mDyn = massDynamical (interp_t z) mUp
+      mDyn = massDynamical (interpT z) mUp
       mDown z = maximum [8, mDyn]
+
+      normImf :: Double -> Double
       normImf = normalisedInitialMassFunction cosmology i_kind 0.1 mUp
-      normImfSN md mu = normalisedInitialMassFunction cosmology SN_Ia md mu
-      metalFraction z m = metal_frac (zTarget z m)
+
+      normImfSN :: Double -> Double -> Double
+      normImfSN md mu = normalisedInitialMassFunction cosmology SN_Ia
+
+      metalFraction :: Double -> Double -> Double
+      metalFraction = (metal_frac .) . zTarget
 
       -- Construct yield of SNe type II by interpolating over AGB, SAGB, ECSNe and CCSNe yields
       -- If neutrino-driven yields are turned on, add yields to SN II yields following the
       -- initial mass - NS mass relation
       yieldII m =
-        (+)
-          <$> curry makeInterp yield_psn yields
-          <*> curry makeInterp (m, y)
+        liftA2
+          (+)
+          (uncurry makeInterp yield_psn yields)
+          (uncurry makeInterp (m, y))
         where
-          (m_sagb, y_sagb) = yield_sagb yields
-          (m_ecsn, y_escn) = yield_ecsn yields
+          (mSAGB, ySAGB) = yield_sagb yields
+          (mECSN, yECSN) = yield_ecsn yields
           (m, y)
             | m < 8 = yield_agb yields
-            | m > 8.8 && m < 9 && not . null $ y_ecsn = yield_ecsn yields
+            | m > 8.8 && m < 9 && not . null $ y_ecsn = (mECSN, yECSN)
             | m < 11 && null y_sagb = yield_ccsn yields
-            | m < 11 = (m_sagb, y_sagb)
+            | m < 11 = (mSAGB, ySAGB)
             | otherwise = yield_ccsn yields
 
       mkIntegrand :: (Double -> Double) -> Double -> (Double -> Double) -> Double -> Double
@@ -266,16 +281,24 @@ interGalacticMediumTerms cosmology yields pk r_kind i_kind s_kind h_kind w_kind 
           * sfrd (zTarget z m - offset)
           * yield m
 
-      integrand_AGB = mkIntegrand normImf 0 (\m -> m - massRemnant m r_kind (metalFraction z m))
-      integrand_AGB_Element =
-        mkIntegrand normImf 0 (\m -> (m - massRemnant m r_kind (metalFraction z m) - yieldII m (metalFraction z m)) * metalFraction z m)
-      integrand_NSM = mkIntegrand normImf delta_t_NSM (const 1)
+      -- Helper functions
+      integrand0 :: (Double -> Double) -> Double -> Double
+      integrand0 = mkIntegrand normImf 0
+
+      massEjectedAGB, massEjectedAGB_Element :: Double -> Double
+      massEjectedAGB m = m - massRemnant m r_kind (metalFraction z m)
+      massEjectedAGB_Element m =
+        massEjected m - yieldII m (metalFraction z m)
+
+      yield_Novae :: Double
+      yield_Novae = eps_CO * (yield_co yields) + (1 - eps_CO) * (yield_one yields)
+
+      integrand_AGB = integrand0 massEjectedAGB
+      integrand_AGB_Element = integrand0 massEjectedAGB_Element
       integrand_Wind = mkIntegrand normImf 0 (\m -> 2 * energy / (kms_ergMsol * vescSq))
       integrand_CCSN_Element = mkIntegrand normImf 0 (\m -> yieldII m (metalFraction z m))
+      integrand_NSM = mkIntegrand normImf delta_t_NSM (const 1)
       integrand_Nova_Element = alpha_Novae * yield_Novae * mkIntegrand normImf delta_t_Novae (const 1)
-        where
-          yield_Novae =
-            eps_CO * (yield_co yields) + (1 - eps_CO) * (yield_one yields)
       integrand_SNe_Ia_1 m = norm_imf m
       integrand_SNe_Ia_2 md mu m = mkIntegrand (normImfSN md mu) 0 (const 1)
 
