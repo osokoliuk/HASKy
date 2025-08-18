@@ -356,7 +356,6 @@ interGalacticMediumTerms cosmology yields pk r_kind i_kind s_kind h_kind w_kind 
             o_Wind = o_Wind
           }
 
-{-
 -- | Solve four coupled first-order differential equations that govern the evolution of:
 --    * rho_IGM (1)
 --    * rho_ISM (3)
@@ -372,17 +371,15 @@ igmIsmEvolution ::
   SMF_kind ->
   HMF_kind ->
   W_kind ->
-  Yield_II ->
-  Yield_Ia ->
-  Yield_NSM ->
+  HNe_Kind ->
   Element ->
   Mhalo ->
   ([Double], [V.Vector Double])
-igmIsmEvolution cosmology pk r_kind i_kind s_kind h_kind w_kind yield_ii yield_ia yield_nsm elem mh_min =
+igmIsmEvolution cosmology pk r_kind i_kind s_kind h_kind w_kind hne_kind elem mh_min =
   let (h0, om0, ob0, _, gn, _, _, _) = unpackCosmology cosmology
-      z_arr = [20.0, 20.0 - 0.5 .. 0]
+      zs = [20.0, 20.0 - 0.5 .. 0]
 
-      terms_arr metal_frac sfrd z =
+      termsmetal_frac sfrd z =
         interGalacticMediumTerms cosmology pk r_kind i_kind s_kind h_kind w_kind yield_ii yield_ia yield_nsm metal_frac mh_min sfrd z
       mar_arr =
         parMap rpar (\z -> 1e9 * baryonFormationRateDensity cosmology pk h_kind w_kind z) z_arr
@@ -398,30 +395,28 @@ igmIsmEvolution cosmology pk r_kind i_kind s_kind h_kind w_kind yield_ii yield_i
       interp_z = makeInterp t_arr z_arr
       interp_t = makeInterp z_arr t_arr
 
+      -- Nucleosynthesis abundances are taken from the [Coc et al. 2014]
+      iniAbundance :: Element -> Double
+      iniAbundance elem =
+        case element elem of
+          "H" -> if isotope elem == 1 then (1 - fd) * fh else fd * fh
+          "He" -> if isotope elem == 4 then (1 - fh3) * yp else fh3
+          "Li" | isotope elem == 7 -> fli7
+          _ -> 0
+        where
+          yp = 0.2464
+          fh = 1 - yp
+          fd = 2.64e-5
+          fh3 = 1.05e-5 * (1 - fd) * fh
+          fli7 = 5.18e-10 * (1 - fd) * fh
+
       -- ICs are set assuming very small baryon fraction in the structures,
       -- with rho_ISM/rho_IGM ~ 0.01 (stellar mass is negligible at this redshift)
       -- following the prescription of [Daigne et al. 2006]
       -- Finally, we also adopt the BBN abundances for H (He),
       -- such that the ICs for Xi_ISM/Xi_IGM = 0.76 (0.24) * M_ISM/M_IGM.
       (n_steps, t_init, a_ini, rho_tot, igm_ini, ism_ini, xi_igm_ini, xi_ism_ini, ejecta_ini, outflow_ini) =
-        -- Nucleosynthesis abundances are taken from the [Coc et al. 2014]
-        let yp = 0.2464
-            fh = 1 - yp
-            fd = 2.64 * 1e-5
-            fh3 = 1.05 * 1e-5 * (1 - fd) * fh
-            fli7 = 5.18 * 1e-10 * (1 - fd) * fh
-            ini_abundance
-              | element elem == "H" =
-                  if
-                    | isotope elem == 1 -> (1 - fd) * fh
-                    | otherwise -> fd * fh
-              | element elem == "He" =
-                  if
-                    | isotope elem == 4 -> (1 - fh3) * yp
-                    | otherwise -> fh3
-              | element elem == "Li" && isotope elem == 7 = fli7
-              | otherwise = 0
-         in (10 :: Int, interp_t (maximum z_arr), 0.01, rho_cr (maximum z_arr) * ob0, (1 - a_ini) * rho_tot, a_ini * rho_tot, ini_abundance, ini_abundance, 0, 0)
+        (10 :: Int, interp_t (maximum z_arr), 0.01, rho_cr (maximum z_arr) * ob0, (1 - a_ini) * rho_tot, a_ini * rho_tot, iniAbundance elem, ini_abundance, 0, 0)
 
       -- Convert Differential-Algebraic system into a system of ODEs
       igm_ode :: History -> Double -> V.Vector Double -> V.Vector Double
@@ -498,5 +493,3 @@ igmIsmMetallicity cosmology pk r_kind i_kind s_kind h_kind w_kind yield_ii yield
       result_igm = zipWith (/) (densities !! 5) (densities !! 0)
       result_ism = zipWith (/) (densities !! 4) (densities !! 1)
    in (times, result_igm, result_ism)
-
--}
