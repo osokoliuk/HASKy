@@ -29,13 +29,13 @@ import System.Environment
 --    * yield_ONe -> Element/Isotope yields model for ONe WDs within a Nova system, in [Msol]
 data ReferenceStarFormationModel
   = MkStarFormation
-  { yield_ia :: ([Double], [Double]),
+  { yield_ia :: Double,
     yield_ccsn :: ([Double], [Double]),
     yield_hne :: ([Double], [Double]),
     yield_ecsn :: ([Double], [Double]),
     yield_agb :: ([Double], [Double]),
     yield_sagb :: ([Double], [Double]),
-    yield_nsm :: ([Double], [Double]),
+    yield_nsm :: Double,
     yield_psn :: ([Double], [Double]),
     yield_co :: Double,
     yield_one :: Double
