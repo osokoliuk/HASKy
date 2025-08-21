@@ -9,7 +9,7 @@ import Helper
 -- implementation is essentially adapted from the SkyPy package
 transferEinsensteinHu :: Wavenumber -> ReferenceCosmology -> Double
 transferEinsensteinHu k cosmology =
-  let (h0, om0, ob0, tcmb0, gn, as, ns, _) = unpackCosmology cosmology
+  let (h0, om0, ob0, tcmb0, gn, as, ns, _, _) = unpackCosmology cosmology
       little_h = h0 / 100
       om0h2 = om0 * little_h ** 2
       ob0h2 = ob0 * little_h ** 2
@@ -86,9 +86,19 @@ transferEinsensteinHu k cosmology =
       transfer = f_baryon * t_b + (1 - f_baryon) * t_c
    in transfer
 
+-- | Transfer function for the ULDM cosmologies
+-- Analytically derived from [Hu & Barkana & Gruzinov 2000]
+transferULDM :: Double -> Wavenumber -> Double
+transferULDM m22 k =
+  let kJ = 9 * m22 ** (1 / 2)
+      x = 1.61 * m22 ** (1 / 18) * k / kJ
+   in cos x ** 3 / (1 + x ** 8)
+
+-- | Construct Eisenstein-Hu matter power spectrum from the given cosmological model
+-- and EH transfer function
 powerSpectrumEisensteinHu :: ReferenceCosmology -> Redshift -> Wavenumber -> Double
 powerSpectrumEisensteinHu cosmology z k =
-  let (h0, om0, ob0, tcmb0, gn, as, ns, _) = unpackCosmology cosmology
+  let (h0, om0, ob0, tcmb0, gn, as, ns, _, model) = unpackCosmology cosmology
       transfer = transferEinsensteinHu k cosmology
 
       om = om0 * (1 + z) ** (-3)
@@ -96,7 +106,7 @@ powerSpectrumEisensteinHu cosmology z k =
 
       expr = 2.5 * om / (1 + z)
       dz = expr / ((om ** (4.0 / 7.0) - ode + (1 + 0.5 * om) * (1.0 + ode / 70.0)))
-      power_spectrum =
+      powerSpectrum =
         sqrt (dz)
           * 1e-9
           * as
@@ -104,4 +114,6 @@ powerSpectrumEisensteinHu cosmology z k =
           * (transfer) ** 2
           * (k / 0.02) ** (ns - 1)
           * (2 * pi ** 2 / k ** 3)
-   in power_spectrum
+   in case model of
+        CDM -> powerSpectrum
+        ULDM m22 -> transferULDM m22 k * powerSpectrum

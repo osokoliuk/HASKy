@@ -377,23 +377,28 @@ igmIsmEvolution ::
   ([Double], [V.Vector Double])
 igmIsmEvolution cosmology pk r_kind i_kind s_kind h_kind w_kind hne_kind elem mh_min =
   let (h0, om0, ob0, _, gn, _, _, _) = unpackCosmology cosmology
+
+
+      -- Constructing stellar yields datatype as a function of metallicity of ISM and given isotope 
+      ...
+
       zs = [20.0, 20.0 - 0.5 .. 0]
 
-      termsmetal_frac sfrd z =
-        interGalacticMediumTerms cosmology pk r_kind i_kind s_kind h_kind w_kind yield_ii yield_ia yield_nsm metal_frac mh_min sfrd z
+      terms metal_frac sfrd z =
+        interGalacticMediumTerms cosmology yields pk r_kind i_kind s_kind h_kind w_kind hne_kind metal_frac mh_min sfrd z
       mar_arr =
-        parMap rpar (\z -> 1e9 * baryonFormationRateDensity cosmology pk h_kind w_kind z) z_arr
-      t_arr =
-        parMap rpar (\z -> cosmicTime cosmology z) z_arr
+        parMap rpar (\z -> 1e9 * baryonFormationRateDensity cosmology pk h_kind w_kind z) zs 
+      ts =
+        parMap rpar (\z -> cosmicTime cosmology z) zs 
       sfrd_arr =
-        parMap rpar (\z -> starFormationRateDensity cosmology pk s_kind h_kind w_kind z mh_min) z_arr
+        parMap rpar (\z -> starFormationRateDensity cosmology pk s_kind h_kind w_kind z mh_min) zs 
       rho_cr z = 3 * h0 ** 2 / (8 * pi * gn) * (1 + z) ** 3
 
       -- Unpack outflow/inflow rates and interpolate over our redshift range
-      interp_mar = makeInterp z_arr mar_arr
-      interp_sfrd = makeInterp t_arr sfrd_arr
-      interp_z = makeInterp t_arr z_arr
-      interp_t = makeInterp z_arr t_arr
+      interp_mar = makeInterp zs mar_arr
+      interp_sfrd = makeInterp ts sfrd_arr
+      interp_z = makeInterp ts zs
+      interp_t = makeInterp zs ts
 
       -- Nucleosynthesis abundances are taken from the [Coc et al. 2014]
       iniAbundance :: Element -> Double
@@ -434,7 +439,7 @@ igmIsmEvolution cosmology pk r_kind i_kind s_kind h_kind w_kind hne_kind elem mh
             -- Unpack all rates at z(t)
             z = interp_z t
             (e_loss, e_loss_Element, e_SNe_II_Element, e_SNe_Ia, e_SNe_Ia_Element, e_NSM, e_NSM_Element, o_Wind) =
-              (terms_arr interp_metal interp_sfrd z)
+              terms_arr interp_metal interp_sfrd z
 
             -- Ejecta
             e_tot = e_loss + e_SNe_Ia + e_NSM
@@ -470,6 +475,7 @@ igmIsmEvolution cosmology pk r_kind i_kind s_kind h_kind w_kind hne_kind elem mh
 
 -- | Derive the metallicity of the IGM/ISM from outflow/inflow rates of metals,
 -- currently using an approach presented in [Tan et al. 2018]
+{-# INLINE igmIsmMetallicity #-}
 igmIsmMetallicity ::
   ReferenceCosmology ->
   PowerSpectrum ->
@@ -478,9 +484,6 @@ igmIsmMetallicity ::
   SMF_kind ->
   HMF_kind ->
   W_kind ->
-  Yield_II ->
-  Yield_Ia ->
-  Yield_NSM ->
   Mhalo ->
   ([Double], [Double], [Double])
 igmIsmMetallicity cosmology pk r_kind i_kind s_kind h_kind w_kind yield_ii yield_ia yield_nsm mh_min =
