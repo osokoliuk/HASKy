@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Cosmology where
 
 {-
@@ -19,7 +21,7 @@ import System.Environment
 
 data CosmologicalModel
   = CDM
-  | ULDM {m22 :: Double}
+  | ULDM {axionMass :: Double}
   deriving (Eq, Show)
 
 -- Define a cosmology datatypes, which includes the following:
@@ -42,7 +44,7 @@ data ReferenceCosmology
     prec' :: Double,
     model' :: CosmologicalModel
   }
-  deriving (Eq, Show)
+  deriving (Eq, Show, Read)
 
 type Redshift = Double
 
@@ -69,13 +71,13 @@ planck18 =
     }
 
 -- | Initialise cosmological model from the args, to be provided from the CLI
-initialiseCosmology :: [String] -> ReferenceCosmology
+initialiseCosmology :: [String] -> Maybe ReferenceCosmology
 initialiseCosmology args =
   case args of
     [h0, om0, ob0, tcmb0, gn, as, ns, prec, model] ->
       let [h0, om0, ob0, tcmb0, gn, as, ns, prec, model] = read <$> args
-       in MkCosmology h0 om0 ob0 tcmb0 gn as ns prec model
-    _ -> MkCosmology 0 0 0 0 0 0 0 0 _
+       in Maybe $ MkCosmology h0 om0 ob0 tcmb0 gn as ns prec model
+    _ -> Nothing
 
 -- | Fiducial Lambda CDM Hubble parameter, in the units of [km s^-1 Mpc^-1]
 hubbleParameter :: ReferenceCosmology -> Redshift -> Double

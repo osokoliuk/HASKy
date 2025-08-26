@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Pk where
 
 import Control.Parallel.Strategies
@@ -107,7 +109,7 @@ powerSpectrumEisensteinHu cosmology z k =
       expr = 2.5 * om / (1 + z)
       dz = expr / ((om ** (4.0 / 7.0) - ode + (1 + 0.5 * om) * (1.0 + ode / 70.0)))
       powerSpectrum =
-        sqrt (dz)
+        sqrt dz
           * 1e-9
           * as
           * (2 * (k / (h0 / 299792.458)) ** 2 / (5 * om0)) ** 2
