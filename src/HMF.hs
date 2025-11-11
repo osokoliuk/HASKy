@@ -57,7 +57,7 @@ type PowerSpectrum = Redshift -> Wavenumber -> Double
 -- | Define a radius for the uniform density sphere in terms of it's mass
 rh :: ReferenceCosmology -> W_kind -> Mhalo -> Rhalo
 rh cosmology w_kind mh =
-  let (h0, om0, ob0, _, gn, _, _, _) = unpackCosmology cosmology
+  let (h0, om0, ob0, _, gn, _, _, _, _) = unpackCosmology cosmology
       rho_mean = 3 * h0 ** 2 * om0 / (8 * pi * gn)
       c_smooth = 3.3
       c_sharp = 2.5
@@ -96,7 +96,7 @@ windowFunction cosmology w_kind k mh =
 -- Derived by integrating a matter power spectrum and a window function
 cosmicVarianceSq :: ReferenceCosmology -> PowerSpectrum -> Mhalo -> Redshift -> W_kind -> Double
 cosmicVarianceSq cosmology pk mh z w_kind =
-  let (_, _, _, _, _, _, _, prec) = unpackCosmology cosmology
+  let (_, _, _, _, _, _, _, prec, _) = unpackCosmology cosmology
 
       integrand k =
         (k ** 2 / (2 * pi ** 2))
@@ -117,7 +117,7 @@ cosmicVarianceSq cosmology pk mh z w_kind =
 -- We are planning to add more options in the near future
 firstCrossing :: ReferenceCosmology -> PowerSpectrum -> HMF_kind -> W_kind -> Mhalo -> Redshift -> Double
 firstCrossing cosmology pk h_kind w_kind mh z =
-  let (h0, om0, ob0, _, _, _, _, _) = unpackCosmology cosmology
+  let (h0, om0, ob0, _, _, _, _, _, _) = unpackCosmology cosmology
       sigma = sqrt $ cosmicVarianceSq cosmology pk mh z w_kind
 
       -- Critical linear overdensity threshold with
@@ -140,7 +140,7 @@ firstCrossing cosmology pk h_kind w_kind mh z =
 {-# INLINE haloMassFunction #-}
 haloMassFunction :: ReferenceCosmology -> PowerSpectrum -> HMF_kind -> W_kind -> Mhalo -> Redshift -> Double
 haloMassFunction cosmology pk h_kind w_kind mh z =
-  let (h0, om0, ob0, _, gn, _, _, _) = unpackCosmology cosmology
+  let (h0, om0, ob0, _, gn, _, _, _, _) = unpackCosmology cosmology
       rho_mean = 3 * h0 ** 2 * om0 / (8 * pi * gn)
 
       sigma = \mh -> cosmicVarianceSq cosmology pk mh z w_kind
@@ -156,7 +156,7 @@ haloMassFunction cosmology pk h_kind w_kind mh z =
 -- in the units of [km^2 s^-2], taken from the [Tan et al. 2018]
 escapeVelocitySq :: ReferenceCosmology -> PowerSpectrum -> HMF_kind -> W_kind -> Mhalo -> Redshift -> Double
 escapeVelocitySq cosmology pk h_kind w_kind mh_min z =
-  let (h0, om0, ob0, _, gn, _, _, prec) = unpackCosmology cosmology
+  let (h0, om0, ob0, _, gn, _, _, prec, _) = unpackCosmology cosmology
 
       first_crossing =
         (\mh -> firstCrossing cosmology pk h_kind w_kind mh z)

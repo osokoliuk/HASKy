@@ -22,7 +22,7 @@ import System.Environment
 data CosmologicalModel
   = CDM
   | ULDM {axionMass :: Double}
-  deriving (Eq, Show)
+  deriving (Eq, Show, Read)
 
 -- Define a cosmology datatypes, which includes the following:
 --    * h0'   -> Hubble parameter in [km s^-1 Mpc^-1]
@@ -44,7 +44,7 @@ data ReferenceCosmology
     prec' :: Double,
     model' :: CosmologicalModel
   }
-  deriving (Eq, Show, Read)
+  deriving (Eq, Show)
 
 type Redshift = Double
 
@@ -75,8 +75,8 @@ initialiseCosmology :: [String] -> Maybe ReferenceCosmology
 initialiseCosmology args =
   case args of
     [h0, om0, ob0, tcmb0, gn, as, ns, prec, model] ->
-      let [h0, om0, ob0, tcmb0, gn, as, ns, prec, model] = read <$> args
-       in Maybe $ MkCosmology h0 om0 ob0 tcmb0 gn as ns prec model
+      -- let [h0, om0, ob0, tcmb0, gn, as, ns, prec, model] = fmap read args
+      Just $ planck18 -- MkCosmology h0 om0 ob0 tcmb0 gn as ns prec model
     _ -> Nothing
 
 -- | Fiducial Lambda CDM Hubble parameter, in the units of [km s^-1 Mpc^-1]

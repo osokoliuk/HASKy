@@ -121,15 +121,15 @@
   (major1) == 0 && (major2) == 13 && (minor) <= 2)
 #endif /* MIN_VERSION_vector */
 
-/* tool gcc-15.1.1 */
+/* tool gcc-15.2.1 */
 #ifndef TOOL_VERSION_gcc
-#define TOOL_VERSION_gcc "15.1.1"
+#define TOOL_VERSION_gcc "15.2.1"
 #endif /* TOOL_VERSION_gcc */
 #ifndef MIN_TOOL_VERSION_gcc
 #define MIN_TOOL_VERSION_gcc(major1,major2,minor) (\
   (major1) <  15 || \
-  (major1) == 15 && (major2) <  1 || \
-  (major1) == 15 && (major2) == 1 && (minor) <= 1)
+  (major1) == 15 && (major2) <  2 || \
+  (major1) == 15 && (major2) == 2 && (minor) <= 1)
 #endif /* MIN_TOOL_VERSION_gcc */
 /* tool ghc-9.4.8 */
 #ifndef TOOL_VERSION_ghc
@@ -181,15 +181,15 @@
   (major1) == 0 && (major2) <  68 || \
   (major1) == 0 && (major2) == 68 && (minor) <= 8)
 #endif /* MIN_TOOL_VERSION_hsc2hs */
-/* tool pkg-config-2.4.3 */
+/* tool pkg-config-2.5.1 */
 #ifndef TOOL_VERSION_pkg_config
-#define TOOL_VERSION_pkg_config "2.4.3"
+#define TOOL_VERSION_pkg_config "2.5.1"
 #endif /* TOOL_VERSION_pkg_config */
 #ifndef MIN_TOOL_VERSION_pkg_config
 #define MIN_TOOL_VERSION_pkg_config(major1,major2,minor) (\
   (major1) <  2 || \
-  (major1) == 2 && (major2) <  4 || \
-  (major1) == 2 && (major2) == 4 && (minor) <= 3)
+  (major1) == 2 && (major2) <  5 || \
+  (major1) == 2 && (major2) == 5 && (minor) <= 1)
 #endif /* MIN_TOOL_VERSION_pkg_config */
 /* tool runghc-9.4.8 */
 #ifndef TOOL_VERSION_runghc
@@ -201,15 +201,15 @@
   (major1) == 9 && (major2) <  4 || \
   (major1) == 9 && (major2) == 4 && (minor) <= 8)
 #endif /* MIN_TOOL_VERSION_runghc */
-/* tool strip-2.44 */
+/* tool strip-2.45 */
 #ifndef TOOL_VERSION_strip
-#define TOOL_VERSION_strip "2.44"
+#define TOOL_VERSION_strip "2.45"
 #endif /* TOOL_VERSION_strip */
 #ifndef MIN_TOOL_VERSION_strip
 #define MIN_TOOL_VERSION_strip(major1,major2,minor) (\
   (major1) <  2 || \
-  (major1) == 2 && (major2) <  44 || \
-  (major1) == 2 && (major2) == 44 && (minor) <= 0)
+  (major1) == 2 && (major2) <  45 || \
+  (major1) == 2 && (major2) == 45 && (minor) <= 0)
 #endif /* MIN_TOOL_VERSION_strip */
 
 #ifndef CURRENT_PACKAGE_KEY
