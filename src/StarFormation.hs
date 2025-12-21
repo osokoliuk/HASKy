@@ -15,6 +15,7 @@ A module that defines reference star formation model. Pretty much used by
 every other module in this library.
 -}
 
+import Data.Char (toLower)
 import Helper
 import Math.GaussianQuadratureIntegration
 import System.Environment
@@ -44,15 +45,19 @@ data ReferenceStarFormationModel
   }
   deriving (Eq, Show, Ord)
 
-{-
+data ReferenceStarFormationConfig
+  = MkStarFormationCfg
+  {model_ia :: [Char]}
+
 -- Functions to extract yields from Yield datatype
-retrieveYieldIa :: ReferenceStarFormationModel -> Element -> IO Double
-retrieveYieldIa yield elem =
-  let filepath = "data/Ia/" ++ show (model_ia yield) ++ "/" ++ (toLower <$> element elem) ++ ".dat"
+retrieveYieldIa :: ReferenceStarFormationConfig -> Element -> IO Double
+retrieveYieldIa cfg elem =
+  let filepath = "data/" ++ model_ia cfg ++ "/" ++ (toLower <$> element elem) ++ ".dat"
    in do
         table <- parseFile_Ia filepath (toLower <$> show elem)
         return table
 
+{-
 retrieveYieldCCSN :: ReferenceStarFormationModel -> Element -> Double -> IO ([Double], [Double])
 retrieveYieldCCSN yield elem metal_frac =
   let metal_str

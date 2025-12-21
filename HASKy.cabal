@@ -103,7 +103,8 @@ executable HASKy
     -- Other library packages from which modules are imported.
     build-depends:
         base,
-        HASKy
+        HASKy,
+        directory
 
     -- Directories containing source files.
     hs-source-dirs:   app

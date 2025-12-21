@@ -435,7 +435,7 @@ igmIsmEvolution cosmology yields pk r_kind i_kind s_kind h_kind w_kind hne_kind 
       -- Finally, we also adopt the BBN abundances for H (He),
       -- such that the ICs for Xi_ISM/Xi_IGM = 0.76 (0.24) * M_ISM/M_IGM.
       (nSteps, tInit, aInit, rhoTot, igmInit, ismInit, xiIgmInit, xiIsmInit, ejectaInit, outflowInit) =
-        (10 :: Int, interpT (maximum zs), 0.01, rhoCr (maximum zs) * ob0, (1 - aInit) * rhoTot, aInit * rhoTot, iniAbundance elem, xiIsmInit, 0, 0)
+        (10 :: Int, interpT (maximum zs), 0.01, rhoCr (maximum zs) * ob0, (1 - aInit) * rhoTot, aInit * rhoTot, iniAbundance elem, xiIgmInit, 0, 0)
 
       -- Convert Differential-Algebraic system into a system of ODEs
       odeSystem :: History -> Double -> V.Vector Double -> V.Vector Double
