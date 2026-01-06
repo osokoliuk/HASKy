@@ -16,6 +16,7 @@ every other module in this library.
 -}
 
 import Data.Char (toLower)
+import Data.Maybe (fromMaybe)
 import Helper
 import Math.GaussianQuadratureIntegration
 import System.Environment
@@ -33,7 +34,7 @@ import System.Environment
 data ReferenceStarFormationModel
   = MkStarFormation
   { yield_ia :: Double,
-    yield_ccsn :: ([Double], [Double]),
+    yield_ccsn :: Double -> ([Double], [Double]),
     yield_hne :: ([Double], [Double]),
     yield_ecsn :: ([Double], [Double]),
     yield_agb :: ([Double], [Double]),
@@ -43,11 +44,11 @@ data ReferenceStarFormationModel
     yield_co :: Double,
     yield_one :: Double
   }
-  deriving (Eq, Show, Ord)
 
 data ReferenceStarFormationConfig
   = MkStarFormationCfg
-  {model_ia :: [Char]}
+  {model_ia :: [Char],
+   model_ccsn :: [Char]}
 
 -- Functions to extract yields from Yield datatype
 retrieveYieldIa :: ReferenceStarFormationConfig -> Element -> IO Double
@@ -57,20 +58,19 @@ retrieveYieldIa cfg elem =
         table <- parseFile_Ia filepath (toLower <$> show elem)
         return table
 
-{-
-retrieveYieldCCSN :: ReferenceStarFormationModel -> Element -> Double -> IO ([Double], [Double])
-retrieveYieldCCSN yield elem metal_frac =
+retrieveYieldCCSN :: ReferenceStarFormationConfig -> Element -> Double -> IO ([Double], [Double])
+retrieveYieldCCSN cfg elem metal_frac =
   let metal_str
         | metal_frac <= 0.001 = "z0001"
         | metal_frac <= 0.01 = "z001"
         | metal_frac <= 0.1 = "z01"
         | otherwise = "z1"
-   in let filepath = "data/CCSNe/" ++ show (model_ccsn yield) ++ "/" ++ metal_str ++ "/" ++ (toLower <$> element elem) ++ ".dat"
+   in let filepath = "data/" ++ model_ccsn cfg ++ "/" ++ metal_str ++ "/" ++ (toLower <$> element elem) ++ ".dat"
        in do
             table <- parseFile_II filepath
             let yields_arr = lookup elem (values table)
             return $ (masses table, fromMaybe [] yields_arr)
-
+{-
 retrieveYieldAGB :: ReferenceStarFormationModel -> Element -> Double -> IO ([Double], [Double])
 retrieveYieldAGB yield elem metal_frac =
   let metal_str

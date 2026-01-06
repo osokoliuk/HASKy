@@ -180,44 +180,44 @@ vecMultiply x = V.map (x *)
 
 -- | Somewhat parallel Runge-Kutta constant step solver
 -- The inner RK4 with history
-rk4StepHist ::
-  ([(Double, V.Vector Double)] -> Double -> V.Vector Double -> V.Vector Double) ->
+
+rk4StepHistIO ::
+  ([(Double, V.Vector Double)] -> Double -> V.Vector Double -> IO (V.Vector Double)) ->
   [(Double, V.Vector Double)] -> -- history
-  Double -> -- current time
-  Double -> -- step size
-  V.Vector Double -> -- current y
-  V.Vector Double
-rk4StepHist f hist t h y =
-  let k1 = vecMultiply h (f hist t y)
-      k2 = vecMultiply h (f hist (t + h / 2) (vecAdd y (vecMultiply 0.5 k1)))
-      k3 = vecMultiply h (f hist (t + h / 2) (vecAdd y (vecMultiply 0.5 k2)))
-      k4 = vecMultiply h (f hist (t + h) (vecAdd y k3))
-   in k1 `par`
-        k2 `par`
-          k3 `par`
-            k4 `pseq`
-              vecAdd y $
-                vecMultiply (1 / 6) $
-                  vecAdd k1 $
-                    vecAdd (vecMultiply 2 k2) $
-                      vecAdd (vecMultiply 2 k3) k4
+  Double ->                     -- current time
+  Double ->                     -- step size
+  V.Vector Double ->            -- current y
+  IO (V.Vector Double)
+rk4StepHistIO f hist t h y = do
+  k1 <- vecMultiply h <$> f hist t y
+  k2 <- vecMultiply h <$> f hist (t + h / 2) (vecAdd y (vecMultiply 0.5 k1))
+  k3 <- vecMultiply h <$> f hist (t + h / 2) (vecAdd y (vecMultiply 0.5 k2))
+  k4 <- vecMultiply h <$> f hist (t + h)     (vecAdd y k3)
+
+  pure $
+    vecAdd y $
+      vecMultiply (1 / 6) $
+        vecAdd k1 $
+          vecAdd (vecMultiply 2 k2) $
+            vecAdd (vecMultiply 2 k3) k4
 
 -- Solver that builds up the history
-rk4SolveHist ::
-  ([(Double, V.Vector Double)] -> Double -> V.Vector Double -> V.Vector Double) ->
-  Double -> -- initial time
-  Double -> -- step size
-  Int -> -- number of steps
+rk4SolveHistIO ::
+  ([(Double, V.Vector Double)] -> Double -> V.Vector Double -> IO (V.Vector Double)) ->
+  Double ->       -- initial time
+  Double ->       -- step size
+  Int ->          -- number of steps
   V.Vector Double -> -- initial state
-  [(Double, V.Vector Double)]
-rk4SolveHist f t0 h n y0 = go 0 t0 y0 []
+  IO [(Double, V.Vector Double)]
+rk4SolveHistIO f t0 h n y0 = go 0 t0 y0 []
   where
     go i t y hist
-      | i > n = reverse hist
-      | otherwise =
-          let y' = rk4StepHist f hist t h y
-              hist' = (t, y) : hist
-           in go (i + 1) (t + h) y' hist'
+      | i > n = pure (reverse hist)
+      | otherwise = do
+          y' <- rk4StepHistIO f hist t h y
+          let hist' = (t, y) : hist
+          go (i + 1) (t + h) y' hist'
+
 
 epsilon :: (RealFloat a) => a
 epsilon = encodeFloat 1 (fromIntegral $ 1 - floatDigits epsilon)

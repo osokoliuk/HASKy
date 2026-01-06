@@ -187,8 +187,8 @@ fractionHNe hne_kind eps_hne0 metal_frac =
 -- Construct yield of SNe type II by interpolating over AGB, SAGB, ECSNe and CCSNe yields
 -- If neutrino-driven yields are turned on, add yields to SN II yields following the
 -- initial mass - NS mass relation
-yieldII :: ReferenceStarFormationModel -> Double -> Double
-yieldII yields m =
+yieldII :: ReferenceStarFormationModel -> Double -> Double -> Double
+yieldII yields metal_frac m =
   y1 m + y2 m
   where
     (mSAGB, ySAGB) = yield_sagb yields
@@ -196,9 +196,9 @@ yieldII yields m =
     (mII, yII)
       | m < 8.0 = yield_agb yields
       | m > 8.8 && m < 9.0 && not (null yECSN) = (mECSN, yECSN)
-      | m < 11.0 && null ySAGB = yield_ccsn yields
+      | m < 11.0 && null ySAGB = yield_ccsn yields $ metal_frac
       | m < 11.0 = (mSAGB, ySAGB)
-      | otherwise = yield_ccsn yields
+      | otherwise = yield_ccsn yields $ metal_frac
     y1 = uncurry makeInterp $ yield_psn yields
     y2 = uncurry makeInterp $ (mII, yII)
 
@@ -295,7 +295,7 @@ interGalacticMediumTerms cosmology yields pk r_kind i_kind s_kind h_kind w_kind 
       massEjectedAGB, massEjectedAGB_Element :: Double -> Double
       massEjectedAGB m = m - massRemnant m r_kind (metalFraction z m)
       massEjectedAGB_Element m =
-        massEjectedAGB m - yieldII yields m
+        massEjectedAGB m - yieldII yields (metalFraction z m) m
 
       yield_Novae :: Double
       yield_Novae = eps_CO * (yield_co yields) + (1 - eps_CO) * (yield_one yields)
@@ -307,7 +307,7 @@ interGalacticMediumTerms cosmology yields pk r_kind i_kind s_kind h_kind w_kind 
       integrand_AGB = integrand0 massEjectedAGB
       integrand_AGB_Element = integrand0 massEjectedAGB_Element
       integrand_Wind = mkIntegrand normImf 0 (\m -> 2 * energy / (kms_ergMsol * vescSq))
-      integrand_CCSN_Element m = (1 - eps_HNe m - eps_MRSNe) * mkIntegrand normImf 0 (yieldII yields) m
+      integrand_CCSN_Element m = (1 - eps_HNe m - eps_MRSNe) * mkIntegrand normImf 0 (yieldII yields (metalFraction z m)) m
       integrand_NSM = mkIntegrand normImf delta_t_NSM (const 1)
       integrand_Novae_Element m = m_ej_Novae * n_Novae * alpha_Novae * yield_Novae * mkIntegrand normImf delta_t_Novae (const 1) m
       integrand_SNe_Ia_1 = normImf
@@ -358,6 +358,61 @@ interGalacticMediumTerms cosmology yields pk r_kind i_kind s_kind h_kind w_kind 
             o_Wind
           }
 
+-- | Extract rates from the EjectaOutflow dataclass and convert them into an appropriate form
+-- to be used further in the ODE solver
+computeRates :: EjectaOutflow Double -> (Double, Double, Double, Double, Double, Double)
+computeRates rates =
+  ( e_AGB + e_SNe_Ia + e_NSM,
+    e_AGB_Element + e_CCSN_Element + e_SNe_Ia_Element + e_NSM_Element,
+    eps_sn * e_AGB,
+    o_Wind,
+    eps_sn * e_AGB_Element,
+    eps_sn * e_AGB + o_Wind
+  )
+  where
+    eps_sn = 0.005
+    MkEjectaOutflow {e_AGB, e_AGB_Element, e_CCSN_Element, e_SNe_Ia, e_SNe_Ia_Element, e_NSM, e_NSM_Element, o_Wind} = rates
+
+
+-- Separate IO function for IGM/ISM terms
+igmTermsIO :: 
+  ReferenceCosmology ->
+  PowerSpectrum ->
+  Remnant_Kind ->
+  IMF_kind ->
+  SMF_kind ->
+  HMF_kind ->
+  W_kind ->
+  HNe_Kind ->
+  Metallicity ->
+  Mhalo ->
+  SFRD ->
+  Redshift ->
+  Element ->
+  IO (Double, Double, Double, Double, Double, Double)
+igmTermsIO cosmology pk r_kind i_kind s_kind h_kind w_kind hne_kind metal_frac mh_min sfrd z elem = 
+  do
+    let
+      sf_cfg = MkStarFormationCfg {model_ia = "iwamoto99/WDD1", model_ccsn = "WW95"}
+    sn_ia_yield <- retrieveYieldIa sf_cfg elem
+    ccsn_yield <- retrieveYieldCCSN sf_cfg elem (metal_frac z) 
+    let 
+      yields =
+        MkStarFormation
+        { yield_ia = sn_ia_yield,
+          yield_ccsn = \_ -> ([1], [1]),
+          yield_hne = ([1], [1]),
+          yield_ecsn = ([1], [1]),
+          yield_agb = ([1], [1]),
+          yield_sagb = ([1], [1]),
+          yield_nsm = 1,
+          yield_psn = ([1], [1]),
+          yield_co = 1,
+          yield_one = 1
+        }
+      result = computeRates $ interGalacticMediumTerms cosmology yields pk r_kind i_kind s_kind h_kind w_kind hne_kind metal_frac mh_min sfrd z 
+    return result 
+
 -- | Set up initial abundance for a given isotope
 -- Big Bang Nucleosynthesis abundances are taken from the [Coc et al. 2014]
 iniAbundance :: Element -> Double
@@ -374,21 +429,6 @@ iniAbundance elem =
     fh3 = 1.05e-5 * (1 - fd) * fh
     fli7 = 5.18e-10 * (1 - fd) * fh
 
--- | Extract rates from the EjectaOutflow dataclass and convert them into an appropriate form
--- to be used further in the ODE solver
-computeRates :: EjectaOutflow Double -> (Double, Double, Double, Double, Double, Double)
-computeRates rates =
-  ( e_AGB + e_SNe_Ia + e_NSM,
-    e_AGB_Element + e_CCSN_Element + e_SNe_Ia_Element + e_NSM_Element,
-    eps_sn * e_AGB,
-    o_Wind,
-    eps_sn * e_AGB_Element,
-    eps_sn * e_AGB + o_Wind
-  )
-  where
-    eps_sn = 0.005
-    MkEjectaOutflow {e_AGB, e_AGB_Element, e_CCSN_Element, e_SNe_Ia, e_SNe_Ia_Element, e_NSM, e_NSM_Element, o_Wind} = rates
-
 -- | Solve four coupled first-order differential equations that govern the evolution of:
 --    * rho_IGM (1)
 --    * rho_ISM (3)
@@ -398,7 +438,6 @@ computeRates rates =
 {-# INLINE igmIsmEvolution #-}
 igmIsmEvolution ::
   ReferenceCosmology ->
-  ReferenceStarFormationModel ->
   PowerSpectrum ->
   Remnant_Kind ->
   IMF_kind ->
@@ -408,74 +447,77 @@ igmIsmEvolution ::
   HNe_Kind ->
   Element ->
   Mhalo ->
-  ([Double], [V.Vector Double])
-igmIsmEvolution cosmology yields pk r_kind i_kind s_kind h_kind w_kind hne_kind elem mh_min =
-  let (h0, om0, ob0, _, gn, _, _, _, _) = unpackCosmology cosmology
+  IO ([Double], [V.Vector Double])
+igmIsmEvolution cosmology pk r_kind i_kind s_kind h_kind w_kind hne_kind elem mh_min = 
+  do
+    let (h0, om0, ob0, _, gn, _, _, _, _) = unpackCosmology cosmology
 
-      -- Constructing stellar yields datatype as a function of metallicity of ISM and given isotope
+        -- Constructing stellar yields datatype as a function of metallicity of ISM and given isotope
 
-      zs = [20.0, 20.0 - 0.5 .. 0]
+        zs = [20.0, 20.0 - 0.5 .. 0]
 
-      terms metal_frac sfrd z =
-        interGalacticMediumTerms cosmology yields pk r_kind i_kind s_kind h_kind w_kind hne_kind metal_frac mh_min sfrd z
-      mar =
-        parMap rpar (\z -> 1e9 * baryonFormationRateDensity cosmology pk h_kind w_kind z) zs
-      ts =
-        parMap rpar (\z -> cosmicTime cosmology z) zs
-      sfrd =
-        parMap rpar (\z -> starFormationRateDensity cosmology pk s_kind h_kind w_kind z mh_min) zs
-      rhoCr z = 3 * h0 ** 2 / (8 * pi * gn) * (1 + z) ** 3
+        mar =
+          parMap rpar (\z -> 1e9 * baryonFormationRateDensity cosmology pk h_kind w_kind z) zs
+        ts =
+          parMap rpar (\z -> cosmicTime cosmology z) zs
+        sfrd =
+          parMap rpar (\z -> starFormationRateDensity cosmology pk s_kind h_kind w_kind z mh_min) zs
+        rhoCr z = 3 * h0 ** 2 / (8 * pi * gn) * (1 + z) ** 3
 
-      -- Unpack outflow/inflow rates and interpolate over our redshift range
-      (interpMAR, interpSFRD, interpZ, interpT) = (makeInterp zs mar, makeInterp ts sfrd, makeInterp ts zs, makeInterp zs ts)
+        -- Unpack outflow/inflow rates and interpolate over our redshift range
+        (interpMAR, interpSFRD, interpZ, interpT) = (makeInterp zs mar, makeInterp ts sfrd, makeInterp ts zs, makeInterp zs ts)
 
-      -- ICs are set assuming very small baryon fraction in the structures,
-      -- with rho_ISM/rho_IGM ~ 0.01 (stellar mass is negligible at this redshift)
-      -- following the prescription of [Daigne et al. 2006]
-      -- Finally, we also adopt the BBN abundances for H (He),
-      -- such that the ICs for Xi_ISM/Xi_IGM = 0.76 (0.24) * M_ISM/M_IGM.
-      (nSteps, tInit, aInit, rhoTot, igmInit, ismInit, xiIgmInit, xiIsmInit, ejectaInit, outflowInit) =
-        (10 :: Int, interpT (maximum zs), 0.01, rhoCr (maximum zs) * ob0, (1 - aInit) * rhoTot, aInit * rhoTot, iniAbundance elem, xiIgmInit, 0, 0)
+        -- ICs are set assuming very small baryon fraction in the structures,
+        -- with rho_ISM/rho_IGM ~ 0.01 (stellar mass is negligible at this redshift)
+        -- following the prescription of [Daigne et al. 2006]
+        -- Finally, we also adopt the BBN abundances for H (He),
+        -- such that the ICs for Xi_ISM/Xi_IGM = 0.76 (0.24) * M_ISM/M_IGM.
+        (nSteps, tInit, aInit, rhoTot, igmInit, ismInit, xiIgmInit, xiIsmInit, ejectaInit, outflowInit) =
+          (10 :: Int, interpT (maximum zs), 0.01, rhoCr (maximum zs) * ob0, (1 - aInit) * rhoTot, aInit * rhoTot, iniAbundance elem, xiIgmInit, 0, 0)
 
-      -- Convert Differential-Algebraic system into a system of ODEs
-      odeSystem :: History -> Double -> V.Vector Double -> V.Vector Double
-      odeSystem history t y =
-        let (times, metals) =
-              unzip $
-                [(t, metal) | (t, v) <- history, V.length v > 2, let metal = (v V.! 4) / v V.! 1]
+        -- Convert Differential-Algebraic system into a system of ODEs
+        odeSystem :: History -> Double -> V.Vector Double -> IO (V.Vector Double)
+        odeSystem history t y = do
+          let (times, metals) =
+                unzip $
+                  [(t, metal) | (t, v) <- history, V.length v > 2, let metal = (v V.! 4) / v V.! 1]
 
-            interpMetal t =
-              if length times < 1
-                then 0
-                else
-                  (makeInterp times metals) t
+              interpMetal t =
+                if length times < 1
+                  then 0
+                  else
+                    (makeInterp times metals) t
 
-            -- Unpack all rates at z(t)
-            z = interpZ t
+              -- Unpack all rates at z(t)
+              z = interpZ t
 
-            (e_tot, e_tot_Element, o_SNe, o_Wind, o_SNe_Element, o_tot) = computeRates $ terms interpMetal interpSFRD z
-         in V.fromList
-              [ -interpMAR z + o_tot,
-                (-1e9 * interpSFRD t + e_tot) + (interpMAR z - o_tot),
-                1 / (y V.! 0) * (o_Wind * (y V.! 3 - y V.! 2) + (o_SNe_Element - o_SNe * y V.! 2)),
-                1 / (y V.! 1) * ((e_tot_Element - e_tot * y V.! 3) + interpMAR z * (y V.! 2 - y V.! 3) - (o_SNe_Element - o_SNe * y V.! 3)),
-                e_tot,
-                o_tot
-              ]
+          (e_tot, e_tot_Element, o_SNe, o_Wind, o_SNe_Element, o_tot) <- igmTermsIO cosmology pk r_kind i_kind s_kind h_kind w_kind hne_kind interpMetal mh_min interpSFRD z elem 
+         
+          pure $ V.fromList
+                [ -interpMAR z + o_tot,
+                  (-1e9 * interpSFRD t + e_tot) + (interpMAR z - o_tot),
+                  1 / (y V.! 0) * (o_Wind * (y V.! 3 - y V.! 2) + (o_SNe_Element - o_SNe * y V.! 2)),
+                  1 / (y V.! 1) * ((e_tot_Element - e_tot * y V.! 3) + interpMAR z * (y V.! 2 - y V.! 3) - (o_SNe_Element - o_SNe * y V.! 3)),
+                  e_tot,
+                  o_tot
+                ]
 
       -- Solve the system and unpack values
-      (times, masses) =
-        unzip $
-          rk4SolveHist odeSystem tInit ((interpT 0 - tInit) / fromIntegral nSteps) nSteps (V.fromList [igmInit, ismInit, xiIgmInit, xiIsmInit, ejectaInit, outflowInit])
+    zipped_result <- 
+        rk4SolveHistIO odeSystem tInit ((interpT 0 - tInit) / fromIntegral nSteps) nSteps (V.fromList [igmInit, ismInit, xiIgmInit, xiIsmInit, ejectaInit, outflowInit])
 
       -- M_star = rho_tot - M_IGM - Mstar from the conservation equation
       -- In addition, we also normalise each mass by the total mass
+    let 
+      (times, masses) = unzip zipped_result
       result =
         ( \v ->
             V.zipWith ($) (V.fromList [(/ rhoTot), (/ rhoTot), (* 1), (* 1), (/ rhoTot), (/ rhoTot), (/ rhoTot)]) $ V.snoc v (rhoTot - v V.! 0 - v V.! 1)
-        )
+          )
           <$> masses
-   in (times, result)
+    return (times, result)
+
+ 
 
 {-
 -- | Derive the metallicity of the IGM/ISM from outflow/inflow rates of metals,
