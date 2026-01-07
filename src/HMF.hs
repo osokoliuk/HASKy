@@ -1,3 +1,4 @@
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module HMF where
@@ -95,14 +96,12 @@ windowFunction cosmology w_kind k mh =
 -- | Cosmic variance squared, usually referred to as sigma^2(R,z)
 -- Derived by integrating a matter power spectrum and a window function
 cosmicVarianceSq :: ReferenceCosmology -> PowerSpectrum -> Mhalo -> Redshift -> W_kind -> Double
-cosmicVarianceSq cosmology pk mh z w_kind =
-  let (_, _, _, _, _, _, _, prec, _) = unpackCosmology cosmology
-
-      integrand k =
+cosmicVarianceSq cosmology@MkCosmology {prec} pk mh z w_kind =
+  let integrand k =
         (k ** 2 / (2 * pi ** 2))
           * (pk z k)
           * (windowFunction cosmology w_kind k mh) ** 2
-      integrator = makeIntegrator (Precision prec)
+      integrator = makeIntegrator prec
 
       result = integrator integrand 1e-3 1e3
    in result
@@ -116,9 +115,8 @@ cosmicVarianceSq cosmology pk mh z w_kind =
 --    * Warren
 -- We are planning to add more options in the near future
 firstCrossing :: ReferenceCosmology -> PowerSpectrum -> HMF_kind -> W_kind -> Mhalo -> Redshift -> Double
-firstCrossing cosmology pk h_kind w_kind mh z =
-  let (h0, om0, ob0, _, _, _, _, _, _) = unpackCosmology cosmology
-      sigma = sqrt $ cosmicVarianceSq cosmology pk mh z w_kind
+firstCrossing cosmology@MkCosmology {h0, om0, ob0} pk h_kind w_kind mh z =
+  let sigma = sqrt $ cosmicVarianceSq cosmology pk mh z w_kind
 
       -- Critical linear overdensity threshold with
       -- redshift corrections from [Kitayama et al. 1996]
@@ -139,9 +137,8 @@ firstCrossing cosmology pk h_kind w_kind mh z =
 -- defined within this module and a differentiation library
 {-# INLINE haloMassFunction #-}
 haloMassFunction :: ReferenceCosmology -> PowerSpectrum -> HMF_kind -> W_kind -> Mhalo -> Redshift -> Double
-haloMassFunction cosmology pk h_kind w_kind mh z =
-  let (h0, om0, ob0, _, gn, _, _, _, _) = unpackCosmology cosmology
-      rho_mean = 3 * h0 ** 2 * om0 / (8 * pi * gn)
+haloMassFunction cosmology@MkCosmology {h0, om0, ob0, gn} pk h_kind w_kind mh z =
+  let rho_mean = 3 * h0 ** 2 * om0 / (8 * pi * gn)
 
       sigma = \mh -> cosmicVarianceSq cosmology pk mh z w_kind
       first_crossing = \mh -> firstCrossing cosmology pk h_kind w_kind mh z
@@ -155,17 +152,15 @@ haloMassFunction cosmology pk h_kind w_kind mh z =
 -- | Escape velocity squared of a star from a halo of mass M and radius R at the redshift z,
 -- in the units of [km^2 s^-2], taken from the [Tan et al. 2018]
 escapeVelocitySq :: ReferenceCosmology -> PowerSpectrum -> HMF_kind -> W_kind -> Mhalo -> Redshift -> Double
-escapeVelocitySq cosmology pk h_kind w_kind mh_min z =
-  let (h0, om0, ob0, _, gn, _, _, prec, _) = unpackCosmology cosmology
-
-      first_crossing =
+escapeVelocitySq cosmology@MkCosmology {h0, om0, ob0, gn, prec} pk h_kind w_kind mh_min z =
+  let first_crossing =
         (\mh -> firstCrossing cosmology pk h_kind w_kind mh z)
 
       integrand_1 mh =
         mh * (2 * gn * mh / rh cosmology w_kind mh) * first_crossing mh
       integrand_2 mh =
         mh * first_crossing mh
-      integrator = makeIntegrator (Precision prec)
+      integrator = makeIntegrator prec
 
       result =
         (integrator integrand_1 mh_min 1e17)

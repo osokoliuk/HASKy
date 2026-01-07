@@ -95,11 +95,10 @@ initialMassFunction i_kind m =
 -- | Next two functions normalise IMF between m_inf = 0.1 Msol and m_sup = 100 Msol
 -- so that it can acts as a PDF in that range
 imfNormalisation :: ReferenceCosmology -> IMF_kind -> Mstar -> Mstar -> Double
-imfNormalisation cosmology i_kind m_down m_up =
-  let (_, _, _, _, _, _, _, prec, _) = unpackCosmology cosmology
-      m_arr = [m_down, m_down + 0.1 .. m_up]
+imfNormalisation MkCosmology {prec} i_kind m_down m_up =
+  let m_arr = [m_down, m_down + 0.1 .. m_up]
       integrand m = m * initialMassFunction i_kind m
-      integrator = makeIntegrator (Precision prec)
+      integrator = makeIntegrator prec
    in integrator integrand m_down m_up
 
 normalisedInitialMassFunction :: ReferenceCosmology -> IMF_kind -> Mstar -> Mstar -> Mstar -> Double
@@ -219,10 +218,8 @@ interGalacticMediumTerms ::
   SFRD ->
   Redshift ->
   EjectaOutflow Double
-interGalacticMediumTerms cosmology yields pk r_kind i_kind s_kind h_kind w_kind hne_kind metal_frac mh_min sfrd z =
-  let (_, _, _, _, _, _, _, prec, _) = unpackCosmology cosmology
-
-      (m_CO, eps_w, eps_sn, yr_Gyr, kms_ergMsol, energy, mUp, m_pu, m_pl, m_du_rg, m_dl_rg, m_du_ms, m_dl_ms, b_rg, b_ms, m_NSM_d, m_NSM_u, alpha_NSM, delta_t_NSM, eps_hne0, eps_MRSNe, delta_t_Novae, alpha_Novae, eps_CO, m_ej_Novae, n_Novae, m_Novae_d, m_Novae_u) =
+interGalacticMediumTerms cosmology@MkCosmology {prec} yields pk r_kind i_kind s_kind h_kind w_kind hne_kind metal_frac mh_min sfrd z =
+  let (m_CO, eps_w, eps_sn, yr_Gyr, kms_ergMsol, energy, mUp, m_pu, m_pl, m_du_rg, m_dl_rg, m_du_ms, m_dl_ms, b_rg, b_ms, m_NSM_d, m_NSM_u, alpha_NSM, delta_t_NSM, eps_hne0, eps_MRSNe, delta_t_Novae, alpha_Novae, eps_CO, m_ej_Novae, n_Novae, m_Novae_d, m_Novae_u) =
         ( 1.38, -- Mass of the CO white dwarf
           0.02, -- Fraction of the mass that contributes to the galactic winds
           0.005, -- Fraction of the mass that contributes to the SNe outflow to the IGM
@@ -316,7 +313,7 @@ interGalacticMediumTerms cosmology yields pk r_kind i_kind s_kind h_kind w_kind 
       integrand_WR m = 1
       integrand_PISNe m = 1
 
-      integrator = makeIntegrator (Precision prec)
+      integrator = makeIntegrator prec
 
       -- Integrate the integrands provided above with the chosen precision
       e_AGB = integrator integrand_AGB (mDown z) mUp
@@ -373,9 +370,8 @@ computeRates rates =
     eps_sn = 0.005
     MkEjectaOutflow {e_AGB, e_AGB_Element, e_CCSN_Element, e_SNe_Ia, e_SNe_Ia_Element, e_NSM, e_NSM_Element, o_Wind} = rates
 
-
 -- Separate IO function for IGM/ISM terms
-igmTermsIO :: 
+igmTermsIO ::
   ReferenceCosmology ->
   PowerSpectrum ->
   Remnant_Kind ->
@@ -390,28 +386,26 @@ igmTermsIO ::
   Redshift ->
   Element ->
   IO (Double, Double, Double, Double, Double, Double)
-igmTermsIO cosmology pk r_kind i_kind s_kind h_kind w_kind hne_kind metal_frac mh_min sfrd z elem = 
+igmTermsIO cosmology pk r_kind i_kind s_kind h_kind w_kind hne_kind metal_frac mh_min sfrd z elem =
   do
-    let
-      sf_cfg = MkStarFormationCfg {model_ia = "iwamoto99/WDD1", model_ccsn = "WW95"}
+    let sf_cfg = MkStarFormationCfg {model_ia = "iwamoto99/WDD1", model_ccsn = "WW95"}
     sn_ia_yield <- retrieveYieldIa sf_cfg elem
-    ccsn_yield <- retrieveYieldCCSN sf_cfg elem (metal_frac z) 
-    let 
-      yields =
-        MkStarFormation
-        { yield_ia = sn_ia_yield,
-          yield_ccsn = \_ -> ([1], [1]),
-          yield_hne = ([1], [1]),
-          yield_ecsn = ([1], [1]),
-          yield_agb = ([1], [1]),
-          yield_sagb = ([1], [1]),
-          yield_nsm = 1,
-          yield_psn = ([1], [1]),
-          yield_co = 1,
-          yield_one = 1
-        }
-      result = computeRates $ interGalacticMediumTerms cosmology yields pk r_kind i_kind s_kind h_kind w_kind hne_kind metal_frac mh_min sfrd z 
-    return result 
+    ccsn_yield <- retrieveYieldCCSN sf_cfg elem (metal_frac z)
+    let yields =
+          MkStarFormation
+            { yield_ia = sn_ia_yield,
+              yield_ccsn = \_ -> ([1], [1]),
+              yield_hne = ([1], [1]),
+              yield_ecsn = ([1], [1]),
+              yield_agb = ([1], [1]),
+              yield_sagb = ([1], [1]),
+              yield_nsm = 1,
+              yield_psn = ([1], [1]),
+              yield_co = 1,
+              yield_one = 1
+            }
+        result = computeRates $ interGalacticMediumTerms cosmology yields pk r_kind i_kind s_kind h_kind w_kind hne_kind metal_frac mh_min sfrd z
+    return result
 
 -- | Set up initial abundance for a given isotope
 -- Big Bang Nucleosynthesis abundances are taken from the [Coc et al. 2014]
@@ -448,11 +442,9 @@ igmIsmEvolution ::
   Element ->
   Mhalo ->
   IO ([Double], [V.Vector Double])
-igmIsmEvolution cosmology pk r_kind i_kind s_kind h_kind w_kind hne_kind elem mh_min = 
+igmIsmEvolution cosmology@MkCosmology {h0, om0, ob0, gn} pk r_kind i_kind s_kind h_kind w_kind hne_kind elem mh_min =
   do
-    let (h0, om0, ob0, _, gn, _, _, _, _) = unpackCosmology cosmology
-
-        -- Constructing stellar yields datatype as a function of metallicity of ISM and given isotope
+    let -- Constructing stellar yields datatype as a function of metallicity of ISM and given isotope
 
         zs = [20.0, 20.0 - 0.5 .. 0]
 
@@ -491,33 +483,31 @@ igmIsmEvolution cosmology pk r_kind i_kind s_kind h_kind w_kind hne_kind elem mh
               -- Unpack all rates at z(t)
               z = interpZ t
 
-          (e_tot, e_tot_Element, o_SNe, o_Wind, o_SNe_Element, o_tot) <- igmTermsIO cosmology pk r_kind i_kind s_kind h_kind w_kind hne_kind interpMetal mh_min interpSFRD z elem 
-         
-          pure $ V.fromList
-                [ -interpMAR z + o_tot,
-                  (-1e9 * interpSFRD t + e_tot) + (interpMAR z - o_tot),
-                  1 / (y V.! 0) * (o_Wind * (y V.! 3 - y V.! 2) + (o_SNe_Element - o_SNe * y V.! 2)),
-                  1 / (y V.! 1) * ((e_tot_Element - e_tot * y V.! 3) + interpMAR z * (y V.! 2 - y V.! 3) - (o_SNe_Element - o_SNe * y V.! 3)),
-                  e_tot,
-                  o_tot
-                ]
+          (e_tot, e_tot_Element, o_SNe, o_Wind, o_SNe_Element, o_tot) <- igmTermsIO cosmology pk r_kind i_kind s_kind h_kind w_kind hne_kind interpMetal mh_min interpSFRD z elem
 
-      -- Solve the system and unpack values
-    zipped_result <- 
-        rk4SolveHistIO odeSystem tInit ((interpT 0 - tInit) / fromIntegral nSteps) nSteps (V.fromList [igmInit, ismInit, xiIgmInit, xiIsmInit, ejectaInit, outflowInit])
+          pure $
+            V.fromList
+              [ -interpMAR z + o_tot,
+                (-1e9 * interpSFRD t + e_tot) + (interpMAR z - o_tot),
+                1 / (y V.! 0) * (o_Wind * (y V.! 3 - y V.! 2) + (o_SNe_Element - o_SNe * y V.! 2)),
+                1 / (y V.! 1) * ((e_tot_Element - e_tot * y V.! 3) + interpMAR z * (y V.! 2 - y V.! 3) - (o_SNe_Element - o_SNe * y V.! 3)),
+                e_tot,
+                o_tot
+              ]
 
-      -- M_star = rho_tot - M_IGM - Mstar from the conservation equation
-      -- In addition, we also normalise each mass by the total mass
-    let 
-      (times, masses) = unzip zipped_result
-      result =
-        ( \v ->
-            V.zipWith ($) (V.fromList [(/ rhoTot), (/ rhoTot), (* 1), (* 1), (/ rhoTot), (/ rhoTot), (/ rhoTot)]) $ V.snoc v (rhoTot - v V.! 0 - v V.! 1)
+    -- Solve the system and unpack values
+    zipped_result <-
+      rk4SolveHistIO odeSystem tInit ((interpT 0 - tInit) / fromIntegral nSteps) nSteps (V.fromList [igmInit, ismInit, xiIgmInit, xiIsmInit, ejectaInit, outflowInit])
+
+    -- M_star = rho_tot - M_IGM - Mstar from the conservation equation
+    -- In addition, we also normalise each mass by the total mass
+    let (times, masses) = unzip zipped_result
+        result =
+          ( \v ->
+              V.zipWith ($) (V.fromList [(/ rhoTot), (/ rhoTot), (* 1), (* 1), (/ rhoTot), (/ rhoTot), (/ rhoTot)]) $ V.snoc v (rhoTot - v V.! 0 - v V.! 1)
           )
-          <$> masses
+            <$> masses
     return (times, result)
-
- 
 
 {-
 -- | Derive the metallicity of the IGM/ISM from outflow/inflow rates of metals,

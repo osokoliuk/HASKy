@@ -39,9 +39,11 @@ import Text.Read (readMaybe)
 --  * 128, 256, 512, 1024
 --   (fast) ------> (slow)
 data Precision
-  = Precision
-  {prec :: Double}
-  deriving (Eq, Show, Ord)
+  = P128
+  | P256
+  | P512
+  | P1024
+  deriving (Eq, Show, Read, Ord)
 
 -- Data type that will describe an element that we want to focus on
 -- while deriving the mass fractions (mainly it will be a kind of metal)
@@ -75,10 +77,10 @@ data Table = Table
 makeIntegrator :: Precision -> ((Double -> Double) -> Double -> Double -> Double)
 makeIntegrator precision =
   case precision of
-    Precision 128 -> nIntegrate128
-    Precision 256 -> nIntegrate256
-    Precision 512 -> nIntegrate512
-    Precision 1024 -> nIntegrate1024
+    P128 -> nIntegrate128
+    P256 -> nIntegrate256
+    P512 -> nIntegrate512
+    P1024 -> nIntegrate1024
     _ -> error "Incorrect precision given"
 
 -- | We define a log10 function (which is apparenly absent from the Prelude)
@@ -180,19 +182,18 @@ vecMultiply x = V.map (x *)
 
 -- | Somewhat parallel Runge-Kutta constant step solver
 -- The inner RK4 with history
-
 rk4StepHistIO ::
   ([(Double, V.Vector Double)] -> Double -> V.Vector Double -> IO (V.Vector Double)) ->
   [(Double, V.Vector Double)] -> -- history
-  Double ->                     -- current time
-  Double ->                     -- step size
-  V.Vector Double ->            -- current y
+  Double -> -- current time
+  Double -> -- step size
+  V.Vector Double -> -- current y
   IO (V.Vector Double)
 rk4StepHistIO f hist t h y = do
   k1 <- vecMultiply h <$> f hist t y
   k2 <- vecMultiply h <$> f hist (t + h / 2) (vecAdd y (vecMultiply 0.5 k1))
   k3 <- vecMultiply h <$> f hist (t + h / 2) (vecAdd y (vecMultiply 0.5 k2))
-  k4 <- vecMultiply h <$> f hist (t + h)     (vecAdd y k3)
+  k4 <- vecMultiply h <$> f hist (t + h) (vecAdd y k3)
 
   pure $
     vecAdd y $
@@ -204,9 +205,9 @@ rk4StepHistIO f hist t h y = do
 -- Solver that builds up the history
 rk4SolveHistIO ::
   ([(Double, V.Vector Double)] -> Double -> V.Vector Double -> IO (V.Vector Double)) ->
-  Double ->       -- initial time
-  Double ->       -- step size
-  Int ->          -- number of steps
+  Double -> -- initial time
+  Double -> -- step size
+  Int -> -- number of steps
   V.Vector Double -> -- initial state
   IO [(Double, V.Vector Double)]
 rk4SolveHistIO f t0 h n y0 = go 0 t0 y0 []
@@ -217,7 +218,6 @@ rk4SolveHistIO f t0 h n y0 = go 0 t0 y0 []
           y' <- rk4StepHistIO f hist t h y
           let hist' = (t, y) : hist
           go (i + 1) (t + h) y' hist'
-
 
 epsilon :: (RealFloat a) => a
 epsilon = encodeFloat 1 (fromIntegral $ 1 - floatDigits epsilon)

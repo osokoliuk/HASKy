@@ -1,3 +1,4 @@
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Cosmology where
@@ -18,6 +19,7 @@ every other module in this library.
 import Helper
 import Math.GaussianQuadratureIntegration
 import System.Environment
+import Text.Read (readMaybe)
 
 data CosmologicalModel
   = CDM
@@ -34,15 +36,15 @@ data CosmologicalModel
 --    * ns' -> spectral index of the primordial scalar power spectrum
 data ReferenceCosmology
   = MkCosmology
-  { h0' :: Double,
-    om0' :: Double,
-    ob0' :: Double,
-    tcmb0' :: Double,
-    gn' :: Double,
-    as' :: Double,
-    ns' :: Double,
-    prec' :: Double,
-    model' :: CosmologicalModel
+  { h0 :: Double,
+    om0 :: Double,
+    ob0 :: Double,
+    tcmb0 :: Double,
+    gn :: Double,
+    as :: Double,
+    ns :: Double,
+    prec :: Precision,
+    model :: CosmologicalModel
   }
   deriving (Eq, Show)
 
@@ -51,33 +53,41 @@ type Redshift = Double
 type CosmicTime = Double
 
 -- | Unpack the values in the cosmology_record into variables
-unpackCosmology :: ReferenceCosmology -> (Double, Double, Double, Double, Double, Double, Double, Double, CosmologicalModel)
+unpackCosmology :: ReferenceCosmology -> (Double, Double, Double, Double, Double, Double, Double, Precision, CosmologicalModel)
 unpackCosmology cosmology =
-  (,,,,,,,,) <$> h0' <*> om0' <*> ob0' <*> tcmb0' <*> gn' <*> as' <*> ns' <*> prec' <*> model' $ cosmology
+  (,,,,,,,,) <$> h0 <*> om0 <*> ob0 <*> tcmb0 <*> gn <*> as <*> ns <*> prec <*> model $ cosmology
 
 -- | Example Planck 2018 cosmology
 planck18 :: ReferenceCosmology
 planck18 =
   MkCosmology
-    { h0' = 67.66,
-      om0' = (0.02242 / (h0' planck18 / 100) ** 2 + 0.11933 / (h0' planck18 / 100) ** 2),
-      ob0' = 0.02242 / (h0' planck18 / 100) ** 2,
-      tcmb0' = 2.7255,
-      gn' = 4.301 * 10 ** (-9),
-      as' = 2.105,
-      ns' = 0.9665,
-      prec' = 128,
-      model' = CDM
+    { h0 = 67.66,
+      om0 = (0.02242 / (h0 planck18 / 100) ** 2 + 0.11933 / (h0 planck18 / 100) ** 2),
+      ob0 = 0.02242 / (h0 planck18 / 100) ** 2,
+      tcmb0 = 2.7255,
+      gn = 4.301 * 10 ** (-9),
+      as = 2.105,
+      ns = 0.9665,
+      prec = P128,
+      model = CDM
     }
 
 -- | Initialise cosmological model from the args, to be provided from the CLI
 initialiseCosmology :: [String] -> Maybe ReferenceCosmology
-initialiseCosmology args =
-  case args of
-    [h0, om0, ob0, tcmb0, gn, as, ns, prec, model] ->
-      -- let [h0, om0, ob0, tcmb0, gn, as, ns, prec, model] = fmap read args
-      Just $ planck18 -- MkCosmology h0 om0 ob0 tcmb0 gn as ns prec model
-    _ -> Nothing
+initialiseCosmology [h0S, om0S, ob0S, tcmb0S, gnS, asS, nsS, precS, modelS] =
+  do
+    let h0 = read h0S
+        om0 = read om0S
+        ob0 = read ob0S
+        tcmb0 = read tcmb0S
+        gn = read gnS
+        as = read asS
+        ns = read nsS
+        prec = read precS
+        model = read modelS
+
+    pure $ MkCosmology {h0, om0, ob0, tcmb0, gn, as, ns, prec, model}
+initialiseCosmology _ = Nothing
 
 -- | Fiducial Lambda CDM Hubble parameter, in the units of [km s^-1 Mpc^-1]
 hubbleParameter :: ReferenceCosmology -> Redshift -> Double

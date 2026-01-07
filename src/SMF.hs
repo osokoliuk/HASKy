@@ -1,3 +1,4 @@
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module SMF where
@@ -44,10 +45,8 @@ type SFRD = Mstar -> Double
 --    * Behroozi et al. 2013 model
 --    * EMERGE semi-analytical model
 epsStar :: ReferenceCosmology -> SMF_kind -> Mhalo -> Redshift -> Double
-epsStar cosmology s_kind mh z =
-  let (h0, om0, ob0, _, _, _, _, _, _) = unpackCosmology cosmology
-
-      -- A set of best fit parameter for the double power-law
+epsStar cosmology@MkCosmology {h0, om0, ob0} s_kind mh z =
+  let -- A set of best fit parameter for the double power-law
       eps_0, mh_0, gamma_lo, gamma_hi :: Double
       (eps_0, mh_0, gamma_lo, gamma_hi) = (0.21, 2.8 * 1e11, 0.49, -0.61)
 
@@ -99,20 +98,18 @@ massAccretionHistory mh z =
 -- | Mass accretion rate, i.e., rate at which halo of mass Mh gains mass,
 -- adopted in the units of a solar mass from the [Fakhouri et al. 2013] work
 massAccretionRate :: ReferenceCosmology -> Mhalo -> Redshift -> Double
-massAccretionRate cosmology mh z =
-  let (h0, om0, ob0, _, _, _, _, _, _) = unpackCosmology cosmology
-   in 25.3
-        * (mh / 1e12) ** 1.1
-        * (1 + 1.65 * z)
-        * sqrt (om0 * (1 + z) ** 3 + 1 - om0)
+massAccretionRate cosmology@MkCosmology {h0, om0, ob0} mh z =
+  25.3
+    * (mh / 1e12) ** 1.1
+    * (1 + 1.65 * z)
+    * sqrt (om0 * (1 + z) ** 3 + 1 - om0)
 
 -- | Star formation rate, derived simply as a normalised halo mass accretion rate
 -- eps_star converts baryonic mass to a stellar mass, while factor Om0/Ob0 converts
 -- halo mass to baryonic mass
 starFormationRate :: SMF_kind -> ReferenceCosmology -> Mhalo -> Redshift -> Double
-starFormationRate s_kind cosmology mh z =
-  let (h0, om0, ob0, _, _, _, _, _, _) = unpackCosmology cosmology
-      ep = epsStar cosmology s_kind mh z
+starFormationRate s_kind cosmology@MkCosmology {h0, om0, ob0} mh z =
+  let ep = epsStar cosmology s_kind mh z
    in ep * ob0 / om0 * massAccretionRate cosmology mh z
 
 -- | Stellar mass function, derived from the HMF and SFE via a simple chain rule
@@ -125,10 +122,8 @@ stellarMassFunction ::
   [Mhalo] ->
   Redshift ->
   ([Mstar], [Double])
-stellarMassFunction cosmology pk s_kind h_kind w_kind mh_arr z =
-  let (h0, om0, ob0, _, _, _, _, _, _) = unpackCosmology cosmology
-
-      ms :: Mhalo -> Mstar -- Function that gives stellar mass
+stellarMassFunction cosmology@MkCosmology {h0, om0, ob0} pk s_kind h_kind w_kind mh_arr z =
+  let ms :: Mhalo -> Mstar -- Function that gives stellar mass
       ms mh = mh * (ob0 / om0) * epsStar cosmology s_kind mh z
 
       ms_arr = ms <$> mh_arr
@@ -146,10 +141,8 @@ stellarMassFunction cosmology pk s_kind h_kind w_kind mh_arr z =
 
 -- | Rate at which baryons are accreted by structures, in [Msol yr^-1 Mpc^-3]
 baryonFormationRateDensity :: ReferenceCosmology -> PowerSpectrum -> HMF_kind -> W_kind -> Redshift -> Double
-baryonFormationRateDensity cosmology pk h_kind w_kind z =
-  let (_, om0, ob0, _, _, _, _, prec, _) = unpackCosmology cosmology
-
-      mh_arr = (10 **) <$> [6, 6 + 0.25 .. 16]
+baryonFormationRateDensity cosmology@MkCosmology {om0, ob0, prec} pk h_kind w_kind z =
+  let mh_arr = (10 **) <$> [6, 6 + 0.25 .. 16]
 
       hmf_arr =
         (\mh -> haloMassFunction cosmology pk h_kind w_kind mh z) <$> mh_arr
@@ -160,7 +153,7 @@ baryonFormationRateDensity cosmology pk h_kind w_kind z =
       integrand mh =
         (interp_hmf mh)
           * (ob0 / om0 * massAccretionRate cosmology mh z)
-      integrator = makeIntegrator (Precision prec)
+      integrator = makeIntegrator prec
 
       result = integrator integrand (minimum mh_arr) (maximum mh_arr)
    in result
@@ -168,10 +161,8 @@ baryonFormationRateDensity cosmology pk h_kind w_kind z =
 -- | Similarly, we also define a star formation rate density in [Msol yr^-1 Mpc^-3],
 -- to be used in the IGM/ISM mass fraction differential equations
 starFormationRateDensity :: ReferenceCosmology -> PowerSpectrum -> SMF_kind -> HMF_kind -> W_kind -> Redshift -> Mhalo -> Double
-starFormationRateDensity cosmology pk s_kind h_kind w_kind z mh_min =
-  let (_, _, _, _, _, _, _, prec, _) = unpackCosmology cosmology
-
-      mh_arr = (10 **) <$> [log10 mh_min, log10 mh_min + 0.25 .. 16]
+starFormationRateDensity cosmology@MkCosmology {prec} pk s_kind h_kind w_kind z mh_min =
+  let mh_arr = (10 **) <$> [log10 mh_min, log10 mh_min + 0.25 .. 16]
 
       hmf_arr =
         (\mh -> haloMassFunction cosmology pk h_kind w_kind mh z) <$> mh_arr
@@ -182,7 +173,7 @@ starFormationRateDensity cosmology pk s_kind h_kind w_kind z mh_min =
       integrand mh =
         (interp_hmf mh)
           * (starFormationRate s_kind cosmology mh z)
-      integrator = makeIntegrator (Precision prec)
+      integrator = makeIntegrator prec
 
       result = integrator integrand (minimum mh_arr) (maximum mh_arr)
    in result
