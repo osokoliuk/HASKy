@@ -34,24 +34,24 @@ import Math.GaussianQuadratureIntegration
 import SMF
 import StarFormation
 
-data IMF_kind
+data IMFKind
   = Salpeter
   | Kroupa
   | Chabrier
   | SN_Ia
   deriving (Eq, Show, Read)
 
-data Remnant_Kind
+data RemnantKind
   = Pereira
   | WoosleyWeaver
   deriving (Eq, Show, Read)
 
-data HNe_Kind
+data HNeKind
   = Constant_HNe
   | Grimmett
   deriving (Eq, Show, Read)
 
-data PNS_Kind
+data PNSKind
   = Arcones
   deriving (Eq, Show, Read)
 
@@ -75,13 +75,13 @@ data EjectaOutflow a
 --  * Single power-law [Salpeter et al. 1995]
 --  * Broken power-law [Kroupa et al. 2001]
 --  * Log-normal [Chabrier et al. 2003] converted to [Mpc^-3]
-initialMassFunction :: IMF_kind -> Mstar -> Double
-initialMassFunction i_kind m =
+initialMassFunction :: IMFKind -> Mstar -> Double
+initialMassFunction iKind m =
   let (alpha0, alpha1, alpha2, m1, m2, k0, k1, k2) =
         (-0.3, -1.3, -2.3, 1, 0.08, 0.5, k0 * m1 ** (alpha0 - alpha1), k1 * m2 ** (alpha1 - alpha2))
       (a_Ch, b_Ch, center_Ch, sigma_Ch) =
         (0.85, 0.24, 0.079, 0.69)
-   in case i_kind of
+   in case iKind of
         Salpeter -> m ** (-2.35)
         Kroupa
           | m < m1 -> k0 * m ** alpha0
@@ -94,34 +94,34 @@ initialMassFunction i_kind m =
 
 -- | Next two functions normalise IMF between m_inf = 0.1 Msol and m_sup = 100 Msol
 -- so that it can acts as a PDF in that range
-imfNormalisation :: ReferenceCosmology -> IMF_kind -> Mstar -> Mstar -> Double
-imfNormalisation MkCosmology {prec} i_kind m_down m_up =
+imfNormalisation :: ReferenceCosmology -> IMFKind -> Mstar -> Mstar -> Double
+imfNormalisation MkCosmology {prec} iKind m_down m_up =
   let m_arr = [m_down, m_down + 0.1 .. m_up]
-      integrand m = m * initialMassFunction i_kind m
+      integrand m = m * initialMassFunction iKind m
       integrator = makeIntegrator prec
    in integrator integrand m_down m_up
 
-normalisedInitialMassFunction :: ReferenceCosmology -> IMF_kind -> Mstar -> Mstar -> Mstar -> Double
-normalisedInitialMassFunction cosmology i_kind m_down m_up m =
-  let norm = imfNormalisation cosmology i_kind m_down m_up
-   in (initialMassFunction i_kind m) / norm
+normalisedInitialMassFunction :: ReferenceCosmology -> IMFKind -> Mstar -> Mstar -> Mstar -> Double
+normalisedInitialMassFunction cosmology iKind m_down m_up m =
+  let norm = imfNormalisation cosmology iKind m_down m_up
+   in (initialMassFunction iKind m) / norm
 
 -- | Mass of a remnant produced by the supernova,
 -- calculated according to various works in the units of [Msol].
 -- Note that below a certain mass, stellar lifetimes are higher than the
 -- t_0 (age of the universe), so there will be no remnant
-massRemnant :: Mstar -> Remnant_Kind -> Double -> Double
-massRemnant m r_kind metal_frac =
-  case r_kind of
+massRemnant :: Mstar -> RemnantKind -> Double -> Double
+massRemnant m rKind metalFraction =
+  case rKind of
     -- Remnant masses taken from the [Woosley & Weaver 95]
     -- and [Hoek & Groenewegen 1996]
     WoosleyWeaver
       | m < 0.9 -> 0
       | m <= 8 ->
-          let (mi, mr) = (unzip . M.toList) (remnantMediumMass metal_frac)
+          let (mi, mr) = (unzip . M.toList) (remnantMediumMass metalFraction)
            in makeInterp mi mr $ m
       | m <= 40 ->
-          let (mi, mr) = (unzip . M.toList) (remnantHighMass metal_frac)
+          let (mi, mr) = (unzip . M.toList) (remnantHighMass metalFraction)
            in makeInterp mi mr $ m
       | otherwise ->
           extrapolate
@@ -130,7 +130,7 @@ massRemnant m r_kind metal_frac =
                 <$> M.findWithDefault 0.0 35
                 <*> M.findWithDefault 0.0 40
                 $ remnantHighMass
-                  metal_frac
+                  metalFraction
             )
             [35, 40]
     -- Remnant masses from the [Pereira & Miranda 2010]
@@ -165,7 +165,7 @@ massDynamical t m_up =
    in interp_tau t
 
 -- | Progenitor mass - proto NS mass relation from []
-massPNS :: PNS_Kind -> Mstar -> Mstar
+massPNS :: PNSKind -> Mstar -> Mstar
 massPNS kind_PNS =
   case kind_PNS of
     Arcones ->
@@ -177,11 +177,11 @@ massPNS kind_PNS =
 -- There are two models:
 --  * Constant fraction, a toy model
 --  * More complicated, metallicity dependent [Grimmett et al. 2020] model
-fractionHNe :: HNe_Kind -> Double -> Double -> Double
-fractionHNe hne_kind eps_hne0 metal_frac =
-  case hne_kind of
+fractionHNe :: HNeKind -> Double -> Double -> Double
+fractionHNe hneKind eps_hne0 metalFraction =
+  case hneKind of
     Constant_HNe -> eps_hne0
-    Grimmett -> maximum (eps_hne0 * exp (-metal_frac / 0.001), 0.001)
+    Grimmett -> maximum (eps_hne0 * exp (-metalFraction / 0.001), 0.001)
 
 -- Construct yield of SNe type II by interpolating over AGB, SAGB, ECSNe and CCSNe yields
 -- If neutrino-driven yields are turned on, add yields to SN II yields following the
@@ -207,18 +207,18 @@ interGalacticMediumTerms ::
   ReferenceCosmology ->
   ReferenceStarFormationModel ->
   PowerSpectrum ->
-  Remnant_Kind ->
-  IMF_kind ->
-  SMF_kind ->
-  HMF_kind ->
-  W_kind ->
-  HNe_Kind ->
+  RemnantKind ->
+  IMFKind ->
+  SMFKind ->
+  HMFKind ->
+  WKind ->
+  HNeKind ->
   Metallicity ->
   Mhalo ->
   SFRD ->
   Redshift ->
   EjectaOutflow Double
-interGalacticMediumTerms cosmology@MkCosmology {prec} yields pk r_kind i_kind s_kind h_kind w_kind hne_kind metal_frac mh_min sfrd z =
+interGalacticMediumTerms cosmology@MkCosmology {prec} yields pk rKind iKind sKind hKind wKind hneKind metalFraction mh_min sfrd z =
   let (m_CO, eps_w, eps_sn, yr_Gyr, kms_ergMsol, energy, mUp, m_pu, m_pl, m_du_rg, m_dl_rg, m_du_ms, m_dl_ms, b_rg, b_ms, m_NSM_d, m_NSM_u, alpha_NSM, delta_t_NSM, eps_hne0, eps_MRSNe, delta_t_Novae, alpha_Novae, eps_CO, m_ej_Novae, n_Novae, m_Novae_d, m_Novae_u) =
         ( 1.38, -- Mass of the CO white dwarf
           0.02, -- Fraction of the mass that contributes to the galactic winds
@@ -265,19 +265,19 @@ interGalacticMediumTerms cosmology@MkCosmology {prec} yields pk r_kind i_kind s_
 
       vescSq :: Double
       vescSq =
-        escapeVelocitySq cosmology pk h_kind w_kind mh_min z
+        escapeVelocitySq cosmology pk hKind wKind mh_min z
 
       mDyn = massDynamical (interpT z) mUp
       mDown z = maximum [8, mDyn]
 
       normImf :: Double -> Double
-      normImf = normalisedInitialMassFunction cosmology i_kind 0.1 mUp
+      normImf = normalisedInitialMassFunction cosmology iKind 0.1 mUp
 
       normImfSN :: Double -> Double -> Double -> Double
       normImfSN = normalisedInitialMassFunction cosmology SN_Ia
 
-      metalFraction :: Double -> Double -> Double
-      metalFraction = (metal_frac .) . zTarget
+      metalFractionAtZ :: Double -> Double -> Double
+      metalFractionAtZ = (metalFraction .) . zTarget
 
       mkIntegrand :: (Double -> Double) -> Double -> (Double -> Double) -> Double -> Double
       mkIntegrand norm offset yield m =
@@ -290,7 +290,7 @@ interGalacticMediumTerms cosmology@MkCosmology {prec} yields pk r_kind i_kind s_
       integrand0 = mkIntegrand normImf 0
 
       massEjectedAGB, massEjectedAGB_Element :: Double -> Double
-      massEjectedAGB m = m - massRemnant m r_kind (metalFraction z m)
+      massEjectedAGB m = m - massRemnant m rKind (metalFractionAtZ z m)
       massEjectedAGB_Element m =
         massEjectedAGB m - yieldII yields m
 
@@ -298,7 +298,7 @@ interGalacticMediumTerms cosmology@MkCosmology {prec} yields pk r_kind i_kind s_
       yield_Novae = eps_CO * (yield_co yields) + (1 - eps_CO) * (yield_one yields)
 
       eps_HNe :: Double -> Double
-      eps_HNe m = fractionHNe hne_kind eps_hne0 (metalFraction z m)
+      eps_HNe m = fractionHNe hneKind eps_hne0 (metalFractionAtZ z m)
 
       -- Integrands from all contributors towards ejecta and outflows
       integrand_AGB = integrand0 massEjectedAGB
@@ -374,23 +374,23 @@ computeRates rates =
 igmTermsIO ::
   ReferenceCosmology ->
   PowerSpectrum ->
-  Remnant_Kind ->
-  IMF_kind ->
-  SMF_kind ->
-  HMF_kind ->
-  W_kind ->
-  HNe_Kind ->
+  RemnantKind ->
+  IMFKind ->
+  SMFKind ->
+  HMFKind ->
+  WKind ->
+  HNeKind ->
   Metallicity ->
   Mhalo ->
   SFRD ->
   Redshift ->
   Element ->
   IO (Double, Double, Double, Double, Double, Double)
-igmTermsIO cosmology pk r_kind i_kind s_kind h_kind w_kind hne_kind metal_frac mh_min sfrd z elem =
+igmTermsIO cosmology pk rKind iKind sKind hKind wKind hneKind metalFraction mh_min sfrd z elem =
   do
     let sf_cfg = MkStarFormationCfg {model_ia = "iwamoto99/WDD1", model_ccsn = "WW95"}
     sn_ia_yield <- retrieveYieldIa sf_cfg elem
-    ccsn_yield <- retrieveYieldCCSN sf_cfg elem (metal_frac z)
+    ccsn_yield <- retrieveYieldCCSN sf_cfg elem (metalFraction z)
     let yields =
           MkStarFormation
             { yield_ia = sn_ia_yield,
@@ -404,7 +404,7 @@ igmTermsIO cosmology pk r_kind i_kind s_kind h_kind w_kind hne_kind metal_frac m
               yield_co = 1,
               yield_one = 1
             }
-        result = computeRates $ interGalacticMediumTerms cosmology yields pk r_kind i_kind s_kind h_kind w_kind hne_kind metal_frac mh_min sfrd z
+        result = computeRates $ interGalacticMediumTerms cosmology yields pk rKind iKind sKind hKind wKind hneKind metalFraction mh_min sfrd z
     return result
 
 -- | Set up initial abundance for a given isotope
@@ -433,27 +433,27 @@ iniAbundance elem =
 igmIsmEvolution ::
   ReferenceCosmology ->
   PowerSpectrum ->
-  Remnant_Kind ->
-  IMF_kind ->
-  SMF_kind ->
-  HMF_kind ->
-  W_kind ->
-  HNe_Kind ->
+  RemnantKind ->
+  IMFKind ->
+  SMFKind ->
+  HMFKind ->
+  WKind ->
+  HNeKind ->
   Element ->
   Mhalo ->
   IO ([Double], [V.Vector Double])
-igmIsmEvolution cosmology@MkCosmology {h0, om0, ob0, gn} pk r_kind i_kind s_kind h_kind w_kind hne_kind elem mh_min =
+igmIsmEvolution cosmology@MkCosmology {h0, om0, ob0, gn} pk rKind iKind sKind hKind wKind hneKind elem mh_min =
   do
     let -- Constructing stellar yields datatype as a function of metallicity of ISM and given isotope
 
         zs = [20.0, 20.0 - 0.5 .. 0]
 
         mar =
-          parMap rpar (\z -> 1e9 * baryonFormationRateDensity cosmology pk h_kind w_kind z) zs
+          parMap rpar (\z -> 1e9 * baryonFormationRateDensity cosmology pk hKind wKind z) zs
         ts =
           parMap rpar (\z -> cosmicTime cosmology z) zs
         sfrd =
-          parMap rpar (\z -> starFormationRateDensity cosmology pk s_kind h_kind w_kind z mh_min) zs
+          parMap rpar (\z -> starFormationRateDensity cosmology pk sKind hKind wKind z mh_min) zs
         rhoCr z = 3 * h0 ** 2 / (8 * pi * gn) * (1 + z) ** 3
 
         -- Unpack outflow/inflow rates and interpolate over our redshift range
@@ -483,7 +483,7 @@ igmIsmEvolution cosmology@MkCosmology {h0, om0, ob0, gn} pk r_kind i_kind s_kind
               -- Unpack all rates at z(t)
               z = interpZ t
 
-          (e_tot, e_tot_Element, o_SNe, o_Wind, o_SNe_Element, o_tot) <- igmTermsIO cosmology pk r_kind i_kind s_kind h_kind w_kind hne_kind interpMetal mh_min interpSFRD z elem
+          (e_tot, e_tot_Element, o_SNe, o_Wind, o_SNe_Element, o_tot) <- igmTermsIO cosmology pk rKind iKind sKind hKind wKind hneKind interpMetal mh_min interpSFRD z elem
 
           pure $
             V.fromList
@@ -496,12 +496,12 @@ igmIsmEvolution cosmology@MkCosmology {h0, om0, ob0, gn} pk r_kind i_kind s_kind
               ]
 
     -- Solve the system and unpack values
-    zipped_result <-
+    zippedHistory <-
       rk4SolveHistIO odeSystem tInit ((interpT 0 - tInit) / fromIntegral nSteps) nSteps (V.fromList [igmInit, ismInit, xiIgmInit, xiIsmInit, ejectaInit, outflowInit])
 
     -- M_star = rho_tot - M_IGM - Mstar from the conservation equation
     -- In addition, we also normalise each mass by the total mass
-    let (times, masses) = unzip zipped_result
+    let (times, masses) = unzip zippedHistory
         result =
           ( \v ->
               V.zipWith ($) (V.fromList [(/ rhoTot), (/ rhoTot), (* 1), (* 1), (/ rhoTot), (/ rhoTot), (/ rhoTot)]) $ V.snoc v (rhoTot - v V.! 0 - v V.! 1)
@@ -516,19 +516,19 @@ igmIsmEvolution cosmology@MkCosmology {h0, om0, ob0, gn} pk r_kind i_kind s_kind
 igmIsmMetallicity ::
   ReferenceCosmology ->
   PowerSpectrum ->
-  Remnant_Kind ->
-  IMF_kind ->
-  SMF_kind ->
-  HMF_kind ->
-  W_kind ->
+  RemnantKind ->
+  IMFKind ->
+  SMFKind ->
+  HMFKind ->
+  WKind ->
   Mhalo ->
   ([Double], [Double], [Double])
-igmIsmMetallicity cosmology pk r_kind i_kind s_kind h_kind w_kind yield_ii yield_ia yield_nsm mh_min =
+igmIsmMetallicity cosmology pk rKind iKind sKind hKind wKind yield_ii yield_ia yield_nsm mh_min =
   let elem = Element "H" 1
 
       (times, densities) =
         bimap id (transpose . (fmap V.toList)) $
-          igmIsmEvolution cosmology pk r_kind i_kind s_kind h_kind w_kind yield_ii yield_ia yield_nsm elem mh_min
+          igmIsmEvolution cosmology pk rKind iKind sKind hKind wKind yield_ii yield_ia yield_nsm elem mh_min
 
       result_igm = zipWith (/) (densities !! 5) (densities !! 0)
       result_ism = zipWith (/) (densities !! 4) (densities !! 1)
