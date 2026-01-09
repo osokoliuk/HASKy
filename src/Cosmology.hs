@@ -21,19 +21,22 @@ import Math.GaussianQuadratureIntegration
 import System.Environment
 import Text.Read (readMaybe)
 
+-- Define a cosmological model datatype, which currently covers:
+--  * CDM     -> Cold Dark Matter (Standard LCDM)
+--  * ULDM    -> UltraLight Dark Matter
 data CosmologicalModel
   = CDM
   | ULDM {axionMass :: Double}
   deriving (Eq, Show, Read)
 
 -- Define a cosmology datatypes, which includes the following:
---    * h0'   -> Hubble parameter in [km s^-1 Mpc^-1]
---    * om0'  -> mass fraction of baryons + CDM
---    * ob0'  -> analoguously, mass fraction of baryons only
---    * tcmb0' -> temperature of the CMB at the current time in [K]
---    * gn'   -> Newton's gravitational constant, in [km^2 Mpc Msun^-1 s^-2]
---    * as' -> 1e9 * amplitude of the primordial scalar power spectrum
---    * ns' -> spectral index of the primordial scalar power spectrum
+--    * h0    -> Hubble parameter in [km s^-1 Mpc^-1]
+--    * om0   -> mass fraction of baryons + CDM
+--    * ob0   -> analoguously, mass fraction of baryons only
+--    * tcmb0 -> temperature of the CMB at the current time in [K]
+--    * gn    -> Newton's gravitational constant, in [km^2 Mpc Msun^-1 s^-2]
+--    * as    -> 1e9 * amplitude of the primordial scalar power spectrum
+--    * ns    -> spectral index of the primordial scalar power spectrum
 data ReferenceCosmology
   = MkCosmology
   { h0 :: Double,
@@ -91,15 +94,13 @@ initialiseCosmology _ = Nothing
 
 -- | Fiducial Lambda CDM Hubble parameter, in the units of [km s^-1 Mpc^-1]
 hubbleParameter :: ReferenceCosmology -> Redshift -> Double
-hubbleParameter cosmology z =
-  let (h0, om0, ob0, _, _, _, _, _, _) = unpackCosmology cosmology
-   in h0 * sqrt (om0 * (1 + z) ** 3 + 1 - om0)
+hubbleParameter cosmology@MkCosmology {h0, om0, ob0} z =
+  h0 * sqrt (om0 * (1 + z) ** 3 + 1 - om0)
 
 -- | dt/dz, will be used as an integrand to derive cosmic time
 dtdz :: ReferenceCosmology -> Redshift -> Double
-dtdz cosmology z =
-  let (h0, om0, ob0, _, _, _, _, _, _) = unpackCosmology cosmology
-      km_Mpc = 3.24 * 1e-20
+dtdz cosmology@MkCosmology {h0, om0, ob0} z =
+  let km_Mpc = 3.24 * 1e-20
       s_Gyr = 3.15 * 1e16
    in (km_Mpc * s_Gyr * (1 + z) * hubbleParameter cosmology z) ** (-1)
 

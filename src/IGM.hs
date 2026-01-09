@@ -186,8 +186,8 @@ fractionHNe hne_kind eps_hne0 metal_frac =
 -- Construct yield of SNe type II by interpolating over AGB, SAGB, ECSNe and CCSNe yields
 -- If neutrino-driven yields are turned on, add yields to SN II yields following the
 -- initial mass - NS mass relation
-yieldII :: ReferenceStarFormationModel -> Double -> Double -> Double
-yieldII yields metal_frac m =
+yieldII :: ReferenceStarFormationModel -> Double -> Double
+yieldII yields m =
   y1 m + y2 m
   where
     (mSAGB, ySAGB) = yield_sagb yields
@@ -195,9 +195,9 @@ yieldII yields metal_frac m =
     (mII, yII)
       | m < 8.0 = yield_agb yields
       | m > 8.8 && m < 9.0 && not (null yECSN) = (mECSN, yECSN)
-      | m < 11.0 && null ySAGB = yield_ccsn yields $ metal_frac
+      | m < 11.0 && null ySAGB = yield_ccsn yields
       | m < 11.0 = (mSAGB, ySAGB)
-      | otherwise = yield_ccsn yields $ metal_frac
+      | otherwise = yield_ccsn yields
     y1 = uncurry makeInterp $ yield_psn yields
     y2 = uncurry makeInterp $ (mII, yII)
 
@@ -292,7 +292,7 @@ interGalacticMediumTerms cosmology@MkCosmology {prec} yields pk r_kind i_kind s_
       massEjectedAGB, massEjectedAGB_Element :: Double -> Double
       massEjectedAGB m = m - massRemnant m r_kind (metalFraction z m)
       massEjectedAGB_Element m =
-        massEjectedAGB m - yieldII yields (metalFraction z m) m
+        massEjectedAGB m - yieldII yields m
 
       yield_Novae :: Double
       yield_Novae = eps_CO * (yield_co yields) + (1 - eps_CO) * (yield_one yields)
@@ -304,7 +304,7 @@ interGalacticMediumTerms cosmology@MkCosmology {prec} yields pk r_kind i_kind s_
       integrand_AGB = integrand0 massEjectedAGB
       integrand_AGB_Element = integrand0 massEjectedAGB_Element
       integrand_Wind = mkIntegrand normImf 0 (\m -> 2 * energy / (kms_ergMsol * vescSq))
-      integrand_CCSN_Element m = (1 - eps_HNe m - eps_MRSNe) * mkIntegrand normImf 0 (yieldII yields (metalFraction z m)) m
+      integrand_CCSN_Element m = (1 - eps_HNe m - eps_MRSNe) * mkIntegrand normImf 0 (yieldII yields) m
       integrand_NSM = mkIntegrand normImf delta_t_NSM (const 1)
       integrand_Novae_Element m = m_ej_Novae * n_Novae * alpha_Novae * yield_Novae * mkIntegrand normImf delta_t_Novae (const 1) m
       integrand_SNe_Ia_1 = normImf
@@ -394,7 +394,7 @@ igmTermsIO cosmology pk r_kind i_kind s_kind h_kind w_kind hne_kind metal_frac m
     let yields =
           MkStarFormation
             { yield_ia = sn_ia_yield,
-              yield_ccsn = \_ -> ([1], [1]),
+              yield_ccsn = ccsn_yield,
               yield_hne = ([1], [1]),
               yield_ecsn = ([1], [1]),
               yield_agb = ([1], [1]),

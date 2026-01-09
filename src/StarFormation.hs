@@ -34,7 +34,7 @@ import System.Environment
 data ReferenceStarFormationModel
   = MkStarFormation
   { yield_ia :: Double,
-    yield_ccsn :: Double -> ([Double], [Double]),
+    yield_ccsn :: ([Double], [Double]),
     yield_hne :: ([Double], [Double]),
     yield_ecsn :: ([Double], [Double]),
     yield_agb :: ([Double], [Double]),
@@ -47,8 +47,9 @@ data ReferenceStarFormationModel
 
 data ReferenceStarFormationConfig
   = MkStarFormationCfg
-  {model_ia :: [Char],
-   model_ccsn :: [Char]}
+  { model_ia :: [Char],
+    model_ccsn :: [Char]
+  }
 
 -- Functions to extract yields from Yield datatype
 retrieveYieldIa :: ReferenceStarFormationConfig -> Element -> IO Double
@@ -70,6 +71,7 @@ retrieveYieldCCSN cfg elem metal_frac =
             table <- parseFile_II filepath
             let yields_arr = lookup elem (values table)
             return $ (masses table, fromMaybe [] yields_arr)
+
 {-
 retrieveYieldAGB :: ReferenceStarFormationModel -> Element -> Double -> IO ([Double], [Double])
 retrieveYieldAGB yield elem metal_frac =
