@@ -250,8 +250,14 @@ interGalacticMediumTerms cosmology@MkCosmology {prec} yields pk rKind iKind sKin
           8.0 -- Same, but upper mass
         )
 
-      zs, ts :: [Double]
+      ------------------------------------------------------------------
+      -- Time / redshift interpolation
+      ------------------------------------------------------------------
+
+      zs :: [Double]
       zs = [20, 20 - 0.5 .. 0]
+
+      ts :: [Double]
       ts = parMap rpar (\z -> cosmicTime cosmology z) zs
 
       interpT :: Double -> Double
@@ -263,34 +269,54 @@ interGalacticMediumTerms cosmology@MkCosmology {prec} yields pk rKind iKind sKin
         where
           zs = [20, 20 - 0.5 .. 0]
 
-      vescSq :: Double
-      vescSq =
-        escapeVelocitySq cosmology pk hKind wKind mh_min z
+      metalFractionAtZ :: Double -> Double -> Double
+      metalFractionAtZ = (metalFraction .) . zTarget
 
+      ------------------------------------------------------------------
+      -- Mass limits
+      ------------------------------------------------------------------
+
+      mDyn :: Double
       mDyn = massDynamical (interpT z) mUp
+
+      mDown :: Double -> Double
       mDown z = maximum [8, mDyn]
+
+      ------------------------------------------------------------------
+      -- IMF helper functions
+      ------------------------------------------------------------------
 
       normImf :: Double -> Double
       normImf = normalisedInitialMassFunction cosmology iKind 0.1 mUp
 
       normImfSN :: Double -> Double -> Double -> Double
-      normImfSN = normalisedInitialMassFunction cosmology SN_Ia
+      normImfSN =
+        normalisedInitialMassFunction
+          cosmology
+          SN_Ia
 
-      metalFractionAtZ :: Double -> Double -> Double
-      metalFractionAtZ = (metalFraction .) . zTarget
+      ------------------------------------------------------------------
+      -- Integrand helper functions
+      ------------------------------------------------------------------
 
-      mkIntegrand :: (Double -> Double) -> Double -> (Double -> Double) -> Double -> Double
+      mkIntegrand ::
+        (Double -> Double) -> Double -> (Double -> Double) -> Double -> Double
       mkIntegrand norm offset yield m =
         norm m
           * sfrd (zTarget z m - offset)
           * yield m
 
-      -- Helper functions
       integrand0 :: (Double -> Double) -> Double -> Double
       integrand0 = mkIntegrand normImf 0
 
-      massEjectedAGB, massEjectedAGB_Element :: Double -> Double
+      ------------------------------------------------------------------
+      -- Yield helper functions
+      ------------------------------------------------------------------
+
+      massEjectedAGB :: Double -> Double
       massEjectedAGB m = m - massRemnant m rKind (metalFractionAtZ z m)
+
+      massEjectedAGB_Element :: Double -> Double
       massEjectedAGB_Element m =
         massEjectedAGB m - yieldII yields m
 
@@ -300,7 +326,14 @@ interGalacticMediumTerms cosmology@MkCosmology {prec} yields pk rKind iKind sKin
       eps_HNe :: Double -> Double
       eps_HNe m = fractionHNe hneKind eps_hne0 (metalFractionAtZ z m)
 
-      -- Integrands from all contributors towards ejecta and outflows
+      ------------------------------------------------------------------
+      -- Integrands
+      ------------------------------------------------------------------
+
+      vescSq :: Double
+      vescSq =
+        escapeVelocitySq cosmology pk hKind wKind mh_min z
+
       integrand_AGB = integrand0 massEjectedAGB
       integrand_AGB_Element = integrand0 massEjectedAGB_Element
       integrand_Wind = mkIntegrand normImf 0 (\m -> 2 * energy / (kms_ergMsol * vescSq))
@@ -315,7 +348,10 @@ interGalacticMediumTerms cosmology@MkCosmology {prec} yields pk rKind iKind sKin
 
       integrator = makeIntegrator prec
 
-      -- Integrate the integrands provided above with the chosen precision
+      ------------------------------------------------------------------
+      -- Numerical integration
+      ------------------------------------------------------------------
+
       e_AGB = integrator integrand_AGB (mDown z) mUp
       e_AGB_Element = integrator integrand_AGB_Element (mDown z) mUp
       o_Wind = eps_w * integrator integrand_Wind (mDown z) mUp
