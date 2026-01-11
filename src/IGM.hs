@@ -326,13 +326,13 @@ interGalacticMediumTerms cosmology@MkCosmology {prec} yields pk rKind iKind sKin
       eps_HNe :: Double -> Double
       eps_HNe m = fractionHNe hneKind eps_hne0 (metalFractionAtZ z m)
 
-      ------------------------------------------------------------------
-      -- Integrands
-      ------------------------------------------------------------------
-
       vescSq :: Double
       vescSq =
         escapeVelocitySq cosmology pk hKind wKind mh_min z
+
+      ------------------------------------------------------------------
+      -- Integrands
+      ------------------------------------------------------------------
 
       integrand_AGB = integrand0 massEjectedAGB
       integrand_AGB_Element = integrand0 massEjectedAGB_Element
@@ -481,7 +481,6 @@ igmIsmEvolution ::
 igmIsmEvolution cosmology@MkCosmology {h0, om0, ob0, gn} pk rKind iKind sKind hKind wKind hneKind elem mh_min =
   do
     let -- Constructing stellar yields datatype as a function of metallicity of ISM and given isotope
-
         zs = [20.0, 20.0 - 0.5 .. 0]
 
         mar =

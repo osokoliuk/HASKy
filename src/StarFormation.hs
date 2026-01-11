@@ -54,7 +54,7 @@ data ReferenceStarFormationConfig
 -- Functions to extract yields from Yield datatype
 retrieveYieldIa :: ReferenceStarFormationConfig -> Element -> IO Double
 retrieveYieldIa cfg elem =
-  let filepath = "data/" ++ model_ia cfg ++ "/" ++ (toLower <$> element elem) ++ ".dat"
+  let filepath = "data/SN_Ia/" <> model_ia cfg <> "/" <> (toLower <$> element elem) <> ".dat"
    in do
         table <- parseFile_Ia filepath (toLower <$> show elem)
         return table
@@ -66,47 +66,21 @@ retrieveYieldCCSN cfg elem metal_frac =
         | metal_frac <= 0.01 = "z001"
         | metal_frac <= 0.1 = "z01"
         | otherwise = "z1"
-   in let filepath = "data/" ++ model_ccsn cfg ++ "/" ++ metal_str ++ "/" ++ (toLower <$> element elem) ++ ".dat"
+   in let filepath = "data/CCSN/" <> model_ccsn cfg <> "/" <> metal_str <> "/" <> (toLower <$> element elem) ++ ".dat"
        in do
             table <- parseFile_II filepath
             let yields_arr = lookup elem (values table)
             return $ (masses table, fromMaybe [] yields_arr)
 
-{-
-retrieveYieldAGB :: ReferenceStarFormationModel -> Element -> Double -> IO ([Double], [Double])
-retrieveYieldAGB yield elem metal_frac =
+retrieveYieldAGB :: ReferenceStarFormationConfig -> Element -> Double -> IO ([Double], [Double])
+retrieveYieldAGB cfg elem metal_frac =
   let metal_str
         | metal_frac <= 0.001 = "z0001"
         | metal_frac <= 0.01 = "z001"
         | metal_frac <= 0.1 = "z01"
         | otherwise = "z1"
-   in let filepath = "data/AGB/" ++ show (model_agb yield) ++ "/" ++ metal_str ++ "/" ++ (toLower <$> element elem) ++ ".dat"
+   in let filepath = "data/AGB/" <> model_ccsn cfg <> "/" <> metal_str <> "/" <> (toLower <$> element elem) ++ ".dat"
        in do
             table <- parseFile_II filepath
             let yields_arr = lookup elem (values table)
-                yields_corrected = [if x >= 0 then x else 0 | x <- fromMaybe [] yields_arr]
-            return $ (masses table, yields_corrected)
-
-retrieveYieldSAGB :: ReferenceStarFormationModel -> Element -> Double -> IO ([Double], [Double])
-retrieveYieldSAGB yield elem metal_frac =
-  let metal_str
-        | metal_frac <= 0.001 = "z0001"
-        | metal_frac <= 0.01 = "z001"
-        | metal_frac <= 0.1 = "z01"
-        | otherwise = "z1"
-   in let filepath = "data/SAGB/" ++ show (model_sagb yield) ++ "/" ++ metal_str ++ "/" ++ (toLower <$> element elem) ++ ".dat"
-       in do
-            table <- parseFile_II filepath
-            let yields_arr = lookup elem (values table)
-                yields_corrected = [if x >= 0 then x else 0 | x <- fromMaybe [] yields_arr]
-            return $ (masses table, yields_corrected)
-
-retrieveYieldNSM :: ReferenceStarFormationModel -> Element -> IO Double
-retrieveYieldNSM yield elem =
-  pure 1.0
-
-retrieveYieldHNe :: ReferenceStarFormationModel -> Element -> IO Double
-retrieveYieldHNe yield elem =
-  pure 1.0
-
--}
+            return $ (masses table, fromMaybe [] yields_arr)
