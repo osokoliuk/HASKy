@@ -424,16 +424,17 @@ igmTermsIO ::
   IO (Double, Double, Double, Double, Double, Double)
 igmTermsIO cosmology pk rKind iKind sKind hKind wKind hneKind metalFraction mh_min sfrd z elem =
   do
-    let sf_cfg = MkStarFormationCfg {model_ia = "iwamoto99/WDD1", model_ccsn = "WW95"}
+    let sf_cfg = MkStarFormationCfg {model_ia = "iwamoto99/WDD1", model_ccsn = "WW95", model_agb = "Cristallo11"}
     sn_ia_yield <- retrieveYieldIa sf_cfg elem
     ccsn_yield <- retrieveYieldCCSN sf_cfg elem (metalFraction z)
+    agb_yield <- retrieveYieldAGB sf_cfg elem (metalFraction z)
     let yields =
           MkStarFormation
             { yield_ia = sn_ia_yield,
               yield_ccsn = ccsn_yield,
               yield_hne = ([1], [1]),
               yield_ecsn = ([1], [1]),
-              yield_agb = ([1], [1]),
+              yield_agb = agb_yield,
               yield_sagb = ([1], [1]),
               yield_nsm = 1,
               yield_psn = ([1], [1]),

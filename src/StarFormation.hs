@@ -16,9 +16,11 @@ every other module in this library.
 -}
 
 import Data.Char (toLower)
+import qualified Data.Map as M
 import Data.Maybe (fromMaybe)
 import Helper
 import Math.GaussianQuadratureIntegration
+import Numeric (showFFloat)
 import System.Environment
 
 -- | Define a star formation model datatype, which includes the following:
@@ -48,7 +50,8 @@ data ReferenceStarFormationModel
 data ReferenceStarFormationConfig
   = MkStarFormationCfg
   { model_ia :: [Char],
-    model_ccsn :: [Char]
+    model_ccsn :: [Char],
+    model_agb :: [Char]
   }
 
 -- Functions to extract yields from Yield datatype
@@ -60,11 +63,11 @@ retrieveYieldIa cfg elem =
         return table
 
 retrieveYieldCCSN :: ReferenceStarFormationConfig -> Element -> Double -> IO ([Double], [Double])
-retrieveYieldCCSN cfg elem metal_frac =
+retrieveYieldCCSN cfg elem metalFrac =
   let metal_str
-        | metal_frac <= 0.001 = "z0001"
-        | metal_frac <= 0.01 = "z001"
-        | metal_frac <= 0.1 = "z01"
+        | metalFrac <= 0.001 = "z0001"
+        | metalFrac <= 0.01 = "z001"
+        | metalFrac <= 0.1 = "z01"
         | otherwise = "z1"
    in let filepath = "data/CCSN/" <> model_ccsn cfg <> "/" <> metal_str <> "/" <> (toLower <$> element elem) ++ ".dat"
        in do
@@ -73,14 +76,22 @@ retrieveYieldCCSN cfg elem metal_frac =
             return $ (masses table, fromMaybe [] yields_arr)
 
 retrieveYieldAGB :: ReferenceStarFormationConfig -> Element -> Double -> IO ([Double], [Double])
-retrieveYieldAGB cfg elem metal_frac =
-  let metal_str
-        | metal_frac <= 0.001 = "z0001"
-        | metal_frac <= 0.01 = "z001"
-        | metal_frac <= 0.1 = "z01"
-        | otherwise = "z1"
-   in let filepath = "data/AGB/" <> model_ccsn cfg <> "/" <> metal_str <> "/" <> (toLower <$> element elem) ++ ".dat"
+retrieveYieldAGB cfg elem metalFrac =
+  -- Create a map lookup for a metal fraction/model
+  let modelMetallicity :: M.Map String [Double]
+      modelMetallicity =
+        M.fromList $
+          [ ("Cristallo11", [0.01, 0.001, 0.0001, 0.02, 0.002, 0.003, 0.0003, 0.006, 0.008, 0.014]),
+            ("Karakas10", [0.0001, 0.02, 0.004, 0.008]),
+            ("Karakas16", [0.03, 0.007, 0.014, 0.0028]),
+            ("Ventura13", [0.001, 0.002, 0.0003, 0.04, 0.004, 0.008, 0.0014])
+          ]
+      metal_str =
+        let lookupList = fromMaybe [] $ M.lookup (model_agb cfg) modelMetallicity
+            id = fromMaybe 0 $ findClosestList metalFrac lookupList
+         in showFFloat Nothing (lookupList !! id) ""
+   in let filepath = "data/AGB/" <> model_agb cfg <> "/" <> metal_str <> "/" <> (toLower <$> element elem) ++ ".dat"
        in do
-            table <- parseFile_II filepath
+            table <- parseFile_AGB filepath
             let yields_arr = lookup elem (values table)
             return $ (masses table, fromMaybe [] yields_arr)

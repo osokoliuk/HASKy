@@ -23,7 +23,7 @@ import Control.Parallel.Strategies (parTuple4, parTuple6, rpar, using, withStrat
 import Data.Bifunctor
 import Data.Char (isDigit, isSpace, toLower, toUpper)
 import Data.Foldable (toList)
-import Data.List (dropWhileEnd, elemIndex, isPrefixOf, transpose)
+import Data.List (dropWhileEnd, elemIndex, foldl1', isPrefixOf, transpose)
 import qualified Data.Map as M
 import qualified Data.Map.Strict as M'
 import Data.Maybe (fromMaybe, mapMaybe)
@@ -172,6 +172,8 @@ parseFile_Ia path isotope =
         isoMap = parseFile_Ia_Helper ls
     return $ fromMaybe 0 (M.lookup isotope isoMap)
 
+parseFile_AGB
+
 type History = [(Double, V.Vector Double)]
 
 vecAdd :: (Num a) => V.Vector a -> V.Vector a -> V.Vector a
@@ -250,3 +252,8 @@ heaviside :: (Ord a, Num a) => a -> a
 heaviside x
   | x >= 0 = 1
   | otherwise = 0
+
+findClosestList :: Double -> [Double] -> Maybe Int
+findClosestList val list =
+  let list' = (\x -> x - val) <$> list
+   in elemIndex (foldl1' min list') list'
