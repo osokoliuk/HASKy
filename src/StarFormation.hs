@@ -92,6 +92,4 @@ retrieveYieldAGB cfg elem metalFrac =
          in showFFloat Nothing (lookupList !! id) ""
    in let filepath = "data/AGB/" <> model_agb cfg <> "/" <> metal_str <> "/" <> (toLower <$> element elem) ++ ".dat"
        in do
-            table <- parseFile_AGB filepath
-            let yields_arr = lookup elem (values table)
-            return $ (masses table, fromMaybe [] yields_arr)
+            parseFile_AGB filepath

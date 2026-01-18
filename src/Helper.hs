@@ -133,14 +133,14 @@ parseFile_II path = do
       let headerWords = words headerLine
       case headerWords of
         ("#" : "M_init" : elems) -> do
-          let tableRows = map words rows
+          let tableRows = words <$> rows
               cols = transpose tableRows
           unless (length cols >= 1 + length elems) $
             error "Not enough columns for all elements"
-          let massCol = map read (head cols)
-              elemCols = map (map read) (tail cols)
+          let massCols = read <$> (head cols)
+              elemCols = (read <$>) <$> (tail cols)
               namedCols = zip (read <$> elems :: [Element]) elemCols
-          return $ Table massCol namedCols
+          return $ Table massCols namedCols
         _ -> error "Invalid header format"
     _ -> error "File too short"
 
@@ -172,7 +172,20 @@ parseFile_Ia path isotope =
         isoMap = parseFile_Ia_Helper ls
     return $ fromMaybe 0 (M.lookup isotope isoMap)
 
-parseFile_AGB
+parseFile_AGB :: FilePath -> IO ([Double], [Double])
+parseFile_AGB path =
+  do
+    exists <- doesFileExist path
+    content <-
+      if exists
+        then
+          readFile path
+        else
+          return "0"
+    let cols = transpose (words <$> lines content)
+        massCols = read <$> cols !! 0
+        yieldCols = read <$> cols !! 1
+    return (massCols, yieldCols)
 
 type History = [(Double, V.Vector Double)]
 
