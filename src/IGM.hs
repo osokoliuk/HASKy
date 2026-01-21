@@ -191,10 +191,10 @@ yieldII yields m =
   y1 m + y2 m
   where
     (mSAGB, ySAGB) = yield_sagb yields
-    (mECSN, yECSN) = yield_ecsn yields
+    yECSN = yield_ecsn yields
     (mII, yII)
       | m < 8.0 = yield_agb yields
-      | m > 8.8 && m < 9.0 && not (null yECSN) = (mECSN, yECSN)
+      | m >= 8.8 && m < 9.0 && not (null yECSN) = (m, yECSN)
       | m < 11.0 && null ySAGB = yield_ccsn yields
       | m < 11.0 = (mSAGB, ySAGB)
       | otherwise = yield_ccsn yields
@@ -219,7 +219,7 @@ interGalacticMediumTerms ::
   Redshift ->
   EjectaOutflow Double
 interGalacticMediumTerms cosmology@MkCosmology {prec} yields pk rKind iKind sKind hKind wKind hneKind metalFraction mh_min sfrd z =
-  let (m_CO, eps_w, eps_sn, yr_Gyr, kms_ergMsol, energy, mUp, m_pu, m_pl, m_du_rg, m_dl_rg, m_du_ms, m_dl_ms, b_rg, b_ms, m_NSM_d, m_NSM_u, alpha_NSM, delta_t_NSM, eps_hne0, eps_MRSNe, delta_t_Novae, alpha_Novae, eps_CO, m_ej_Novae, n_Novae, m_Novae_d, m_Novae_u) =
+  let (m_CO, eps_w, eps_sn, yr_Gyr, kms_ergMsol, energy, mUp, m_pu, m_pl, m_du_rg, m_dl_rg, m_du_ms, m_dl_ms, b_rg, b_ms, m_NSM_d, m_NSM_u, alpha_NSM, delta_t_NSM, eps_hne0, eps_MRSNe, delta_t_Novae, alpha_Novae, eps_CO, m_ej_Novae, n_Novae, m_Novae_d, m_Novae_u, m_AGB_d, m_AGB_u, m_ECSN_d, m_ECSN_u, m_ej_ECSN) =
         ( 1.38, -- Mass of the CO white dwarf
           0.02, -- Fraction of the mass that contributes to the galactic winds
           0.005, -- Fraction of the mass that contributes to the SNe outflow to the IGM
@@ -247,7 +247,12 @@ interGalacticMediumTerms cosmology@MkCosmology {prec} yields pk rKind iKind sKin
           2e-5, -- Average ejected mass per Nova explosion
           1e4, -- Number of Nova explosions that fit in the lifetime of a WD
           0.8, -- Lower mass bound of a star that will end up as WD
-          8.0 -- Same, but upper mass
+          8.0, -- Same, but upper mass
+          1.3, -- Lower mass of a star in an AGB phase
+          8.0, -- Same, but upper mass
+          8.8, -- Lower mass of a star in an ECSN phase
+          9.0, -- Same, but upper mass
+          1.14 * 1e-2 -- Mass ejected by the ECSN event
         )
 
       ------------------------------------------------------------------
@@ -336,28 +341,31 @@ interGalacticMediumTerms cosmology@MkCosmology {prec} yields pk rKind iKind sKin
 
       integrand_AGB = integrand0 massEjectedAGB
       integrand_AGB_Element = integrand0 massEjectedAGB_Element
+      integrand_ECSN_Element m = mkIntegrand normImf (tauMS m) (yieldII yields) m
       integrand_Wind = mkIntegrand normImf 0 (\m -> 2 * energy / (kms_ergMsol * vescSq))
-      integrand_CCSN_Element m = (1 - eps_HNe m - eps_MRSNe) * mkIntegrand normImf 0 (yieldII yields) m
+      integrand_CCSN_Element m = (1 - eps_HNe m - eps_MRSNe) * mkIntegrand normImf (tauMS m) (yieldII yields) m
       integrand_NSM = mkIntegrand normImf delta_t_NSM (const 1)
       integrand_Novae_Element m = m_ej_Novae * n_Novae * alpha_Novae * yield_Novae * mkIntegrand normImf delta_t_Novae (const 1) m
       integrand_SNe_Ia_1 = normImf
-      integrand_SNe_Ia_2 md mu m = mkIntegrand (normImfSN md mu) 0 (const 1)
-      integrand_HNe m = (eps_HNe m - eps_MRSNe) * 1
+      integrand_SNe_Ia_2 md mu m = mkIntegrand (normImfSN md mu) (tauMS m) (const 1)
+      integrand_HNe_Element m = (eps_HNe m - eps_MRSNe) * 1
+      integrand_MRSNe_Element m = eps_MRSNe * 1
       integrand_WR m = 1
       integrand_PISNe m = 1
-
-      integrator = makeIntegrator prec
 
       ------------------------------------------------------------------
       -- Numerical integration
       ------------------------------------------------------------------
 
-      e_AGB = integrator integrand_AGB (mDown z) mUp
-      e_AGB_Element = integrator integrand_AGB_Element (mDown z) mUp
+      integrator = makeIntegrator prec
+
+      e_AGB = integrator integrand_AGB m_AGB_d m_AGB_u
+      e_AGB_Element = integrator integrand_AGB_Element m_AGB_d m_AGB_u
       o_Wind = eps_w * integrator integrand_Wind (mDown z) mUp
       e_CCSN_Element = integrator integrand_CCSN_Element (mDown z) mUp
-      e_HNe_Element = integrator integrand_HNe (mDown z) mUp
-      e_MRSNe_Element = eps_MRSNe * e_HNe_Element
+      e_ECSN_Element = integrator integrand_ECSN_Element m_ECSN_d m_ECSN_u
+      e_HNe_Element = integrator integrand_HNe_Element (mDown z) mUp
+      e_MRSNe_Element = eps_MRSNe * e_MRSNe_Element
       e_Novae_Element = integrator integrand_Novae_Element m_Novae_d m_Novae_u
       e_NSM = alpha_NSM * integrator integrand_NSM m_NSM_d m_NSM_u
       e_NSM_Element = yield_nsm yields * e_NSM
@@ -432,14 +440,14 @@ igmTermsIO cosmology pk rKind iKind sKind hKind wKind hneKind metalFraction mh_m
           MkStarFormation
             { yield_ia = sn_ia_yield,
               yield_ccsn = ccsn_yield,
-              yield_hne = ([1], [1]),
-              yield_ecsn = ([1], [1]),
+              yield_hne = ([0], [0]),
+              yield_ecsn = 0,
               yield_agb = agb_yield,
-              yield_sagb = ([1], [1]),
-              yield_nsm = 1,
-              yield_psn = ([1], [1]),
-              yield_co = 1,
-              yield_one = 1
+              yield_sagb = ([0], [0]),
+              yield_nsm = 0,
+              yield_psn = ([0], [0]),
+              yield_co = 0,
+              yield_one = 0
             }
         result = computeRates $ interGalacticMediumTerms cosmology yields pk rKind iKind sKind hKind wKind hneKind metalFraction mh_min sfrd z
     return result

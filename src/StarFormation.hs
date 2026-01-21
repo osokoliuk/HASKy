@@ -38,7 +38,7 @@ data ReferenceStarFormationModel
   { yield_ia :: Double,
     yield_ccsn :: ([Double], [Double]),
     yield_hne :: ([Double], [Double]),
-    yield_ecsn :: ([Double], [Double]),
+    yield_ecsn :: Double,
     yield_agb :: ([Double], [Double]),
     yield_sagb :: ([Double], [Double]),
     yield_nsm :: Double,

@@ -172,6 +172,7 @@ parseFile_Ia path isotope =
         isoMap = parseFile_Ia_Helper ls
     return $ fromMaybe 0 (M.lookup isotope isoMap)
 
+-- | Parse AGB yields
 parseFile_AGB :: FilePath -> IO ([Double], [Double])
 parseFile_AGB path =
   do
@@ -266,6 +267,7 @@ heaviside x
   | x >= 0 = 1
   | otherwise = 0
 
+-- | Function that finds the value in a list closest to a given one
 findClosestList :: Double -> [Double] -> Maybe Int
 findClosestList val list =
   let list' = (\x -> x - val) <$> list
