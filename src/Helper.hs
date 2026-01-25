@@ -116,13 +116,6 @@ mapTuple6 f (x1, x2, x3, x4, x5, x6) =
   withStrategy (parTuple6 rpar rpar rpar rpar rpar rpar) $
     (f x1, f x2, f x3, f x4, f x5, f x6)
 
--- | Helper function for reading the file into a table
-parseLine :: String -> (Double, Double)
-parseLine line =
-  case mapM readMaybe (words line) of -- Try to read both values
-    Just [x, y] -> (x, y) -- If both are parsed, return the tuple
-    _ -> error ("Invalid line: " ++ line)
-
 -- | Parse SNe II yields (specifically, WW95)
 parseFile_II :: FilePath -> IO Table
 parseFile_II path = do
@@ -187,6 +180,23 @@ parseFile_AGB path =
         massCols = read <$> cols !! 0
         yieldCols = read <$> cols !! 1
     return (massCols, yieldCols)
+
+parseFile_ECSN :: FilePath -> IO (M.Map String Double)
+parseFile_ECSN path =
+  do
+    exists <- doesFileExist path
+    content <-
+      if exists
+        then readFile path
+        else
+          return "0"
+    let cols = parseLine <$> lines content
+    return $ M.fromList cols
+  where
+    parseLine line =
+      case words line of
+        [elem, yield] -> (elem, read yield)
+        _ -> error $ "Invalid entry at line:" ++ line
 
 type History = [(Double, V.Vector Double)]
 

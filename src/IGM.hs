@@ -194,12 +194,12 @@ yieldII yields m =
     yECSN = yield_ecsn yields
     (mII, yII)
       | m < 8.0 = yield_agb yields
-      | m >= 8.8 && m < 9.0 && not (null yECSN) = (m, yECSN)
+      | m >= 8.8 && m < 9.0 && yECSN /= 0 = ([8.8, 9.0], [yECSN, yECSN])
       | m < 11.0 && null ySAGB = yield_ccsn yields
       | m < 11.0 = (mSAGB, ySAGB)
       | otherwise = yield_ccsn yields
     y1 = uncurry makeInterp $ yield_psn yields
-    y2 = uncurry makeInterp $ (mII, yII)
+    y2 = makeInterp mII yII
 
 -- | Some of the terms (IGM/ISM outflows for all mass and a specific element yield, SFRD),
 -- to be used in the next function
@@ -432,17 +432,18 @@ igmTermsIO ::
   IO (Double, Double, Double, Double, Double, Double)
 igmTermsIO cosmology pk rKind iKind sKind hKind wKind hneKind metalFraction mh_min sfrd z elem =
   do
-    let sf_cfg = MkStarFormationCfg {model_ia = "iwamoto99/WDD1", model_ccsn = "WW95", model_agb = "Cristallo11"}
-    sn_ia_yield <- retrieveYieldIa sf_cfg elem
-    ccsn_yield <- retrieveYieldCCSN sf_cfg elem (metalFraction z)
-    agb_yield <- retrieveYieldAGB sf_cfg elem (metalFraction z)
+    let sfCfg = MkStarFormationCfg {model_ia = "iwamoto99/WDD1", model_ccsn = "WW95", model_agb = "Cristallo11", model_ecsn = "Wanajo13"}
+    snIaYieldRetrieved <- retrieveYieldIa sfCfg elem
+    ccsnYieldRetrieved <- retrieveYieldCCSN sfCfg elem (metalFraction z)
+    agbYieldRetrieved <- retrieveYieldAGB sfCfg elem (metalFraction z)
+    ecsnYieldRetrieved <- retrieveYieldECSN sfCfg elem
     let yields =
           MkStarFormation
-            { yield_ia = sn_ia_yield,
-              yield_ccsn = ccsn_yield,
+            { yield_ia = snIaYieldRetrieved,
+              yield_ccsn = ccsnYieldRetrieved,
               yield_hne = ([0], [0]),
-              yield_ecsn = 0,
-              yield_agb = agb_yield,
+              yield_ecsn = ecsnYieldRetrieved,
+              yield_agb = agbYieldRetrieved,
               yield_sagb = ([0], [0]),
               yield_nsm = 0,
               yield_psn = ([0], [0]),

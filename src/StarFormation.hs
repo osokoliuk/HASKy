@@ -51,32 +51,33 @@ data ReferenceStarFormationConfig
   = MkStarFormationCfg
   { model_ia :: [Char],
     model_ccsn :: [Char],
-    model_agb :: [Char]
+    model_agb :: [Char],
+    model_ecsn :: [Char]
   }
 
 -- Functions to extract yields from Yield datatype
 retrieveYieldIa :: ReferenceStarFormationConfig -> Element -> IO Double
-retrieveYieldIa cfg elem =
-  let filepath = "data/SN_Ia/" <> model_ia cfg <> "/" <> (toLower <$> element elem) <> ".dat"
+retrieveYieldIa cfg isotopeElem =
+  let filepath = "data/SN_Ia/" <> model_ia cfg <> "/" <> (toLower <$> element isotopeElem) <> ".dat"
    in do
-        table <- parseFile_Ia filepath (toLower <$> show elem)
+        table <- parseFile_Ia filepath (toLower <$> show isotopeElem)
         return table
 
 retrieveYieldCCSN :: ReferenceStarFormationConfig -> Element -> Double -> IO ([Double], [Double])
-retrieveYieldCCSN cfg elem metalFrac =
-  let metal_str
+retrieveYieldCCSN cfg isotopeElem metalFrac =
+  let metalStr
         | metalFrac <= 0.001 = "z0001"
         | metalFrac <= 0.01 = "z001"
         | metalFrac <= 0.1 = "z01"
         | otherwise = "z1"
-   in let filepath = "data/CCSN/" <> model_ccsn cfg <> "/" <> metal_str <> "/" <> (toLower <$> element elem) ++ ".dat"
+   in let filepath = "data/CCSN/" <> model_ccsn cfg <> "/" <> metalStr <> "/" <> (toLower <$> element isotopeElem) <> ".dat"
        in do
             table <- parseFile_II filepath
-            let yields_arr = lookup elem (values table)
+            let yields_arr = lookup isotopeElem (values table)
             return $ (masses table, fromMaybe [] yields_arr)
 
 retrieveYieldAGB :: ReferenceStarFormationConfig -> Element -> Double -> IO ([Double], [Double])
-retrieveYieldAGB cfg elem metalFrac =
+retrieveYieldAGB cfg isotopeElem metalFrac =
   -- Create a map lookup for a metal fraction/model
   let modelMetallicity :: M.Map String [Double]
       modelMetallicity =
@@ -86,10 +87,18 @@ retrieveYieldAGB cfg elem metalFrac =
             ("Karakas16", [0.03, 0.007, 0.014, 0.0028]),
             ("Ventura13", [0.001, 0.002, 0.0003, 0.04, 0.004, 0.008, 0.0014])
           ]
-      metal_str =
+      metalStr =
         let lookupList = fromMaybe [] $ M.lookup (model_agb cfg) modelMetallicity
-            id = fromMaybe 0 $ findClosestList metalFrac lookupList
-         in showFFloat Nothing (lookupList !! id) ""
-   in let filepath = "data/AGB/" <> model_agb cfg <> "/" <> metal_str <> "/" <> (toLower <$> element elem) ++ ".dat"
+            idx = fromMaybe 0 $ findClosestList metalFrac lookupList
+         in showFFloat Nothing (lookupList !! idx) ""
+   in let filepath = "data/AGB/" <> model_agb cfg <> "/" <> metalStr <> "/" <> (toLower <$> element isotopeElem) <> ".dat"
        in do
             parseFile_AGB filepath
+
+retrieveYieldECSN :: ReferenceStarFormationConfig -> Element -> IO Double
+retrieveYieldECSN cfg isotopeElem =
+  let filepath = "data/ECSN/" <> model_ecsn cfg <> "/" <> "yields.dat"
+   in do
+        yieldTable <- parseFile_ECSN filepath
+        let yield = fromMaybe 0.0 $ M.lookup (show isotopeElem) yieldTable
+        return yield

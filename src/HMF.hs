@@ -77,6 +77,11 @@ powerSpectrum filepath =
         parsedLines = map parseLine linesOfFile
         (xValues, yValues) = unzip parsedLines
     return (xValues, yValues)
+  where
+    parseLine line =
+      case words line of
+        [xVal, yVal] -> (read xVal, read yVal)
+        _ -> error $ "Invalid entry at line:" ++ line
 
 -- | Window function, used to derive the cosmic variance
 -- You have a choice of two different ones, namely:
