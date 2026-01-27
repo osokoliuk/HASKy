@@ -66,7 +66,7 @@ instance Show Element where
   show (Element elem isotope) = (toLower <$> elem) ++ show isotope
 
 data Table = Table
-  { masses :: [Double],
+  { indices :: [Double],
     values :: [(Element, [Double])]
   }
   deriving (Show)
@@ -160,7 +160,7 @@ parseFile_Ia path isotope =
         then
           readFile path
         else
-          return "0"
+          error $ "Incorrect file name" <> path
     let ls = lines content
         isoMap = parseFile_Ia_Helper ls
     return $ fromMaybe 0 (M.lookup isotope isoMap)
@@ -175,7 +175,7 @@ parseFile_AGB path =
         then
           readFile path
         else
-          return "0"
+          error $ "Incorrect file name" <> path
     let cols = transpose (words <$> lines content)
         massCols = read <$> cols !! 0
         yieldCols = read <$> cols !! 1
@@ -189,13 +189,30 @@ parseFile_ECSN path =
       if exists
         then readFile path
         else
-          return "0"
+          error $ "Incorrect file name" <> path
     let cols = parseLine <$> lines content
     return $ M.fromList cols
   where
     parseLine line =
       case words line of
         [elem, yield] -> (elem, read yield)
+        _ -> error $ "Invalid entry at line:" ++ line
+
+parseFile_HNe :: FilePath -> IO (M.Map String [Double])
+parseFile_HNe path =
+  do
+    exists <- doesFileExist path
+    content <-
+      if exists
+        then readFile path
+        else
+          error $ "Incorrect file name" <> path
+    let rows = parseLine <$> lines content
+    return $ M.fromList rows
+  where
+    parseLine line =
+      case words line of
+        [elem, y1, y2, y3, y4] -> (elem, read <$> [y1, y2, y3, y4])
         _ -> error $ "Invalid entry at line:" ++ line
 
 type History = [(Double, V.Vector Double)]

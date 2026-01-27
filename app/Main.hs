@@ -18,9 +18,65 @@ main :: IO ()
 main =
   do
     -- Fix this interpolation later, this code is not prod ready...
-    let 
-      pk = powerSpectrumEisensteinHu planck18
-      elem = Element {element = "C", isotope = 12}
- 
-    mass_time <- igmIsmEvolution planck18 pk Pereira Kroupa Behroozi ST Smooth Constant_HNe elem 1e6
+    let pk = powerSpectrumEisensteinHu planck18
+        elem = Element {element = "C", isotope = 12}
+        sfCfg = MkStarFormationCfg {model_ia = "iwamoto99/WDD1", model_ccsn = "WW95", model_agb = "Cristallo11", model_ecsn = "Wanajo13", model_hne = "Kobayashi06"}
+
+        defaultIGMParams :: IGMParams
+        defaultIGMParams =
+          IGMParams
+            { phys =
+                PhysicalConstants
+                  { mCO = 1.38,
+                    yrGyr = 1e9,
+                    kmsErgMsol = 1.989e43,
+                    snEnergy = 2e51
+                  },
+              masses =
+                MassLimits
+                  { mUp = 100,
+                    mPU = 8.0,
+                    mPL = 3.0,
+                    mDURG = 1.5,
+                    mDLRG = 0.9,
+                    mDUMS = 2.6,
+                    mDLMS = 1.8,
+                    mNSMd = 9.0,
+                    mNSMu = 30.0,
+                    mNovaeD = 0.8,
+                    mNovaeU = 8.0,
+                    mAGBd = 1.3,
+                    mAGBu = 8.0,
+                    mECSNd = 8.8,
+                    mECSNu = 9.0
+                  },
+              effs =
+                Efficiencies
+                  { epsW = 0.02,
+                    epsSN = 0.005,
+                    bRG = 0.02,
+                    bMS = 0.04,
+                    epsHNe0 = 0.5,
+                    epsMRSNe = 0.03,
+                    alphaNSM = 0.018,
+                    alphaNovae = 0.01,
+                    epsCO = 0.7
+                  },
+              delays =
+                DelayTimes
+                  { delayNSM = 1e7,
+                    delayNovae = 2e9
+                  },
+              novae =
+                NovaeParams
+                  { mEjNovae = 2e-5,
+                    nNovae = 1e4
+                  },
+              ecsn =
+                ECSNParams
+                  { mEjECSN = 1.14e-2
+                  }
+            }
+
+    mass_time <- igmIsmEvolution sfCfg planck18 pk Pereira Kroupa Behroozi ST Smooth Constant_HNe elem 1e6
     print mass_time
