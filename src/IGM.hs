@@ -107,6 +107,20 @@ normalisedInitialMassFunction cosmology iKind m_down m_up m =
   let norm = imfNormalisation cosmology iKind m_down m_up
    in (initialMassFunction iKind m) / norm
 
+-- Define a normalised IMF for a specific IMF kind and Cosmology kind
+normImf :: ReferenceCosmology -> IMFKind -> Double -> Double
+normImf cosmology iKind =
+  let IGMParams {..} = defaultIGMParams
+      MassLimits {..} = masses
+   in normalisedInitialMassFunction cosmology iKind 0.1 mUp
+
+-- More so for the sake of simplicity, define a separate normalised SN Ia IMF
+normImfSN :: ReferenceCosmology -> Double -> Double -> Double -> Double
+normImfSN cosmology =
+  normalisedInitialMassFunction
+    cosmology
+    SN_Ia
+
 -- | Mass of a remnant produced by the supernova,
 -- calculated according to various works in the units of [Msol].
 -- Note that below a certain mass, stellar lifetimes are higher than the
@@ -159,11 +173,22 @@ tauMS m
 
 -- | Mass of the main sequence star that dies at age t [Gyr].
 -- This is practically an inverse of tauMS function defined above
-massDynamical :: CosmicTime -> Mstar -> Mstar
-massDynamical t m_up =
+mDynamicalTime :: CosmicTime -> Mstar -> Mstar
+mDynamicalTime t m_up =
   let mass_range = [0.1, 0.1 + 0.5 .. m_up]
       interp_tau = makeInterp (tauMS <$> mass_range) mass_range
    in interp_tau t
+
+-- | Dynamical mass of a star at redshift z
+mDynamicalRedshift :: ReferenceCosmology -> Double -> Double
+mDynamicalRedshift cosmology z =
+  let IGMParams {..} = defaultIGMParams
+      MassLimits {..} = masses
+   in mDynamicalTime (interpT cosmology z) mUp
+
+-- | Lower limit for a mass of a CCSN
+mDown :: ReferenceCosmology -> Double -> Double
+mDown cosmology z = maximum [8, mDynamicalRedshift cosmology z]
 
 -- | Progenitor mass - proto NS mass relation from []
 massPNS :: PNSKind -> Mstar -> Mstar
@@ -184,7 +209,7 @@ fractionHNe hneKind epsHNe0 metalFraction =
     Constant_HNe -> epsHNe0
     Grimmett -> maximum (epsHNe0 * exp (-metalFraction / 0.001), 0.001)
 
--- Construct yield of SNe type II by interpolating over AGB, SAGB, ECSNe and CCSNe yields
+-- | Construct yield of SNe type II by interpolating over AGB, SAGB, ECSNe and CCSNe yields
 -- If neutrino-driven yields are turned on, add yields to SN II yields following the
 -- initial mass - NS mass relation
 yieldII :: ReferenceStarFormationModel -> Double -> Double
@@ -201,6 +226,45 @@ yieldII yields m =
       | otherwise = yield_ccsn yields
     y1 = uncurry makeInterp $ yield_psn yields
     y2 = makeInterp mII yII
+
+-- | Calculate total mass ejected by an AGB star from the total remnant mass
+massEjectedAGB :: RemnantKind -> Double -> Double -> Double
+massEjectedAGB rKind metalFraction m = m - massRemnant m rKind metalFraction
+
+-- | Calculate total mass of a particular isotope ejected by an AGB star
+massEjectedAGB_Element :: ReferenceStarFormationModel -> RemnantKind -> Double -> Double -> Double
+massEjectedAGB_Element yields rKind metalFraction m =
+  massEjectedAGB rKind metalFraction m - yieldII yields m
+
+-- | Calculate metal fraction at redshift z
+metalFractionAtZ :: ReferenceCosmology -> Metallicity -> Double -> Double -> Double
+metalFractionAtZ cosmology metalFraction = (metalFraction .) . zTarget cosmology
+
+-- | Calculate a yield from Novae star
+yield_Novae :: ReferenceStarFormationModel -> Double
+yield_Novae yields =
+  let IGMParams {..} = defaultIGMParams
+      Efficiencies {..} = effs
+   in epsCO * (yield_co yields) + (1 - epsCO) * (yield_one yields)
+
+-- | Calculate a yield from an HNe star as a function of mass
+yield_HNe :: ReferenceStarFormationModel -> Double -> Double
+yield_HNe yields = yieldInterp
+  where
+    (mHNe, yHNe) = yield_hne yields
+    yieldInterp = makeInterp mHNe yHNe
+
+-- | Helper function to construct an IMF normalised integral
+mkIntegrand ::
+  ReferenceCosmology -> (Double -> Double) -> (Double -> Double) -> Double -> (Double -> Double) -> Double -> Double -> Double
+mkIntegrand cosmology norm sfrd offset yield z m =
+  norm m
+    * sfrd (zTarget cosmology z m - offset)
+    * yield m
+
+-- | Similarly, a helper function to construct an IMF normalised integral with normalised IMF and no time delay
+integrand0 :: ReferenceCosmology -> IMFKind -> (Double -> Double) -> (Double -> Double) -> Double -> Double -> Double
+integrand0 cosmology iKind sfrd yield = mkIntegrand cosmology (normImf cosmology iKind) sfrd 0 yield
 
 -- | Some of the terms (IGM/ISM outflows for all mass and a specific element yield, SFRD),
 -- to be used in the next function
@@ -229,122 +293,30 @@ interGalacticMediumTerms cosmology@MkCosmology {prec} yields pk rKind iKind sKin
       NovaeParams {..} = novae
       ECSNParams {..} = ecsn
 
-      ------------------------------------------------------------------
-      -- Time / redshift interpolation
-      ------------------------------------------------------------------
-
-      zs :: [Double]
-      zs = [20, 20 - 0.5 .. 0]
-
-      ts :: [Double]
-      ts = parMap rpar (\z -> cosmicTime cosmology z) zs
-
-      interpT :: Double -> Double
-      interpT =
-        makeInterp zs ts
-
-      zTarget :: Double -> Double -> Double
-      zTarget m = makeInterp zs ts
-        where
-          zs = [20, 20 - 0.5 .. 0]
-
-      metalFractionAtZ :: Double -> Double -> Double
-      metalFractionAtZ = (metalFraction .) . zTarget
-
-      ------------------------------------------------------------------
-      -- Mass limits
-      ------------------------------------------------------------------
-
-      mDyn :: Double
-      mDyn = massDynamical (interpT z) mUp
-
-      mDown :: Double -> Double
-      mDown z = maximum [8, mDyn]
-
-      ------------------------------------------------------------------
-      -- IMF helper functions
-      ------------------------------------------------------------------
-
-      normImf :: Double -> Double
-      normImf = normalisedInitialMassFunction cosmology iKind 0.1 mUp
-
-      normImfSN :: Double -> Double -> Double -> Double
-      normImfSN =
-        normalisedInitialMassFunction
-          cosmology
-          SN_Ia
-
-      ------------------------------------------------------------------
-      -- Integrand helper functions
-      ------------------------------------------------------------------
-
-      mkIntegrand ::
-        (Double -> Double) -> Double -> (Double -> Double) -> Double -> Double
-      mkIntegrand norm offset yield m =
-        norm m
-          * sfrd (zTarget z m - offset)
-          * yield m
-
-      integrand0 :: (Double -> Double) -> Double -> Double
-      integrand0 = mkIntegrand normImf 0
-
-      ------------------------------------------------------------------
-      -- Yield helper functions
-      ------------------------------------------------------------------
-
-      massEjectedAGB :: Double -> Double
-      massEjectedAGB m = m - massRemnant m rKind (metalFractionAtZ z m)
-
-      massEjectedAGB_Element :: Double -> Double
-      massEjectedAGB_Element m =
-        massEjectedAGB m - yieldII yields m
-
-      yield_Novae :: Double
-      yield_Novae = epsCO * (yield_co yields) + (1 - epsCO) * (yield_one yields)
-
-      yield_HNe :: Double -> Double
-      yield_HNe = yieldInterp
-        where
-          (mHNe, yHNe) = yield_hne yields
-          yieldInterp = makeInterp mHNe yHNe
-
-      epsHNe :: Double -> Double
-      epsHNe m = fractionHNe hneKind epsHNe0 (metalFractionAtZ z m)
-
-      vescSq :: Double
-      vescSq =
-        escapeVelocitySq cosmology pk hKind wKind mh_min z
-
-      ------------------------------------------------------------------
       -- Integrands
-      ------------------------------------------------------------------
-
-      integrand_AGB = integrand0 massEjectedAGB
-      integrand_AGB_Element = integrand0 massEjectedAGB_Element
-      integrand_ECSN_Element m = mkIntegrand normImf (tauMS m) (yieldII yields) m
-      integrand_Wind = mkIntegrand normImf 0 (\m -> 2 * snEnergy / (kmsErgMsol * vescSq))
-      integrand_CCSN_Element m = (1 - epsHNe m - epsMRSNe) * mkIntegrand normImf (tauMS m) (yieldII yields) m
-      integrand_NSM = mkIntegrand normImf delayNSM (const 1)
-      integrand_Novae_Element m = mEjNovae * nNovae * alphaNovae * yield_Novae * mkIntegrand normImf delayNovae (const 1) m
-      integrand_SNe_Ia_1 = normImf
-      integrand_SNe_Ia_2 md mu m = mkIntegrand (normImfSN md mu) (tauMS m) (const 1)
-      integrand_HNe_Element m = (epsHNe m - epsMRSNe) * mkIntegrand normImf (tauMS m) yield_HNe m
+      integrand_AGB m = integrand0 cosmology iKind sfrd (massEjectedAGB rKind (metalFractionAtZ cosmology metalFraction z m)) z m
+      integrand_AGB_Element m = integrand0 cosmology iKind sfrd (massEjectedAGB_Element yields rKind (metalFractionAtZ cosmology metalFraction z m)) z m
+      integrand_ECSN_Element m = mkIntegrand cosmology (normImf cosmology iKind) sfrd (tauMS m) (yieldII yields) z m
+      integrand_Wind = mkIntegrand cosmology (normImf cosmology iKind) sfrd 0 (\m -> 2 * snEnergy / (kmsErgMsol * escapeVelocitySq cosmology pk hKind wKind mh_min z)) z
+      integrand_CCSN_Element m = (1 - fractionHNe hneKind epsHNe0 (metalFractionAtZ cosmology metalFraction z m) - epsMRSNe) * mkIntegrand cosmology (normImf cosmology iKind) sfrd (tauMS m) (yieldII yields) z m
+      integrand_NSM = mkIntegrand cosmology (normImf cosmology iKind) sfrd delayNSM (const 1) z
+      integrand_Novae_Element m = mEjNovae * nNovae * alphaNovae * yield_Novae yields * mkIntegrand cosmology (normImf cosmology iKind) sfrd delayNovae (const 1) z m
+      integrand_SNe_Ia_1 = normImf cosmology iKind
+      integrand_SNe_Ia_2 md mu m = mkIntegrand cosmology (normImfSN cosmology md mu) sfrd (tauMS m) (const 1) z
+      integrand_HNe_Element m = (fractionHNe hneKind epsHNe0 (metalFractionAtZ cosmology metalFraction z m) - epsMRSNe) * mkIntegrand cosmology (normImf cosmology iKind) sfrd (tauMS m) (yield_HNe yields) z m
       integrand_MRSNe_Element m = epsMRSNe * 1
       integrand_WR m = 1
       integrand_PISNe m = 1
 
-      ------------------------------------------------------------------
       -- Numerical integration
-      ------------------------------------------------------------------
-
       integrator = makeIntegrator prec
 
       e_AGB = integrator integrand_AGB mAGBd mAGBu
       e_AGB_Element = integrator integrand_AGB_Element mAGBd mAGBu
-      o_Wind = epsW * integrator integrand_Wind (mDown z) mUp
-      e_CCSN_Element = integrator integrand_CCSN_Element (mDown z) mUp
+      o_Wind = epsW * integrator integrand_Wind (mDown cosmology z) mUp
+      e_CCSN_Element = integrator integrand_CCSN_Element (mDown cosmology z) mUp
       e_ECSN_Element = integrator integrand_ECSN_Element mECSNd mECSNu
-      e_HNe_Element = integrator integrand_HNe_Element (mDown z) mUp
+      e_HNe_Element = integrator integrand_HNe_Element (mDown cosmology z) mUp
       e_MRSNe_Element = epsMRSNe * e_MRSNe_Element
       e_Novae_Element = integrator integrand_Novae_Element mNovaeD mNovaeU
       e_NSM = alphaNSM * integrator integrand_NSM mNSMd mNSMu
@@ -352,15 +324,15 @@ interGalacticMediumTerms cosmology@MkCosmology {prec} yields pk rKind iKind sKin
 
       first_term =
         bRG
-          * integrator (normImfSN mDLRG mDURG) (maximum [mDLRG, mDyn]) mDURG
-          / integrator (normImfSN mDLRG mDURG) mDLRG mDURG
+          * integrator (normImfSN cosmology mDLRG mDURG) (maximum [mDLRG, mDynamicalRedshift cosmology z]) mDURG
+          / integrator (normImfSN cosmology mDLRG mDURG) mDLRG mDURG
       second_term =
         bMS
-          * integrator (normImfSN mDLMS mDUMS) (maximum [mDLMS, mDyn]) mDUMS
-          / integrator (normImfSN mDLMS mDUMS) mDLMS mDUMS
+          * integrator (normImfSN cosmology mDLMS mDUMS) (maximum [mDLMS, mDynamicalRedshift cosmology z]) mDUMS
+          / integrator (normImfSN cosmology mDLMS mDUMS) mDLMS mDUMS
       e_SNe_Ia =
         mCO
-          * integrator integrand_SNe_Ia_1 (maximum [mPL, mDyn]) mPU
+          * integrator integrand_SNe_Ia_1 (maximum [mPL, mDynamicalRedshift cosmology z]) mPU
           * (first_term + second_term)
       e_SNe_Ia_Element = yield_ia yields * e_SNe_Ia
    in fmap

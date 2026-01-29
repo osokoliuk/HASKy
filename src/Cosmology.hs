@@ -1,5 +1,6 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Cosmology where
 
@@ -16,8 +17,10 @@ A module that defines reference cosmology. Pretty much used by
 every other module in this library.
 -}
 
+import Control.Parallel.Strategies
 import Helper
 import Math.GaussianQuadratureIntegration
+import StarFormation
 import System.Environment
 import Text.Read (readMaybe)
 
@@ -108,3 +111,21 @@ dtdz cosmology@MkCosmology {h0, om0, ob0} z =
 cosmicTime :: ReferenceCosmology -> Redshift -> CosmicTime
 cosmicTime cosmology z =
   nIntegrate128 (dtdz cosmology) z 20
+
+-- | Make some general definitions for redshift and related cosmic time lookup tables
+-- and interpolation functions
+zs :: [Double]
+zs =
+  let IGMParams {..} = defaultIGMParams
+      PhysicalConstants {..} = phys
+   in [zMax, zMax - 0.5 .. 0]
+
+ts :: ReferenceCosmology -> [Double]
+ts cosmology = parMap rpar (\z -> cosmicTime cosmology z) zs
+
+interpT :: ReferenceCosmology -> Double -> Double
+interpT cosmology =
+  makeInterp zs $ ts cosmology
+
+zTarget :: ReferenceCosmology -> Double -> Double -> Double
+zTarget cosmology m = makeInterp zs $ ts cosmology

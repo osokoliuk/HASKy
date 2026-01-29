@@ -66,7 +66,8 @@ data ReferenceStarFormationConfig
 --    * ECSNParams - tunable parameters for ECSNe
 --    * IGMParams - all of the aforementioned parameters compiled in a single datatype
 data PhysicalConstants = PhysicalConstants
-  { mCO :: Double,
+  { zMax :: Double,
+    mCO :: Double,
     yrGyr :: Double,
     kmsErgMsol :: Double,
     snEnergy :: Double
@@ -130,7 +131,8 @@ defaultIGMParams =
   IGMParams
     { phys =
         PhysicalConstants
-          { mCO = 1.38,
+          { zMax = 20,
+            mCO = 1.38,
             yrGyr = 1e9,
             kmsErgMsol = 1.989e43,
             snEnergy = 2e51
