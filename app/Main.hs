@@ -1,7 +1,11 @@
 module Main where
 
+import Control.Concurrent.Async (mapConcurrently)
+import Control.Parallel.Strategies
 import Cosmology
+import DSP.Basic (logspace)
 import Data.Char (toLower)
+import Data.List
 import HMF
 import Helper
 import IGM
@@ -19,7 +23,7 @@ main =
   do
     -- Fix this interpolation later, this code is not prod ready...
     let pk = powerSpectrumEisensteinHu planck18
-        elem = Element {element = "C", isotope = 12}
+        elem = Element {element = "Fe", isotope = 56}
         sfCfg = MkStarFormationCfg {model_ia = "iwamoto99/WDD1", model_ccsn = "WW95", model_agb = "Cristallo11", model_ecsn = "Wanajo13", model_hne = "Kobayashi06"}
 
         defaultIGMParams :: IGMParams
@@ -78,5 +82,8 @@ main =
                   }
             }
 
-    mass_time <- igmIsmEvolution sfCfg planck18 pk Pereira Kroupa Behroozi ST Smooth Constant_HNe elem 1e6
-    print mass_time
+    -- mass_time <- igmIsmEvolution sfCfg planck18 pk Pereira Kroupa Behroozi ST Smooth Constant_HNe elem 1e6
+    sfrd <- pure $ makeInterp (parMap rpar (\z -> starFormationRateDensity planck18 pk Behroozi ST Smooth z 1e6) [20.0, 20.0 - 0.5 .. 0]) [20.0, 20.0 - 0.5 .. 0]
+    igm <- mapConcurrently (\z -> snTermsIO sfCfg planck18 pk Pereira Kroupa Behroozi ST Smooth Constant_HNe (\x -> 1e-3) 1e6 sfrd z elem) [20.0, 20.0 - 0.5 .. 0]
+    imf <- pure $ parMap rpar (\m -> normalisedInitialMassFunction planck18 Kroupa 1e-3 1e3 m) $ logspace (-3) 3 50
+    print $ imf ++ logspace (-3) 3 50

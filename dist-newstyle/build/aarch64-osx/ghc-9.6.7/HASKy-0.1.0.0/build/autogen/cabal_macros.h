@@ -50,6 +50,16 @@
   (major1) == 1 && (major2) <  3 || \
   (major1) == 1 && (major2) == 3 && (minor) <= 8)
 #endif /* MIN_VERSION_directory */
+/* package dsp-0.2.5.2 */
+#ifndef VERSION_dsp
+#define VERSION_dsp "0.2.5.2"
+#endif /* VERSION_dsp */
+#ifndef MIN_VERSION_dsp
+#define MIN_VERSION_dsp(major1,major2,minor) (\
+  (major1) <  0 || \
+  (major1) == 0 && (major2) <  2 || \
+  (major1) == 0 && (major2) == 2 && (minor) <= 5)
+#endif /* MIN_VERSION_dsp */
 /* package lens-5.3.5 */
 #ifndef VERSION_lens
 #define VERSION_lens "5.3.5"

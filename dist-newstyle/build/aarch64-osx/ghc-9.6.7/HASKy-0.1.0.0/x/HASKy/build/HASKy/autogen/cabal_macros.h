@@ -20,6 +20,26 @@
   (major1) == 0 && (major2) <  1 || \
   (major1) == 0 && (major2) == 1 && (minor) <= 0)
 #endif /* MIN_VERSION_HASKy */
+/* package array-0.5.8.0 */
+#ifndef VERSION_array
+#define VERSION_array "0.5.8.0"
+#endif /* VERSION_array */
+#ifndef MIN_VERSION_array
+#define MIN_VERSION_array(major1,major2,minor) (\
+  (major1) <  0 || \
+  (major1) == 0 && (major2) <  5 || \
+  (major1) == 0 && (major2) == 5 && (minor) <= 8)
+#endif /* MIN_VERSION_array */
+/* package async-2.2.5 */
+#ifndef VERSION_async
+#define VERSION_async "2.2.5"
+#endif /* VERSION_async */
+#ifndef MIN_VERSION_async
+#define MIN_VERSION_async(major1,major2,minor) (\
+  (major1) <  2 || \
+  (major1) == 2 && (major2) <  2 || \
+  (major1) == 2 && (major2) == 2 && (minor) <= 5)
+#endif /* MIN_VERSION_async */
 /* package base-4.18.3.0 */
 #ifndef VERSION_base
 #define VERSION_base "4.18.3.0"
@@ -30,6 +50,36 @@
   (major1) == 4 && (major2) <  18 || \
   (major1) == 4 && (major2) == 18 && (minor) <= 3)
 #endif /* MIN_VERSION_base */
+/* package directory-1.3.8.5 */
+#ifndef VERSION_directory
+#define VERSION_directory "1.3.8.5"
+#endif /* VERSION_directory */
+#ifndef MIN_VERSION_directory
+#define MIN_VERSION_directory(major1,major2,minor) (\
+  (major1) <  1 || \
+  (major1) == 1 && (major2) <  3 || \
+  (major1) == 1 && (major2) == 3 && (minor) <= 8)
+#endif /* MIN_VERSION_directory */
+/* package dsp-0.2.5.2 */
+#ifndef VERSION_dsp
+#define VERSION_dsp "0.2.5.2"
+#endif /* VERSION_dsp */
+#ifndef MIN_VERSION_dsp
+#define MIN_VERSION_dsp(major1,major2,minor) (\
+  (major1) <  0 || \
+  (major1) == 0 && (major2) <  2 || \
+  (major1) == 0 && (major2) == 2 && (minor) <= 5)
+#endif /* MIN_VERSION_dsp */
+/* package parallel-3.2.2.0 */
+#ifndef VERSION_parallel
+#define VERSION_parallel "3.2.2.0"
+#endif /* VERSION_parallel */
+#ifndef MIN_VERSION_parallel
+#define MIN_VERSION_parallel(major1,major2,minor) (\
+  (major1) <  3 || \
+  (major1) == 3 && (major2) <  2 || \
+  (major1) == 3 && (major2) == 2 && (minor) <= 2)
+#endif /* MIN_VERSION_parallel */
 
 /* tool gcc-14.0.6 */
 #ifndef TOOL_VERSION_gcc

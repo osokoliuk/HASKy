@@ -79,7 +79,8 @@ library
       mtl,
       parallel,
       directory,
-      lens
+      lens,
+      dsp
 
     -- Directories containing source files.
     hs-source-dirs:   src
@@ -104,7 +105,11 @@ executable HASKy
     build-depends:
         base,
         HASKy,
-        directory
+        directory,
+        parallel,
+        async,
+        array,
+        dsp 
 
     -- Directories containing source files.
     hs-source-dirs:   app
