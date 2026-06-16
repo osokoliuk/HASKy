@@ -162,18 +162,22 @@ baryonFormationRateDensity cosmology@MkCosmology {om0, ob0, prec} pk hKind wKind
 -- to be used in the IGM/ISM mass fraction differential equations
 starFormationRateDensity :: ReferenceCosmology -> PowerSpectrum -> SMFKind -> HMFKind -> WKind -> Redshift -> Mhalo -> Double
 starFormationRateDensity cosmology@MkCosmology {prec} pk sKind hKind wKind z mh_min =
-  let mh_arr = (10 **) <$> [log10 mh_min, log10 mh_min + 0.25 .. 16]
+  if z <= 20
+    then
+      let mh_arr = (10 **) <$> [log10 mh_min, log10 mh_min + 0.25 .. 16]
 
-      hmf_arr =
-        (\mh -> haloMassFunction cosmology pk hKind wKind mh z) <$> mh_arr
-      dndmh = zipWith (/) hmf_arr mh_arr
+          hmf_arr =
+            (\mh -> haloMassFunction cosmology pk hKind wKind mh z) <$> mh_arr
+          dndmh = zipWith (/) hmf_arr mh_arr
 
-      interp_hmf = makeInterp mh_arr dndmh
+          interp_hmf = makeInterp mh_arr dndmh
 
-      integrand mh =
-        (interp_hmf mh)
-          * (starFormationRate sKind cosmology mh z)
-      integrator = makeIntegrator prec
+          integrand mh =
+            (interp_hmf mh)
+              * (starFormationRate sKind cosmology mh z)
+          integrator = makeIntegrator prec
 
-      result = integrator integrand (minimum mh_arr) (maximum mh_arr)
-   in result
+          result = integrator integrand (minimum mh_arr) (maximum mh_arr)
+       in result
+    else
+      0

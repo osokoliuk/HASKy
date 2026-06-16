@@ -81,9 +81,14 @@ main =
                   { mEjECSN = 1.14e-2
                   }
             }
+        zs = [20.0, 20.0 - 0.5 .. 0]
+        ts =
+          parMap rpar (\z -> cosmicTime planck18 z) zs
+        sfrd = makeInterp (parMap rpar (\z -> starFormationRateDensity planck18 pk Behroozi ST Smooth z 1e6) zs) ts
+        ccsn_integrand z m = mkIntegrand planck18 (normImf planck18 Kroupa) sfrd (tauMS m) (const 1) z m
 
     -- mass_time <- igmIsmEvolution sfCfg planck18 pk Pereira Kroupa Behroozi ST Smooth Constant_HNe elem 1e6
-    sfrd <- pure $ makeInterp (parMap rpar (\z -> starFormationRateDensity planck18 pk Behroozi ST Smooth z 1e6) [20.0, 20.0 - 0.5 .. 0]) [20.0, 20.0 - 0.5 .. 0]
-    igm <- mapConcurrently (\z -> snTermsIO sfCfg planck18 pk Pereira Kroupa Behroozi ST Smooth Constant_HNe (\x -> 1e-3) 1e6 sfrd z elem) [20.0, 20.0 - 0.5 .. 0]
-    imf <- pure $ parMap rpar (\m -> normalisedInitialMassFunction planck18 Kroupa 1e-3 1e3 m) $ logspace (-3) 3 50
-    print $ imf ++ logspace (-3) 3 50
+    igm <- mapConcurrently (\z -> snTermsIO sfCfg planck18 pk Pereira Kroupa Behroozi ST Smooth Constant_HNe (\x -> 1e-3) 1e6 sfrd z elem) zs
+    imf <- pure $ parMap rpar (\m -> normImf planck18 Kroupa m) $ logspace (-2) 2 50
+    ccsn <- pure $ parMap rpar (\z -> makeIntegrator P128 (ccsn_integrand z) (mDown planck18 z) 100) [20.0, 20.0 - 0.5 .. 0]
+    print $ parMap rpar (\z -> ccsn_integrand z 8) zs

@@ -80,7 +80,7 @@ data EjectaOutflow a
 initialMassFunction :: IMFKind -> Mstar -> Double
 initialMassFunction iKind m =
   let (alpha0, alpha1, alpha2, m1, m2, k0, k1, k2) =
-        (-0.3, -1.3, -2.3, 0.08, 0.5, 1, k0 * m1 ** (alpha0 - alpha1), k1 * m2 ** (alpha1 - alpha2))
+        (-0.3, -1.3, -2.3, 0.08, 0.5, 0.58, k0 * m1 ** (alpha0 - alpha1), k1 * m2 ** (alpha1 - alpha2))
       (a_Ch, b_Ch, center_Ch, sigma_Ch) =
         (0.85, 0.24, 0.079, 0.69)
    in case iKind of
@@ -113,7 +113,7 @@ normImf :: ReferenceCosmology -> IMFKind -> Double -> Double
 normImf cosmology iKind =
   let IGMParams {..} = defaultIGMParams
       MassLimits {..} = masses
-   in normalisedInitialMassFunction cosmology iKind 0.1 mUp
+   in normalisedInitialMassFunction cosmology iKind 0.01 mUp
 
 -- More so for the sake of simplicity, define a separate normalised SN Ia IMF
 normImfSN :: ReferenceCosmology -> Double -> Double -> Double -> Double
@@ -238,8 +238,8 @@ massEjectedAGB_Element yields rKind metalFraction m =
   massEjectedAGB rKind metalFraction m - yieldII yields m
 
 -- | Calculate metal fraction at redshift z
-metalFractionAtZ :: ReferenceCosmology -> Metallicity -> Double -> Double -> Double
-metalFractionAtZ cosmology metalFraction = (metalFraction .) . zTarget cosmology
+metalFractionAtZ :: ReferenceCosmology -> Double -> Metallicity -> Double
+metalFractionAtZ cosmology z metalFraction = metalFraction . interpT cosmology $ z
 
 -- | Calculate a yield from Novae star
 yield_Novae :: ReferenceStarFormationModel -> Double
@@ -260,7 +260,7 @@ mkIntegrand ::
   ReferenceCosmology -> (Double -> Double) -> (Double -> Double) -> Double -> (Double -> Double) -> Double -> Double -> Double
 mkIntegrand cosmology norm sfrd offset yield z m =
   norm m
-    * sfrd (zTarget cosmology z m - offset)
+    * sfrd (interpT cosmology z - offset)
     * yield m
 
 -- | Similarly, a helper function to construct an IMF normalised integral with normalised IMF and no time delay
@@ -295,16 +295,16 @@ interGalacticMediumTerms cosmology@MkCosmology {prec} yields pk rKind iKind sKin
       ECSNParams {..} = ecsn
 
       -- Integrands
-      integrand_AGB m = integrand0 cosmology iKind sfrd (massEjectedAGB rKind (metalFractionAtZ cosmology metalFraction z m)) z m
-      integrand_AGB_Element m = integrand0 cosmology iKind sfrd (massEjectedAGB_Element yields rKind (metalFractionAtZ cosmology metalFraction z m)) z m
+      integrand_AGB m = integrand0 cosmology iKind sfrd (massEjectedAGB rKind (metalFractionAtZ cosmology z metalFraction)) z m
+      integrand_AGB_Element m = integrand0 cosmology iKind sfrd (massEjectedAGB_Element yields rKind (metalFractionAtZ cosmology z metalFraction)) z m
       integrand_ECSN_Element m = mkIntegrand cosmology (normImf cosmology iKind) sfrd (tauMS m) (yieldII yields) z m
       integrand_Wind = mkIntegrand cosmology (normImf cosmology iKind) sfrd 0 (\m -> 2 * snEnergy / (kmsErgMsol * escapeVelocitySq cosmology pk hKind wKind mh_min z)) z
-      integrand_CCSN m = (1 - fractionHNe hneKind epsHNe0 (metalFractionAtZ cosmology metalFraction z m) - epsMRSNe) * mkIntegrand cosmology (normImf cosmology iKind) sfrd (tauMS m) (const 1) z m
-      integrand_CCSN_Element m = (1 - fractionHNe hneKind epsHNe0 (metalFractionAtZ cosmology metalFraction z m) - epsMRSNe) * mkIntegrand cosmology (normImf cosmology iKind) sfrd (tauMS m) (yieldII yields) z m
+      integrand_CCSN m = (1 - fractionHNe hneKind epsHNe0 (metalFractionAtZ cosmology z metalFraction) - epsMRSNe) * mkIntegrand cosmology (normImf cosmology iKind) sfrd (tauMS m) (const 1) z m
+      integrand_CCSN_Element m = (1 - fractionHNe hneKind epsHNe0 (metalFractionAtZ cosmology z metalFraction) - epsMRSNe) * mkIntegrand cosmology (normImf cosmology iKind) sfrd (tauMS m) (yieldII yields) z m
       integrand_NSM = mkIntegrand cosmology (normImf cosmology iKind) sfrd delayNSM (const 1) z
       integrand_Novae_Element m = mEjNovae * nNovae * alphaNovae * yield_Novae yields * mkIntegrand cosmology (normImf cosmology iKind) sfrd delayNovae (const 1) z m
       integrand_SNe_Ia = normImf cosmology iKind
-      integrand_HNe_Element m = (fractionHNe hneKind epsHNe0 (metalFractionAtZ cosmology metalFraction z m) - epsMRSNe) * mkIntegrand cosmology (normImf cosmology iKind) sfrd (tauMS m) (yield_HNe yields) z m
+      integrand_HNe_Element m = (fractionHNe hneKind epsHNe0 (metalFractionAtZ cosmology z metalFraction) - epsMRSNe) * mkIntegrand cosmology (normImf cosmology iKind) sfrd (tauMS m) (yield_HNe yields) z m
       integrand_MRSNe_Element m = epsMRSNe * 1
       integrand_WR m = 1
       integrand_PISNe m = 1

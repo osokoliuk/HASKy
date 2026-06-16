@@ -126,6 +126,3 @@ ts cosmology = parMap rpar (\z -> cosmicTime cosmology z) zs
 interpT :: ReferenceCosmology -> Double -> Double
 interpT cosmology =
   makeInterp zs $ ts cosmology
-
-zTarget :: ReferenceCosmology -> Double -> Double -> Double
-zTarget cosmology m = makeInterp zs $ ts cosmology
