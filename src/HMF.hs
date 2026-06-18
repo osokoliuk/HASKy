@@ -149,7 +149,7 @@ haloMassFunction cosmology@MkCosmology {h0, om0, ob0, gn} pk hKind wKind mh z =
       first_crossing = \mh -> firstCrossing cosmology pk hKind wKind mh z
 
       diff_func mh = log . sqrt $ sigma mh
-      dsdm = diffRes $ diffRichardson diff_func 100 mh
+      dsdm = diffRes $ diffRichardson diff_func 1000 mh
       dsdlogm = dsdm / mh
       fdsdlogm = dsdlogm * first_crossing mh
    in -rho_mean * fdsdlogm * mh

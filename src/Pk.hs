@@ -103,13 +103,14 @@ powerSpectrumEisensteinHu cosmology z k =
   let (h0, om0, ob0, tcmb0, gn, as, ns, _, model) = unpackCosmology cosmology
       transfer = transferEinsensteinHu k cosmology
 
-      om = om0 * (1 + z) ** (-3)
-      ode = 1 - om
+      ez2 = om0 * (1 + z) ** 3 + (1 - om0)
+      om = om0 * (1 + z) ** 3 / ez2
+      ode = (1 - om0) / ez2
 
       expr = 2.5 * om / (1 + z)
       dz = expr / ((om ** (4.0 / 7.0) - ode + (1 + 0.5 * om) * (1.0 + ode / 70.0)))
       powerSpectrum =
-        sqrt dz
+        dz ** 2
           * 1e-9
           * as
           * (2 * (k / (h0 / 299792.458)) ** 2 / (5 * om0)) ** 2
