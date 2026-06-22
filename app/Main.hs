@@ -84,8 +84,8 @@ main =
         zs = [20.0, 20.0 - 0.5 .. 0]
         ts =
           parMap rpar (\z -> cosmicTime planck18 z) zs
-        sfrd = (parMap rpar (\z -> starFormationRateDensity planck18 pk DoublePower ST Smooth z 1e6) zs)
-        hmf = (\mh -> haloMassFunction planck18 pk ST Smooth mh 10) <$> ((\x -> 10 ** x) <$> [6.0, 6.5 .. 16])
+        sfrd = (parMap rpar (\z -> starFormationRateDensity planck18 pk Behroozi ST TopHat z 1e6) zs)
+        hmf = (\mh -> haloMassFunction planck18 pk ST TopHat mh 10) <$> ((\x -> 10 ** x) <$> [6.0, 6.5 .. 16])
         pk_approx = (\k -> pk 10 k) <$> ((\x -> 10 ** x) <$> [-3, -2.75 .. 3])
     -- ccsn_integrand z m = mkIntegrand planck18 (normImf planck18 Kroupa) sfrd (tauMS m) (const 1) z m
 
@@ -94,4 +94,4 @@ main =
     -- imf <- pure $ parMap rpar (\m -> normImf planck18 Kroupa m) $ logspace (-2) 2 50
     -- ccsn <- pure $ parMap rpar (\z -> makeIntegrator P128 (ccsn_integrand z) (mDown planck18 z) 100) [20.0, 20.0 - 0.5 .. 0]
     -- print $ parMap rpar (\z -> ccsn_integrand z 8) zs
-    print $ pk_approx
+    print $ sfrd

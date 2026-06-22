@@ -133,10 +133,10 @@ firstCrossing cosmology@MkCosmology {h0, om0, ob0} pk hKind wKind mh z =
         (0.186, 0.3222, 0.3, 1.47, 2.57, 1.19, 0.201, 2.08, -1.172, 0.315, 0.61, 0.7234, 0.2538, 1.1982)
    in case hKind of
         Tinker -> a_T' * ((sigma / b_T) ** (-a_T) + 1) * exp (-c_T / sigma ** 2)
-        ST -> a_ST' * sqrt (2 * nu ** 2 / pi) * (1 + nu ** (-2 * p)) * exp (-nu ** 2 / 2)
+        ST -> a_ST' * nu * sqrt (2 * nu ** 2 / pi) * (1 + nu ** (-2 * p)) * exp (-nu ** 2 / 2)
         Angulo -> a_Ang * (b_Ang / sigma + 1) ** 1.7 * exp (c_Ang / sigma ** 2)
-        Jenkins -> a_Jen * exp (-abs (log sigma ** (-1) + b_Jen) ** 3.8)
-        Warren -> a_War * (sigma ** (-1.625) + b_War) * exp (-c_War / sigma)
+        Jenkins -> a_Jen * exp (-abs (log (sigma ** (-1)) + b_Jen) ** 3.8)
+        Warren -> a_War * (sigma ** (-1.625) + b_War) * exp (-c_War / sigma ** 2)
 
 -- | The Halo Mass Function (HMF) itself, uses most of the functions
 -- defined within this module and a differentiation library
@@ -149,10 +149,9 @@ haloMassFunction cosmology@MkCosmology {h0, om0, ob0, gn} pk hKind wKind mh z =
       first_crossing = \mh -> firstCrossing cosmology pk hKind wKind mh z
 
       diff_func mh = log . sqrt $ sigma mh
-      dsdm = diffRes $ diffRichardson diff_func 1000 mh
-      dsdlogm = dsdm / mh
-      fdsdlogm = dsdlogm * first_crossing mh
-   in -rho_mean * fdsdlogm * mh
+      dsdm = diffRes $ diffRichardson diff_func 100 mh
+      fdsdlogm = dsdm * first_crossing mh
+   in -rho_mean * fdsdlogm
 
 -- | Escape velocity squared of a star from a halo of mass M and radius R at the redshift z,
 -- in the units of [km^2 s^-2], taken from the [Tan et al. 2018]
