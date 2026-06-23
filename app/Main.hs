@@ -1,3 +1,5 @@
+{-# LANGUAGE RecordWildCards #-}
+
 module Main where
 
 import Control.Concurrent.Async (mapConcurrently)
@@ -84,14 +86,31 @@ main =
         zs = [20.0, 20.0 - 0.5 .. 0]
         ts =
           parMap rpar (\z -> cosmicTime planck18 z) zs
-        sfrd = (parMap rpar (\z -> starFormationRateDensity planck18 pk Behroozi ST TopHat z 1e6) zs)
+        sfrd = makeInterp ts (parMap rpar (\z -> starFormationRateDensity planck18 pk Behroozi ST TopHat z 1e6) zs)
         hmf = (\mh -> haloMassFunction planck18 pk ST TopHat mh 10) <$> ((\x -> 10 ** x) <$> [6.0, 6.5 .. 16])
         pk_approx = (\k -> pk 10 k) <$> ((\x -> 10 ** x) <$> [-3, -2.75 .. 3])
-    -- ccsn_integrand z m = mkIntegrand planck18 (normImf planck18 Kroupa) sfrd (tauMS m) (const 1) z m
+        ccsn_integrand t m = (normImf planck18 Kroupa m) * sfrd (t - tauMS m)
+        IGMParams {..} = defaultIGMParams
+        PhysicalConstants {..} = phys
+        MassLimits {..} = masses
+        Efficiencies {..} = effs
+        DelayTimes {..} = delays
+        NovaeParams {..} = novae
+        ECSNParams {..} = ecsn
 
-    -- mass_time <- igmIsmEvolution sfCfg planck18 pk Pereira Kroupa Behroozi ST Smooth Constant_HNe elem 1e6
-    -- igm <- mapConcurrently (\z -> snTermsIO sfCfg planck18 pk Pereira Kroupa Behroozi ST Smooth Constant_HNe (\x -> 1e-3) 1e6 sfrd z elem) zs
-    -- imf <- pure $ parMap rpar (\m -> normImf planck18 Kroupa m) $ logspace (-2) 2 50
-    -- ccsn <- pure $ parMap rpar (\z -> makeIntegrator P128 (ccsn_integrand z) (mDown planck18 z) 100) [20.0, 20.0 - 0.5 .. 0]
-    -- print $ parMap rpar (\z -> ccsn_integrand z 8) zs
-    print $ sfrd
+        first_term t =
+          bRG
+            * makeIntegrator P128 (\m -> normImfSN planck18 mDLRG mDURG m * sfrd (t - tauMS m)) mDLRG mDURG
+        second_term t =
+          bMS
+            * makeIntegrator P128 (\m -> normImfSN planck18 mDLMS mDUMS m * sfrd (t - tauMS m)) mDLMS mDUMS
+        snia z =
+          makeIntegrator P128 (\m -> normImf planck18 Kroupa m) (maximum [mPL, mDynamicalRedshift planck18 z]) mPU
+            * (first_term (interpT planck18 z) + second_term (interpT planck18 z))
+
+    mass_time <- igmIsmEvolution sfCfg planck18 pk Pereira Kroupa Behroozi ST Smooth Constant_HNe elem 1e6
+    igm <- mapConcurrently (\z -> snTermsIO sfCfg planck18 pk Pereira Kroupa Behroozi ST Smooth Constant_HNe (\x -> 1e-3) 1e6 sfrd z elem) zs
+    imf <- pure $ parMap rpar (\m -> normImf planck18 Kroupa m) $ logspace (-2) 2 50
+    ccsn <- pure $ parMap rpar (\z -> makeIntegrator P128 (ccsn_integrand z) (mDown planck18 z) 100) [20.0, 20.0 - 0.5 .. 0]
+    print $ parMap rpar (\z -> (makeIntegrator P512 (\m -> ccsn_integrand (interpT planck18 z) m) (mDown planck18 z) 100)) zs
+    print $ parMap rpar (\z -> snia z) zs

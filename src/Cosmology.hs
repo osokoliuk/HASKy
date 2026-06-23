@@ -74,7 +74,7 @@ planck18 =
       gn = 4.301 * 10 ** (-9),
       as = 2.105,
       ns = 0.9665,
-      prec = P512,
+      prec = P128,
       model = CDM
     }
 
