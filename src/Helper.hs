@@ -122,23 +122,32 @@ mapTuple6 f (x1, x2, x3, x4, x5, x6) =
 -- | Parse SNe II yields (specifically, WW95)
 parseFile_II :: FilePath -> IO Table
 parseFile_II path = do
-  content <- readFileStrict path
-  let ls = lines content
-  case ls of
-    (_ : headerLine : _ : rows) -> do
-      let headerWords = words headerLine
-      case headerWords of
-        ("#" : "M_init" : elems) -> do
-          let tableRows = words <$> rows
-              cols = transpose tableRows
-          unless (length cols >= 1 + length elems) $
-            error "Not enough columns for all elements"
-          let massCols = read <$> (head cols)
-              elemCols = (read <$>) <$> (tail cols)
-              namedCols = zip (read <$> elems :: [Element]) elemCols
-          return $ Table massCols namedCols
-        _ -> error "Invalid header format"
-    _ -> error "File too short"
+  exists <- doesFileExist path
+  if not exists
+    then do
+      traceM "CCSN yield parsing failed for the chosen element"
+      pure $ Table [0.0] [(Element "H" 1, [0.0])]
+    else do
+      content <- readFileStrict path
+      let ls = lines content
+      case ls of
+        (_ : headerLine : _ : rows) -> do
+          let headerWords = words headerLine
+          case headerWords of
+            "#" : "M_init" : elems -> do
+              let tableRows = map words rows
+                  cols = transpose tableRows
+
+              unless (length cols >= 1 + length elems) $
+                error "Not enough columns for all elements"
+
+              let massCols = map read (head cols)
+                  elemCols = map (map read) (tail cols)
+                  namedCols = zip (map read elems :: [Element]) elemCols
+
+              pure $ Table massCols namedCols
+            _ -> error "Invalid header format"
+        _ -> error "File too short"
 
 -- | Parse SNe Ia yields
 parseFile_Ia_Helper :: [String] -> M.Map String Double

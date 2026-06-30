@@ -486,22 +486,21 @@ igmIsmEvolution ::
   HNeKind ->
   Element ->
   Mhalo ->
-  IO ([Double], [V.Vector Double])
+  IO ([Double], [Double], [V.Vector Double])
 igmIsmEvolution sfCfg cosmology@MkCosmology {h0, om0, ob0, gn} pk rKind iKind sKind hKind wKind hneKind elem mh_min =
   do
     let -- Constructing stellar yields datatype as a function of metallicity of ISM and given isotope
-        zs = [20.0, 20.0 - 0.05 .. 0]
+        IGMParams {..} = defaultIGMParams
+        PhysicalConstants {..} = phys
 
         mar =
           parMap rpar (\z -> 1e9 * baryonFormationRateDensity cosmology pk hKind wKind z) zs
-        ts =
-          parMap rpar (\z -> cosmicTime cosmology z) zs
         sfrd =
           parMap rpar (\z -> starFormationRateDensity cosmology pk sKind hKind wKind z mh_min) zs
         rhoCr z = 3 * h0 ** 2 / (8 * pi * gn) * (1 + z) ** 3
 
         -- Unpack outflow/inflow rates and interpolate over our redshift range
-        (interpMAR, interpSFRD, interpZ, interpT) = (makeInterp zs mar, makeInterp ts sfrd, makeInterp ts zs, makeInterp zs ts)
+        (interpMAR, interpSFRD) = (makeInterp zs mar, makeInterp (ts cosmology) sfrd)
 
         -- ICs are set assuming very small baryon fraction in the structures,
         -- with rho_ISM/rho_IGM ~ 0.01 (stellar mass is negligible at this redshift)
@@ -509,7 +508,7 @@ igmIsmEvolution sfCfg cosmology@MkCosmology {h0, om0, ob0, gn} pk rKind iKind sK
         -- Finally, we also adopt the BBN abundances for H (He),
         -- such that the ICs for Xi_ISM/Xi_IGM = 0.76 (0.24) * M_ISM/M_IGM.
         (nSteps, tInit, aInit, rhoTot, igmInit, ismInit, xiIgmInit, xiIsmInit, ejectaInit, outflowInit) =
-          (100 :: Int, interpT (maximum zs), 0.01, rhoCr (maximum zs) * ob0, (1 - aInit) * rhoTot, aInit * rhoTot, iniAbundance elem, xiIgmInit, 0, 0)
+          (100 :: Int, interpT cosmology zMax, 0.01, rhoCr zMax * ob0, (1 - aInit) * rhoTot, aInit * rhoTot, iniAbundance elem, xiIgmInit, 0, 0)
 
         -- Convert Differential-Algebraic system into a system of ODEs
         odeSystem :: History -> Double -> V.Vector Double -> IO (V.Vector Double)
@@ -525,7 +524,7 @@ igmIsmEvolution sfCfg cosmology@MkCosmology {h0, om0, ob0, gn} pk rKind iKind sK
                     (makeInterp times metals) t
 
               -- Unpack all rates at z(t)
-              z = interpZ t
+              z = interpZ cosmology t
 
           (e_tot, e_tot_Element, o_SNe, o_Wind, o_SNe_Element, o_tot) <- igmTermsIO sfCfg cosmology pk rKind iKind sKind hKind wKind hneKind interpMetal mh_min interpSFRD z elem
 
@@ -541,7 +540,7 @@ igmIsmEvolution sfCfg cosmology@MkCosmology {h0, om0, ob0, gn} pk rKind iKind sK
 
     -- Solve the system and unpack values
     zippedHistory <-
-      rk4SolveHistIO odeSystem tInit ((interpT 0 - tInit) / fromIntegral nSteps) nSteps (V.fromList [igmInit, ismInit, xiIgmInit, xiIsmInit, ejectaInit, outflowInit])
+      rk4SolveHistIO odeSystem tInit ((interpT cosmology 0 - tInit) / fromIntegral nSteps) nSteps (V.fromList [igmInit, ismInit, xiIgmInit, xiIsmInit, ejectaInit, outflowInit])
 
     -- M_star = rho_tot - M_IGM - Mstar from the conservation equation
     -- In addition, we also normalise each mass by the total mass
@@ -551,7 +550,7 @@ igmIsmEvolution sfCfg cosmology@MkCosmology {h0, om0, ob0, gn} pk rKind iKind sK
               V.zipWith ($) (V.fromList [(/ rhoTot), (/ rhoTot), (* 1), (* 1), (/ rhoTot), (/ rhoTot), (/ rhoTot)]) $ V.snoc v (rhoTot - v V.! 0 - v V.! 1)
           )
             <$> masses
-    return (times, result)
+    return (times, interpZ cosmology <$> times, result)
 
 {-
 -- | Derive the metallicity of the IGM/ISM from outflow/inflow rates of metals,

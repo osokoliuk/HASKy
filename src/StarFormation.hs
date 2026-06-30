@@ -67,6 +67,8 @@ data ReferenceStarFormationConfig
 --    * IGMParams - all of the aforementioned parameters compiled in a single datatype
 data PhysicalConstants = PhysicalConstants
   { zMax :: Double,
+    zMin :: Double,
+    dz :: Double,
     mCO :: Double,
     yrGyr :: Double,
     kmsErgMsol :: Double,
@@ -132,6 +134,8 @@ defaultIGMParams =
     { phys =
         PhysicalConstants
           { zMax = 20,
+            zMin = 0,
+            dz = 0.05,
             mCO = 1.38,
             yrGyr = 1e9,
             kmsErgMsol = 1.989e43,
@@ -191,18 +195,34 @@ retrieveYieldIa cfg isotopeElem =
         table <- parseFile_Ia filepath (toLower <$> show isotopeElem)
         return table
 
-retrieveYieldCCSN :: ReferenceStarFormationConfig -> Element -> Double -> IO ([Double], [Double])
-retrieveYieldCCSN cfg isotopeElem metalFrac =
+retrieveYieldCCSN ::
+  ReferenceStarFormationConfig ->
+  Element ->
+  Double ->
+  IO ([Double], [Double])
+retrieveYieldCCSN cfg isotopeElem metalFrac = do
   let metalStr
         | metalFrac <= 0.001 = "z0001"
         | metalFrac <= 0.01 = "z001"
         | metalFrac <= 0.1 = "z01"
         | otherwise = "z1"
-   in let filepath = "data/CCSN/" <> model_ccsn cfg <> "/" <> metalStr <> "/" <> (toLower <$> element isotopeElem) <> ".dat"
-       in do
-            table <- parseFile_II filepath
-            let yields_arr = lookup isotopeElem (values table)
-            return $ (indices table, fromMaybe [] yields_arr)
+
+      filepath =
+        "data/CCSN/"
+          <> model_ccsn cfg
+          <> "/"
+          <> metalStr
+          <> "/"
+          <> map toLower (element isotopeElem)
+          <> ".dat"
+
+  table <- parseFile_II filepath
+
+  let yields_arr = lookup isotopeElem (values table)
+
+  case yields_arr of
+    Just ys -> pure (indices table, ys)
+    Nothing -> pure ([0.0], [0.0])
 
 retrieveYieldAGB :: ReferenceStarFormationConfig -> Element -> Double -> IO ([Double], [Double])
 retrieveYieldAGB cfg isotopeElem metalFrac =

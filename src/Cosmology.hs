@@ -118,7 +118,7 @@ zs :: [Double]
 zs =
   let IGMParams {..} = defaultIGMParams
       PhysicalConstants {..} = phys
-   in [zMax, zMax - 0.5 .. 0]
+   in [zMax, zMax - dz .. zMin]
 
 ts :: ReferenceCosmology -> [Double]
 ts cosmology = parMap rpar (\z -> cosmicTime cosmology z) zs
@@ -126,3 +126,7 @@ ts cosmology = parMap rpar (\z -> cosmicTime cosmology z) zs
 interpT :: ReferenceCosmology -> Double -> Double
 interpT cosmology =
   makeInterp zs $ ts cosmology
+
+interpZ :: ReferenceCosmology -> Double -> Double
+interpZ cosmology =
+  makeInterp (ts cosmology) zs
