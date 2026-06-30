@@ -1,2 +1,2 @@
 ignore-project: False
-profiling: True
+optimization: 2

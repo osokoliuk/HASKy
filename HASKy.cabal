@@ -80,7 +80,8 @@ library
       parallel,
       directory,
       lens,
-      dsp
+      dsp,
+      hslogger
 
     -- Directories containing source files.
     hs-source-dirs:   src

@@ -27,8 +27,11 @@ import Data.List (dropWhileEnd, elemIndex, foldl1', isPrefixOf, transpose)
 import qualified Data.Map as M
 import qualified Data.Map.Strict as M'
 import Data.Maybe (fromMaybe, mapMaybe)
+import qualified Data.Text as T
+import qualified Data.Text.IO as TIO
 import Data.Traversable (mapAccumL)
 import qualified Data.Vector as V
+import Debug.Trace
 import Math.GaussianQuadratureIntegration
 import System.Directory (doesFileExist)
 import System.IO
@@ -119,7 +122,7 @@ mapTuple6 f (x1, x2, x3, x4, x5, x6) =
 -- | Parse SNe II yields (specifically, WW95)
 parseFile_II :: FilePath -> IO Table
 parseFile_II path = do
-  content <- readFile path
+  content <- readFileStrict path
   let ls = lines content
   case ls of
     (_ : headerLine : _ : rows) -> do
@@ -158,28 +161,34 @@ parseFile_Ia path isotope =
     content <-
       if exists
         then
-          readFile path
+          readFileStrict path
         else
-          error $ "Incorrect file name" <> path
+          trace
+            "SN Ia yield parsing failed for the chosen element \n"
+            return
+            ""
     let ls = lines content
         isoMap = parseFile_Ia_Helper ls
     return $ fromMaybe 0 (M.lookup isotope isoMap)
 
 -- | Parse AGB yields
 parseFile_AGB :: FilePath -> IO ([Double], [Double])
-parseFile_AGB path =
-  do
-    exists <- doesFileExist path
-    content <-
-      if exists
-        then
-          readFile path
-        else
-          error $ "Incorrect file name" <> path
-    let cols = transpose (words <$> lines content)
-        massCols = read <$> cols !! 0
-        yieldCols = read <$> cols !! 1
-    return (massCols, yieldCols)
+parseFile_AGB path = do
+  exists <- doesFileExist path
+  content <- if exists then readFileStrict path else pure ""
+  let cols = transpose (words <$> lines content)
+  result <-
+    if null cols
+      then
+        trace
+          "AGB yield parsing failed for the chosen element \n"
+          pure
+          ([0.0], [0.0])
+      else
+        let massCols = read <$> (cols !! 0)
+            yieldCols = read <$> (cols !! 1)
+         in pure (massCols, yieldCols)
+  return result
 
 parseFile_ECSN :: FilePath -> IO (M.Map String Double)
 parseFile_ECSN path =
@@ -187,7 +196,7 @@ parseFile_ECSN path =
     exists <- doesFileExist path
     content <-
       if exists
-        then readFile path
+        then readFileStrict path
         else
           error $ "Incorrect file name" <> path
     let cols = parseLine <$> lines content
@@ -299,3 +308,7 @@ findClosestList :: Double -> [Double] -> Maybe Int
 findClosestList val list =
   let list' = (\x -> x - val) <$> list
    in elemIndex (foldl1' min list') list'
+
+-- | Strict IO version of readFile, taken from https://stackoverflow.com/questions/22893168/preventing-getcurrentdirectory-resource-exhausted-too-many-open-files-error
+readFileStrict :: FilePath -> IO String
+readFileStrict = fmap T.unpack . TIO.readFile
