@@ -122,18 +122,20 @@ cosmicVarianceSq cosmology@MkCosmology {prec} pk mh z wKind =
 firstCrossing :: ReferenceCosmology -> PowerSpectrum -> HMFKind -> WKind -> Mhalo -> Redshift -> Double
 firstCrossing cosmology@MkCosmology {h0, om0, ob0} pk hKind wKind mh z =
   let sigma = sqrt $ cosmicVarianceSq cosmology pk mh z wKind
+      ez2 = om0 * (1 + z) ** 3 + (1 - om0)
 
       -- Critical linear overdensity threshold with
       -- redshift corrections from [Kitayama et al. 1996]
       delta_c :: Redshift -> Double
-      delta_c z = 1.686 * (om0 * (1 + z) ** 3) ** 0.0055
+      delta_c z = 1.686 * ((om0 * (1 + z) ** 3) / ez2) ** 0.0055
       nu = delta_c z / sigma
-      a_T', a_ST', p, a_T, b_T, c_T, a_Ang, b_Ang, c_Ang, a_Jen, b_Jen, a_War, b_War, c_War :: Double
-      (a_T', a_ST', p, a_T, b_T, c_T, a_Ang, b_Ang, c_Ang, a_Jen, b_Jen, a_War, b_War, c_War) =
-        (0.186, 0.3222, 0.3, 1.47, 2.57, 1.19, 0.201, 2.08, -1.172, 0.315, 0.61, 0.7234, 0.2538, 1.1982)
+
+      a_T', a_ST', a_ST, p, a_T, b_T, c_T, a_Ang, b_Ang, c_Ang, a_Jen, b_Jen, a_War, b_War, c_War :: Double
+      (a_T', a_ST', a_ST, p, a_T, b_T, c_T, a_Ang, b_Ang, c_Ang, a_Jen, b_Jen, a_War, b_War, c_War) =
+        (0.186, 0.3222, 0.707, 0.3, 1.47, 2.57, 1.19, 0.201, 2.08, -1.172, 0.315, 0.61, 0.7234, 0.2538, 1.1982)
    in case hKind of
         Tinker -> a_T' * ((sigma / b_T) ** (-a_T) + 1) * exp (-c_T / sigma ** 2)
-        ST -> a_ST' * nu * sqrt (2 * nu ** 2 / pi) * (1 + nu ** (-2 * p)) * exp (-nu ** 2 / 2)
+        ST -> a_ST' * sqrt (2 * a_ST / pi) * nu * (1 + (a_ST * nu ** 2) ** (-p)) * exp (-a_ST * nu ** 2 / 2)
         Angulo -> a_Ang * (b_Ang / sigma + 1) ** 1.7 * exp (c_Ang / sigma ** 2)
         Jenkins -> a_Jen * exp (-abs (log (sigma ** (-1)) + b_Jen) ** 3.8)
         Warren -> a_War * (sigma ** (-1.625) + b_War) * exp (-c_War / sigma ** 2)
@@ -149,7 +151,7 @@ haloMassFunction cosmology@MkCosmology {h0, om0, ob0, gn} pk hKind wKind mh z =
       first_crossing = \mh -> firstCrossing cosmology pk hKind wKind mh z
 
       diff_func mh = log . sqrt $ sigma mh
-      dsdm = diffRes $ diffRichardson diff_func 100 mh
+      dsdm = diffRes $ diffRichardson diff_func (mh * 1e-6) mh
       fdsdlogm = dsdm * first_crossing mh
    in -rho_mean * fdsdlogm
 

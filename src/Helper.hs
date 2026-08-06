@@ -57,6 +57,9 @@ data Element
   }
   deriving (Eq, Ord)
 
+-- Placeholder element
+defaultElement = Element {element = "H", isotope = 1}
+
 -- Create a read instance for the Element type so that it can ignore first uppercase letter
 instance Read Element where
   readsPrec _ str =
@@ -231,7 +234,10 @@ parseFile_HNe path =
     parseLine line =
       case words line of
         [elem, y1, y2, y3, y4] -> (elem, read <$> [y1, y2, y3, y4])
-        _ -> error $ "Invalid entry at line:" ++ line
+        _ ->
+          trace
+            "No HNe entry"
+            ("h1", [0.0, 0.0, 0.0, 0.0])
 
 type History = [(Double, V.Vector Double)]
 

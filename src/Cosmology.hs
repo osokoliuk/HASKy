@@ -7,7 +7,7 @@ module Cosmology where
 {-
 Module      : HASKy.Cosmology
 Description : Cosmology module
-Copyright   : (c) Oleksii Sokoliuk, 20256
+Copyright   : (c) Oleksii Sokoliuk, 2026
 License     : MIT
 Maintainer  : oleksii.sokoliuk@mao.kiev.ua
 Stability   : experimental
@@ -110,7 +110,9 @@ dtdz cosmology@MkCosmology {h0, om0, ob0} z =
 -- | Define cosmic time t(z) in the units of [Gyr]
 cosmicTime :: ReferenceCosmology -> Redshift -> CosmicTime
 cosmicTime cosmology z =
-  nIntegrate128 (dtdz cosmology) z 20
+  let IGMParams {..} = defaultIGMParams
+      PhysicalConstants {..} = phys
+   in nIntegrate128 (dtdz cosmology) z zMax
 
 -- | Make some general definitions for redshift and related cosmic time lookup tables
 -- and interpolation functions

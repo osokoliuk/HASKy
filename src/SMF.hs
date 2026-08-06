@@ -110,7 +110,7 @@ massAccretionRate cosmology@MkCosmology {h0, om0, ob0} mh z =
 starFormationRate :: SMFKind -> ReferenceCosmology -> Mhalo -> Redshift -> Double
 starFormationRate sKind cosmology@MkCosmology {h0, om0, ob0} mh z =
   let ep = epsStar cosmology sKind mh z
-   in ep * ob0 / om0 * massAccretionRate cosmology mh z
+   in ep * massAccretionRate cosmology mh z
 
 -- | Stellar mass function, derived from the HMF and SFE via a simple chain rule
 stellarMassFunction ::
@@ -124,7 +124,7 @@ stellarMassFunction ::
   ([Mstar], [Double])
 stellarMassFunction cosmology@MkCosmology {h0, om0, ob0} pk sKind hKind wKind mh_arr z =
   let ms :: Mhalo -> Mstar -- Function that gives stellar mass
-      ms mh = mh * (ob0 / om0) * epsStar cosmology sKind mh z
+      ms mh = mh * epsStar cosmology sKind mh z
 
       ms_arr = ms <$> mh_arr
       hmf_arr =
@@ -136,13 +136,13 @@ stellarMassFunction cosmology@MkCosmology {h0, om0, ob0} pk sKind hKind wKind mh
       dmhdms :: [Double] -- Part of the chain rule to turn HMF into SMF
       dmhdms =
         zipWith (/) ln_factors $
-          (\mh -> diffRes $ diffRichardson ms 10 mh) <$> mh_arr
+          (\mh -> diffRes $ diffRichardson ms (mh * 1e-6) mh) <$> mh_arr
    in (ms_arr, zipWith (\x y -> x * y) hmf_arr dmhdms)
 
 -- | Rate at which baryons are accreted by structures, in [Msol yr^-1 Mpc^-3]
-baryonFormationRateDensity :: ReferenceCosmology -> PowerSpectrum -> HMFKind -> WKind -> Redshift -> Double
-baryonFormationRateDensity cosmology@MkCosmology {om0, ob0, prec} pk hKind wKind z =
-  let mh_arr = (10 **) <$> [6, 6 + 0.25 .. 16]
+baryonFormationRateDensity :: ReferenceCosmology -> PowerSpectrum -> HMFKind -> WKind -> Redshift -> Mhalo -> Double
+baryonFormationRateDensity cosmology@MkCosmology {om0, ob0, prec} pk hKind wKind z mh_min =
+  let mh_arr = (10 **) <$> [log10 mh_min, log10 mh_min + 0.01 .. 16]
 
       hmf_arr =
         (\mh -> haloMassFunction cosmology pk hKind wKind mh z) <$> mh_arr
@@ -164,7 +164,7 @@ starFormationRateDensity :: ReferenceCosmology -> PowerSpectrum -> SMFKind -> HM
 starFormationRateDensity cosmology@MkCosmology {prec} pk sKind hKind wKind z mh_min =
   if z <= 20
     then
-      let mh_arr = (10 **) <$> [log10 mh_min, log10 mh_min + 0.25 .. 16]
+      let mh_arr = (10 **) <$> [log10 mh_min, log10 mh_min + 0.01 .. 16]
 
           hmf_arr =
             (\mh -> haloMassFunction cosmology pk hKind wKind mh z) <$> mh_arr

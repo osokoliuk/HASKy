@@ -164,7 +164,7 @@ defaultIGMParams =
           { epsW = 0.02,
             epsSN = 0.005,
             bRG = 0.02,
-            bMS = 0.04,
+            bMS = 0.05,
             epsHNe0 = 0.5,
             epsMRSNe = 0.03,
             alphaNSM = 0.018,
@@ -201,6 +201,17 @@ retrieveYieldCCSN ::
   Double ->
   IO ([Double], [Double])
 retrieveYieldCCSN cfg isotopeElem metalFrac = do
+  let modelMetallicity :: M.Map String [Double]
+      modelMetallicity =
+        M.fromList $
+          [ ("WW95", [0.001, 0.01, 0.1, 1]),
+            ("NKT13", [0.001, 0.07, 0.29, 0.57, 1.41, 3.55])
+          ]
+      metalStr =
+        let lookupList = fromMaybe [] $ M.lookup (model_ccsn cfg) modelMetallicity
+            idx = fromMaybe 0 $ findClosestList metalFrac lookupList
+         in showFFloat Nothing (lookupList !! idx) ""
+
   let metalStr
         | metalFrac <= 0.001 = "z0001"
         | metalFrac <= 0.01 = "z001"
