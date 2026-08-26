@@ -688,20 +688,29 @@ igmIsmEvolution sfCfg cosmology@MkCosmology {h0, om0, ob0, gn} pk rKind iKind sK
         -- following the prescription of [Daigne et al. 2006]
         -- Finally, we also adopt the BBN abundances for H (He),
         -- such that the ICs for Xi_ISM/Xi_IGM = 0.76 (0.24) * M_ISM/M_IGM.
-        (nSteps, tInit, aInit, rhoTot, igmInit, ismInit, rhoIGMElementInit, rhoISMElementInit, ejectaInit, outflowInit) =
-          (100 :: Int, interpT cosmology zMax, 0.01, rhoCr zMax * ob0, (1 - aInit) * rhoTot, aInit * rhoTot, igmInit * iniAbundance elem, ismInit * iniAbundance elem, 0, 0)
+        (nSteps, tInit, aInit, rhoTot, igmInit, ismInit, rhoIGMElementInit, rhoISMElementInit, ejectaInit, outflowInit, metallicityInit) =
+          (100 :: Int, interpT cosmology zMax, 0.01, rhoCr zMax * ob0, (1 - aInit) * rhoTot, aInit * rhoTot, igmInit * iniAbundance elem, ismInit * iniAbundance elem, 0, 0, 0)
 
         -- Convert Differential-Algebraic system into a system of ODEs
         odeSystem :: History -> Double -> V.Vector Double -> IO (V.Vector Double)
         odeSystem history t y = do
           let (times, metals) =
                 unzip $
-                  [(t', metal) | (t', v) <- history, V.length v > 3, let metal = (v V.! 3) / v V.! 1]
+                  [(t', metals) | (t', v) <- history, V.length v > 3, let metals = (v V.! 9)]
 
               interpMetal t' =
                 if length times < 1
                   then 0
                   else (makeInterp times metals) t'
+
+              (_, xis) =
+                unzip $
+                  [(t', xis) | (t', v) <- history, V.length v > 3, let xis = (v V.! 6)]
+
+              interpXiISM t' =
+                if length times < 1
+                  then 0
+                  else (makeInterp times xis) t'
 
               z = interpZ cosmology t
               rhoIGM = y V.! 0
@@ -710,10 +719,18 @@ igmIsmEvolution sfCfg cosmology@MkCosmology {h0, om0, ob0, gn} pk rKind iKind sK
               rhoISMElement = y V.! 3
               xiIGM = rhoIGMElement / rhoIGM
               xiISM = rhoISMElement / rhoISM
+              rhoIGM_Fe = y V.! 2
+              rhoISM_Fe = y V.! 3
+              xiIGM_Fe = rhoIGM_Fe / rhoIGM
+              xiISM_Fe = rhoISM_Fe / rhoISM
 
-          (e_tot, e_tot_Element, o_SNe, o_Wind, _, o_tot) <- igmTermsIO sfCfg cosmology pk rKind iKind sKind hKind wKind hneKind interpMetal interpMetal mh_min interpSFRD z elem
+          (e_tot, e_tot_Element, o_SNe, o_Wind, _, o_tot) <- igmTermsIO sfCfg cosmology pk rKind iKind sKind hKind wKind hneKind interpMetal interpXiISM mh_min interpSFRD z elem
+          (_, e_tot_Fe, _, _, _, _) <- igmTermsIO sfCfg cosmology pk rKind iKind sKind hKind wKind hneKind interpMetal interpXiISM mh_min interpSFRD z (Element {element = "Fe", isotope = 56})
+
           let o_SNe_Element = o_SNe * xiISM
               o_tot_Element = o_Wind * xiISM + o_SNe_Element
+              o_SNe_Fe = o_SNe * xiISM_Fe
+              o_tot_Fe = o_Wind * xiISM_Fe + o_SNe_Element
 
           return $
             V.fromList
@@ -722,18 +739,22 @@ igmIsmEvolution sfCfg cosmology@MkCosmology {h0, om0, ob0, gn} pk rKind iKind sK
                 -interpMAR z * xiIGM + o_tot_Element,
                 interpMAR z * xiIGM - 1e9 * interpSFRD t * xiISM + e_tot_Element - o_tot_Element,
                 e_tot,
-                o_tot
+                o_tot,
+                e_tot - xiISM,
+                -interpMAR z * xiIGM_Fe + o_tot_Fe,
+                interpMAR z * xiIGM_Fe - 1e9 * interpSFRD t * xiISM_Fe + e_tot_Fe - o_tot_Fe,
+                e_tot - xiISM_Fe
               ]
 
     -- Solve the system and unpack values
-    zippedHistory <- rk4SolveHistIO odeSystem tInit ((interpT cosmology 0 - tInit) / fromIntegral nSteps) nSteps (V.fromList [igmInit, ismInit, rhoIGMElementInit, rhoISMElementInit, ejectaInit, outflowInit])
+    zippedHistory <- rk4SolveHistIO odeSystem tInit ((interpT cosmology 0 - tInit) / fromIntegral nSteps) nSteps (V.fromList [igmInit, ismInit, rhoIGMElementInit, rhoISMElementInit, ejectaInit, outflowInit, metallicityInit, 0, 0, 0])
 
     -- M_star = rho_tot - M_IGM - M_ISM - ejecta from the conservation equation
     -- In addition, we also normalise each mass by the total mass
     let (times, masses) = unzip zippedHistory
         result =
           ( \v ->
-              V.zipWith ($) (V.fromList [(/ rhoTot), (/ rhoTot), (/ rhoTot), (/ rhoTot), (/ rhoTot), (/ rhoTot), (/ rhoTot)]) $
+              V.zipWith ($) (V.fromList [(/ rhoTot), (/ rhoTot), (/ rhoTot), (/ rhoTot), (/ rhoTot), (/ rhoTot), (/ rhoTot), (/ rhoTot), (/ rhoTot), (/ rhoTot), (/ rhoTot)]) $
                 V.snoc v (rhoTot - v V.! 0 - v V.! 1 - v V.! 4)
           )
             <$> masses

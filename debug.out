@@ -1,25 +1,381 @@
+
+src/IGM.hs:24:1: warning: [-Wunused-imports]
+    The import of ‘Control.Lens.Combinators’ is redundant
+      except perhaps to import instances from ‘Control.Lens.Combinators’
+    To import instances alone, use: import Control.Lens.Combinators()
+   |
+24 | import Control.Lens.Combinators (each, over)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+src/IGM.hs:27:1: warning: [-Wunused-imports]
+    The import of ‘Data.Bifunctor’ is redundant
+      except perhaps to import instances from ‘Data.Bifunctor’
+    To import instances alone, use: import Data.Bifunctor()
+   |
+27 | import Data.Bifunctor
+   | ^^^^^^^^^^^^^^^^^^^^^
+
+src/IGM.hs:28:1: warning: [-Wunused-imports]
+    The import of ‘Data.List’ is redundant
+      except perhaps to import instances from ‘Data.List’
+    To import instances alone, use: import Data.List()
+   |
+28 | import Data.List (transpose)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+src/IGM.hs:34:1: warning: [-Wunused-imports]
+    The import of ‘Math.GaussianQuadratureIntegration’ is redundant
+      except perhaps to import instances from ‘Math.GaussianQuadratureIntegration’
+    To import instances alone, use: import Math.GaussianQuadratureIntegration()
+   |
+34 | import Math.GaussianQuadratureIntegration
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+src/IGM.hs:102:7: warning: [-Wunused-local-binds]
+    Defined but not used: ‘m_arr’
+    |
+102 |   let m_arr = [m_down, m_down + 0.1 .. m_up]
+    |       ^^^^^
+
+src/IGM.hs:132:3: warning: [GHC-62161] [-Wincomplete-patterns]
+    Pattern match(es) are non-exhaustive
+    In a case alternative:
+        Patterns of type ‘RemnantKind’ not matched: Pereira
+    |
+132 |   case rKind of
+    |   ^^^^^^^^^^^^^...
+
+src/IGM.hs:289:77: warning: [-Wunused-matches]
+    Defined but not used: ‘sKind’
+    |
+289 | interGalacticMediumTerms cosmology@MkCosmology {prec} yields pk rKind iKind sKind hKind wKind hneKind metalFraction xiISM mh_min sfrd z =
+    |                                                                             ^^^^^
+
+src/IGM.hs:296:19: warning: [-Wunused-record-wildcards]
+    No variables bound in the record wildcard match are used
+      Possible fix: omit the ‘..’
+    |
+296 |       ECSNParams {..} = ecsn
+    |                   ^^
+
+src/IGM.hs:303:7: warning: [-Wunused-local-binds]
+    Defined but not used: ‘birthZ’
+    |
+303 |       birthZ m =
+    |       ^^^^^^
+
+src/IGM.hs:564:103: warning: [GHC-63397] [-Wname-shadowing]
+    This binding for ‘elem’ shadows the existing binding
+      imported from ‘Prelude’ at src/IGM.hs:7:8-10
+      (and originally defined in ‘Data.Foldable’)
+    |
+564 | igmTermsIO sfCfg cosmology pk rKind iKind sKind hKind wKind hneKind metalFraction xiISM mh_min sfrd z elem =
+    |                                                                                                       ^^^^
+
+src/IGM.hs:622:102: warning: [GHC-63397] [-Wname-shadowing]
+    This binding for ‘elem’ shadows the existing binding
+      imported from ‘Prelude’ at src/IGM.hs:7:8-10
+      (and originally defined in ‘Data.Foldable’)
+    |
+622 | snTermsIO sfCfg cosmology pk rKind iKind sKind hKind wKind hneKind metalFraction xiISM mh_min sfrd z elem =
+    |                                                                                                      ^^^^
+
+src/IGM.hs:643:32: warning: [-Wunused-local-binds]
+    Defined but not used: ‘e_AGB’
+    |
+643 |           let MkEjectaOutflow {e_AGB, e_AGB_Element, e_CCSN, e_CCSN_Element, e_ECSN_Element, e_HNe_Element, e_MRSNe_Element, e_SNe_Ia, e_SNe_Ia_Element, e_Novae_Element, e_NSM, e_NSM_Element, o_Wind} =
+    |                                ^^^^^
+
+src/IGM.hs:643:39: warning: [-Wunused-local-binds]
+    Defined but not used: ‘e_AGB_Element’
+    |
+643 |           let MkEjectaOutflow {e_AGB, e_AGB_Element, e_CCSN, e_CCSN_Element, e_ECSN_Element, e_HNe_Element, e_MRSNe_Element, e_SNe_Ia, e_SNe_Ia_Element, e_Novae_Element, e_NSM, e_NSM_Element, o_Wind} =
+    |                                       ^^^^^^^^^^^^^
+
+src/IGM.hs:643:78: warning: [-Wunused-local-binds]
+    Defined but not used: ‘e_ECSN_Element’
+    |
+643 |           let MkEjectaOutflow {e_AGB, e_AGB_Element, e_CCSN, e_CCSN_Element, e_ECSN_Element, e_HNe_Element, e_MRSNe_Element, e_SNe_Ia, e_SNe_Ia_Element, e_Novae_Element, e_NSM, e_NSM_Element, o_Wind} =
+    |                                                                              ^^^^^^^^^^^^^^
+
+src/IGM.hs:643:94: warning: [-Wunused-local-binds]
+    Defined but not used: ‘e_HNe_Element’
+    |
+643 |           let MkEjectaOutflow {e_AGB, e_AGB_Element, e_CCSN, e_CCSN_Element, e_ECSN_Element, e_HNe_Element, e_MRSNe_Element, e_SNe_Ia, e_SNe_Ia_Element, e_Novae_Element, e_NSM, e_NSM_Element, o_Wind} =
+    |                                                                                              ^^^^^^^^^^^^^
+
+src/IGM.hs:643:109: warning: [-Wunused-local-binds]
+    Defined but not used: ‘e_MRSNe_Element’
+    |
+643 |           let MkEjectaOutflow {e_AGB, e_AGB_Element, e_CCSN, e_CCSN_Element, e_ECSN_Element, e_HNe_Element, e_MRSNe_Element, e_SNe_Ia, e_SNe_Ia_Element, e_Novae_Element, e_NSM, e_NSM_Element, o_Wind} =
+    |                                                                                                             ^^^^^^^^^^^^^^^
+
+src/IGM.hs:643:154: warning: [-Wunused-local-binds]
+    Defined but not used: ‘e_Novae_Element’
+    |
+643 |           let MkEjectaOutflow {e_AGB, e_AGB_Element, e_CCSN, e_CCSN_Element, e_ECSN_Element, e_HNe_Element, e_MRSNe_Element, e_SNe_Ia, e_SNe_Ia_Element, e_Novae_Element, e_NSM, e_NSM_Element, o_Wind} =
+    |                                                                                                                                                          ^^^^^^^^^^^^^^^
+
+src/IGM.hs:643:171: warning: [-Wunused-local-binds]
+    Defined but not used: ‘e_NSM’
+    |
+643 |           let MkEjectaOutflow {e_AGB, e_AGB_Element, e_CCSN, e_CCSN_Element, e_ECSN_Element, e_HNe_Element, e_MRSNe_Element, e_SNe_Ia, e_SNe_Ia_Element, e_Novae_Element, e_NSM, e_NSM_Element, o_Wind} =
+    |                                                                                                                                                                           ^^^^^
+
+src/IGM.hs:643:178: warning: [-Wunused-local-binds]
+    Defined but not used: ‘e_NSM_Element’
+    |
+643 |           let MkEjectaOutflow {e_AGB, e_AGB_Element, e_CCSN, e_CCSN_Element, e_ECSN_Element, e_HNe_Element, e_MRSNe_Element, e_SNe_Ia, e_SNe_Ia_Element, e_Novae_Element, e_NSM, e_NSM_Element, o_Wind} =
+    |                                                                                                                                                                                  ^^^^^^^^^^^^^
+
+src/IGM.hs:643:193: warning: [-Wunused-local-binds]
+    Defined but not used: ‘o_Wind’
+    |
+643 |           let MkEjectaOutflow {e_AGB, e_AGB_Element, e_CCSN, e_CCSN_Element, e_ECSN_Element, e_HNe_Element, e_MRSNe_Element, e_SNe_Ia, e_SNe_Ia_Element, e_Novae_Element, e_NSM, e_NSM_Element, o_Wind} =
+    |                                                                                                                                                                                                 ^^^^^^
+
+src/IGM.hs:652:14: warning: [GHC-63397] [-Wname-shadowing]
+    This binding for ‘elem’ shadows the existing binding
+      imported from ‘Prelude’ at src/IGM.hs:7:8-10
+      (and originally defined in ‘Data.Foldable’)
+    |
+652 | iniAbundance elem =
+    |              ^^^^
+
+src/IGM.hs:673:50: warning: [-Wunused-matches]
+    Defined but not used: ‘om0’
+    |
+673 | igmIsmEvolution sfCfg cosmology@MkCosmology {h0, om0, ob0, gn} pk rKind iKind sKind hKind wKind hneKind elem mh_min =
+    |                                                  ^^^
+
+src/IGM.hs:673:105: warning: [GHC-63397] [-Wname-shadowing]
+    This binding for ‘elem’ shadows the existing binding
+      imported from ‘Prelude’ at src/IGM.hs:7:8-10
+      (and originally defined in ‘Data.Foldable’)
+    |
+673 | igmIsmEvolution sfCfg cosmology@MkCosmology {h0, om0, ob0, gn} pk rKind iKind sKind hKind wKind hneKind elem mh_min =
+    |                                                                                                         ^^^^
+
+src/IGM.hs:681:9: warning: [-Wunused-local-binds]
+    Defined but not used: ‘metalFractionSol’
+    |
+681 |         metalFractionSol = 0.0139
+    |         ^^^^^^^^^^^^^^^^
+
+src/IGM.hs:681:28: warning: [GHC-18042] [-Wtype-defaults]
+    • Defaulting the type variable ‘a0’ to type ‘Double’ in the following constraint
+        Fractional a0 arising from the literal ‘0.0139’
+    • In the expression: 0.0139
+      In an equation for ‘metalFractionSol’: metalFractionSol = 0.0139
+      In the expression:
+        do let IGMParams {..} = defaultIGMParams
+               PhysicalConstants {..} = phys
+               ....
+           zippedHistory <- rk4SolveHistIO
+                              odeSystem tInit
+                              ((interpT cosmology 0 - tInit) / fromIntegral nSteps) nSteps
+                              (V.fromList [igmInit, ismInit, ....])
+           let (times, masses) = unzip zippedHistory
+               result = (\ v -> ...) <$> masses
+           return (times, interpZ cosmology <$> times, result)
+    |
+681 |         metalFractionSol = 0.0139
+    |                            ^^^^^^
+
+src/IGM.hs:726:1: warning: [GHC-94817] [-Wtabs]
+    Tab character found here, and in three further locations.
+    Suggested fix: Please use spaces instead.
+    |
+726 |                                 e_tot - xiISM 
+    | ^^^^^^^^
+
+src/IGM.hs:734:17: warning: [GHC-63397] [-Wname-shadowing]
+    This binding for ‘masses’ shadows the existing binding
+      bound at src/IGM.hs:676:20
+    |
+734 |     let (times, masses) = unzip zippedHistory
+    |                 ^^^^^^
+[cctools-port]: generating fake signature for 'dist-newstyle/build/aarch64-osx/ghc-9.6.7/HASKy-0.1.0.0/opt/build/libHSHASKy-0.1.0.0-inplace-ghc9.6.7.dylib'
+
+app/Main.hs:8:1: warning: [-Wunused-imports]
+    The import of ‘DSP.Basic’ is redundant
+      except perhaps to import instances from ‘DSP.Basic’
+    To import instances alone, use: import DSP.Basic()
+  |
+8 | import DSP.Basic (logspace)
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+app/Main.hs:9:1: warning: [-Wunused-imports]
+    The import of ‘Data.Char’ is redundant
+      except perhaps to import instances from ‘Data.Char’
+    To import instances alone, use: import Data.Char()
+  |
+9 | import Data.Char (toLower)
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+app/Main.hs:10:1: warning: [-Wunused-imports]
+    The import of ‘Data.List’ is redundant
+      except perhaps to import instances from ‘Data.List’
+    To import instances alone, use: import Data.List()
+   |
+10 | import Data.List
+   | ^^^^^^^^^^^^^^^^
+
+app/Main.hs:14:1: warning: [-Wunused-imports]
+    The import of ‘Lookup’ is redundant
+      except perhaps to import instances from ‘Lookup’
+    To import instances alone, use: import Lookup()
+   |
+14 | import Lookup
+   | ^^^^^^^^^^^^^
+
+app/Main.hs:18:1: warning: [-Wunused-imports]
+    The import of ‘System.Directory’ is redundant
+      except perhaps to import instances from ‘System.Directory’
+    To import instances alone, use: import System.Directory()
+   |
+18 | import System.Directory (doesFileExist)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+app/Main.hs:28:9: warning: [GHC-63397] [-Wname-shadowing]
+    This binding for ‘elem’ shadows the existing binding
+      imported from ‘Data.List’ at app/Main.hs:10:1-16
+      (and originally defined in ‘Data.Foldable’)
+   |
+28 |         elem = Element {element = "Fe", isotope = 56}
+   |         ^^^^
+
+app/Main.hs:30:9: warning: [GHC-63397] [-Wname-shadowing]
+    This binding for ‘ts’ shadows the existing binding
+      imported from ‘Cosmology’ at app/Main.hs:7:1-16
+   |
+30 |         ts =
+   |         ^^
+
+app/Main.hs:33:9: warning: [-Wunused-local-binds]
+    Defined but not used: ‘hmf’
+   |
+33 |         hmf = (\mh -> haloMassFunction planck18 pk ST TopHat mh 10) <$> ((\x -> 10 ** x) <$> [6.0, 6.5 .. 16])
+   |         ^^^
+
+app/Main.hs:34:9: warning: [-Wunused-local-binds]
+    Defined but not used: ‘pk_approx’
+   |
+34 |         pk_approx = (\k -> pk 10 k) <$> ((\x -> 10 ** x) <$> [-3, -2.75 .. 3])
+   |         ^^^^^^^^^
+
+app/Main.hs:35:9: warning: [-Wunused-local-binds]
+    Defined but not used: ‘ccsn_integrand’
+   |
+35 |         ccsn_integrand t m = (normImf planck18 Kroupa m) * sfrd (t - tauMS m)
+   |         ^^^^^^^^^^^^^^
+
+app/Main.hs:36:20: warning: [-Wunused-record-wildcards]
+    No variables bound in the record wildcard match are used
+      Possible fix: omit the ‘..’
+   |
+36 |         IGMParams {..} = defaultIGMParams
+   |                    ^^
+
+app/Main.hs:37:28: warning: [-Wunused-record-wildcards]
+    No variables bound in the record wildcard match are used
+      Possible fix: omit the ‘..’
+   |
+37 |         PhysicalConstants {..} = phys
+   |                            ^^
+
+app/Main.hs:38:21: warning: [-Wunused-record-wildcards]
+    No variables bound in the record wildcard match are used
+      Possible fix: omit the ‘..’
+   |
+38 |         MassLimits {..} = masses
+   |                     ^^
+
+app/Main.hs:39:23: warning: [-Wunused-record-wildcards]
+    No variables bound in the record wildcard match are used
+      Possible fix: omit the ‘..’
+   |
+39 |         Efficiencies {..} = effs
+   |                       ^^
+
+app/Main.hs:40:21: warning: [-Wunused-record-wildcards]
+    No variables bound in the record wildcard match are used
+      Possible fix: omit the ‘..’
+   |
+40 |         DelayTimes {..} = delays
+   |                     ^^
+
+app/Main.hs:41:22: warning: [-Wunused-record-wildcards]
+    No variables bound in the record wildcard match are used
+      Possible fix: omit the ‘..’
+   |
+41 |         NovaeParams {..} = novae
+   |                      ^^
+
+app/Main.hs:42:21: warning: [-Wunused-record-wildcards]
+    No variables bound in the record wildcard match are used
+      Possible fix: omit the ‘..’
+   |
+42 |         ECSNParams {..} = ecsn
+   |                     ^^
+
+app/Main.hs:44:9: warning: [-Wunused-local-binds]
+    Defined but not used: ‘first_term’
+   |
+44 |         first_term t =
+   |         ^^^^^^^^^^
+
+app/Main.hs:47:9: warning: [-Wunused-local-binds]
+    Defined but not used: ‘second_term’
+   |
+47 |         second_term t =
+   |         ^^^^^^^^^^^
+
+app/Main.hs:50:9: warning: [-Wunused-local-binds]
+    Defined but not used: ‘snia’
+   |
+50 |         snia z =
+   |         ^^^^
+
+app/Main.hs:55:5: warning: [-Wunused-matches]
+    Defined but not used: ‘igm’
+   |
+55 |     igm <- mapConcurrently (\z -> snTermsIO sfCfg planck18 pk Pereira Kroupa Behroozi ST Smooth Constant_HNe (\x -> 1e-3) (\x -> 1e-3) 1e6 sfrd z elem) zs
+   |     ^^^
+
+app/Main.hs:55:112: warning: [-Wunused-matches]
+    Defined but not used: ‘x’
+   |
+55 |     igm <- mapConcurrently (\z -> snTermsIO sfCfg planck18 pk Pereira Kroupa Behroozi ST Smooth Constant_HNe (\x -> 1e-3) (\x -> 1e-3) 1e6 sfrd z elem) zs
+   |                                                                                                                ^
+
+app/Main.hs:55:125: warning: [-Wunused-matches]
+    Defined but not used: ‘x’
+   |
+55 |     igm <- mapConcurrently (\z -> snTermsIO sfCfg planck18 pk Pereira Kroupa Behroozi ST Smooth Constant_HNe (\x -> 1e-3) (\x -> 1e-3) 1e6 sfrd z elem) zs
+   |                                                                                                                             ^
 No HNe entry
- 239,825,095,488 bytes allocated in the heap
-     823,431,400 bytes copied during GC
-      23,023,480 bytes maximum residency (9 sample(s))
-       5,209,632 bytes maximum slop
-             148 MiB total memory in use (0 MiB lost due to fragmentation)
+ 189,335,776,312 bytes allocated in the heap
+     651,835,424 bytes copied during GC
+      20,360,888 bytes maximum residency (9 sample(s))
+       5,282,200 bytes maximum slop
+             110 MiB total memory in use (1 MiB lost due to fragmentation)
 
                                      Tot time (elapsed)  Avg pause  Max pause
-  Gen  0     37725 colls,     0 par    0.099s   0.784s     0.0000s    0.0024s
-  Gen  1         9 colls,     0 par    0.003s   0.025s     0.0028s    0.0075s
+  Gen  0     35413 colls,     0 par    0.070s   0.610s     0.0000s    0.0030s
+  Gen  1         9 colls,     0 par    0.003s   0.017s     0.0019s    0.0045s
 
   TASKS: 35 (1 bound, 34 peak workers (34 total), using -N8)
 
-  SPARKS: 849157 (253455 converted, 0 overflowed, 0 dud, 593237 GC'd, 2465 fizzled)
+  SPARKS: 817075 (221058 converted, 0 overflowed, 0 dud, 594333 GC'd, 1684 fizzled)
 
-  INIT    time    0.005s  (  0.009s elapsed)
-  MUT     time  227.131s  ( 98.476s elapsed)
-  GC      time    0.102s  (  0.810s elapsed)
-  EXIT    time    0.002s  (  0.011s elapsed)
-  Total   time  227.239s  ( 99.305s elapsed)
+  INIT    time    0.003s  (  0.003s elapsed)
+  MUT     time  150.405s  ( 89.182s elapsed)
+  GC      time    0.073s  (  0.627s elapsed)
+  EXIT    time    0.002s  (  0.010s elapsed)
+  Total   time  150.483s  ( 89.822s elapsed)
 
-  Alloc rate    1,055,888,254 bytes per MUT second
+  Alloc rate    1,258,840,654 bytes per MUT second
 
-  Productivity 100.0% of total user, 99.2% of total elapsed
+  Productivity  99.9% of total user, 99.3% of total elapsed
 
