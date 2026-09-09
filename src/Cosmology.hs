@@ -112,7 +112,7 @@ cosmicTime :: ReferenceCosmology -> Redshift -> CosmicTime
 cosmicTime cosmology z =
   let IGMParams {..} = defaultIGMParams
       PhysicalConstants {..} = phys
-   in nIntegrate128 (dtdz cosmology) z zMax
+   in nIntegrate256 (dtdz cosmology) z zMax
 
 -- | Make some general definitions for redshift and related cosmic time lookup tables
 -- and interpolation functions

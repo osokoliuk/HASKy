@@ -34,6 +34,7 @@ import Lookup
 import Math.GaussianQuadratureIntegration
 import SMF
 import StarFormation
+import Debug.Trace
 
 data IMFKind
   = Salpeter
@@ -487,9 +488,7 @@ interGalacticMediumTerms cosmology@MkCosmology {prec} yields pk rKind iKind sKin
 
       e_SNe_Ia_Element =
         yield_ia yields * e_SNe_Ia
-   in fmap
-        (* yrGyr)
-        MkEjectaOutflow
+   in MkEjectaOutflow
           { e_AGB = e_AGB,
             e_AGB_Element = e_AGB_Element,
             e_CCSN = e_CCSN,
@@ -676,27 +675,31 @@ igmIsmEvolution sfCfg cosmology@MkCosmology {h0, om0, ob0, gn} pk rKind iKind sK
         IGMParams {..} = defaultIGMParams
         PhysicalConstants {..} = phys
         mar = parMap rpar (\z -> 1e9 * baryonFormationRateDensity cosmology pk hKind wKind z mh_min) zs
-        sfrd = parMap rpar (\z -> starFormationRateDensity cosmology pk sKind hKind wKind z mh_min) zs
-        rhoCr z = 3 * h0 ** 2 / (8 * pi * gn) * (1 + z) ** 3
+        sfrd = parMap rpar (\z -> 1e9 * starFormationRateDensity cosmology pk sKind hKind wKind z mh_min) zs
+        rhoOb = 2.77 * 1e11 * ob0 * (h0 / 100)**2 
         metalFractionSol = 0.0139
 
         -- Unpack outflow/inflow rates and interpolate over our redshift range
-        (interpMAR, interpSFRD) = (makeInterp zs mar, makeInterp (ts cosmology) sfrd)
+        (interpMAR, interpSFRD) = (makeInterp zs mar, makeInterp zs sfrd)
 
         -- ICs are set assuming very small baryon fraction in the structures,
         -- with rho_ISM/rho_IGM ~ 0.01 (stellar mass is negligible at this redshift)
         -- following the prescription of [Daigne et al. 2006]
         -- Finally, we also adopt the BBN abundances for H (He),
         -- such that the ICs for Xi_ISM/Xi_IGM = 0.76 (0.24) * M_ISM/M_IGM.
-        (nSteps, tInit, aInit, rhoTot, igmInit, ismInit, rhoIGMElementInit, rhoISMElementInit, ejectaInit, outflowInit, metallicityInit) =
-          (100 :: Int, interpT cosmology zMax, 0.01, rhoCr zMax * ob0, (1 - aInit) * rhoTot, aInit * rhoTot, igmInit * iniAbundance elem, ismInit * iniAbundance elem, 0, 0, 0)
+        (nSteps, tInit, aInit, mTot, hydrogenElement, heliumElement) =
+          (100 :: Int, interpT cosmology zMax, 0.01, rhoOb , Element {element = "H", isotope = 1}, Element {element = "He", isotope = 2})
 
+        (rhoIGMInit, rhoISMInit, xiIGMInit, xiISMInit, xiIGMInit_H, xiISMInit_H, xiIGMInit_He, xiISMInit_He, ejectaInit, outflowInit) = 
+          ((1 - aInit) * mTot, aInit * mTot, iniAbundance elem, iniAbundance elem, iniAbundance hydrogenElement, iniAbundance hydrogenElement, iniAbundance heliumElement, iniAbundance heliumElement,0, 0)
+
+       
         -- Convert Differential-Algebraic system into a system of ODEs
         odeSystem :: History -> Double -> V.Vector Double -> IO (V.Vector Double)
         odeSystem history t y = do
           let (times, metals) =
                 unzip $
-                  [(t', metals) | (t', v) <- history, V.length v > 3, let metals = (v V.! 9)]
+                  [(t', metals) | (t', v) <- history, V.length v > 3, let metals = (1 - v V.! 7 - v V.! 9)]
 
               interpMetal t' =
                 if length times < 1
@@ -705,7 +708,7 @@ igmIsmEvolution sfCfg cosmology@MkCosmology {h0, om0, ob0, gn} pk rKind iKind sK
 
               (_, xis) =
                 unzip $
-                  [(t', xis) | (t', v) <- history, V.length v > 3, let xis = (v V.! 6)]
+                  [(t', xis) | (t', v) <- history, V.length v > 3, let xis = (v V.! 3)]
 
               interpXiISM t' =
                 if length times < 1
@@ -715,47 +718,70 @@ igmIsmEvolution sfCfg cosmology@MkCosmology {h0, om0, ob0, gn} pk rKind iKind sK
               z = interpZ cosmology t
               rhoIGM = y V.! 0
               rhoISM = y V.! 1
-              rhoIGMElement = y V.! 2
-              rhoISMElement = y V.! 3
-              xiIGM = rhoIGMElement / rhoIGM
-              xiISM = rhoISMElement / rhoISM
-              rhoIGM_Fe = y V.! 2
-              rhoISM_Fe = y V.! 3
-              xiIGM_Fe = rhoIGM_Fe / rhoIGM
-              xiISM_Fe = rhoISM_Fe / rhoISM
+              xiIGM = y V.! 2 
+              xiISM = y V.! 3 
+              xiIGM_H = y V.! 6 
+              xiISM_H = y V.! 7
+              xiIGM_He = y V.! 8 
+              xiISM_He = y V.! 9
 
-          (e_tot, e_tot_Element, o_SNe, o_Wind, _, o_tot) <- igmTermsIO sfCfg cosmology pk rKind iKind sKind hKind wKind hneKind interpMetal interpXiISM mh_min interpSFRD z elem
-          (_, e_tot_Fe, _, _, _, _) <- igmTermsIO sfCfg cosmology pk rKind iKind sKind hKind wKind hneKind interpMetal interpXiISM mh_min interpSFRD z (Element {element = "Fe", isotope = 56})
 
-          let o_SNe_Element = o_SNe * xiISM
-              o_tot_Element = o_Wind * xiISM + o_SNe_Element
-              o_SNe_Fe = o_SNe * xiISM_Fe
-              o_tot_Fe = o_Wind * xiISM_Fe + o_SNe_Element
+
+          (e_tot, e_tot_Element, o_SNe, o_Wind, o_SNe_Element, o_tot) <- igmTermsIO sfCfg cosmology pk rKind iKind sKind hKind wKind hneKind interpMetal interpXiISM mh_min interpSFRD z elem
+          (_, e_tot_H, _, _, o_SNe_H, _) <- igmTermsIO sfCfg cosmology pk rKind iKind sKind hKind wKind hneKind interpMetal interpXiISM mh_min interpSFRD z hydrogenElement 
+          (_, e_tot_He, _, _, o_SNe_He, _) <- igmTermsIO sfCfg cosmology pk rKind iKind sKind hKind wKind hneKind interpMetal interpXiISM mh_min interpSFRD z heliumElement 
+
+          -- Debug output
+          traceM $ "e_tot        = " ++ show e_tot
+          traceM $ "e_tot_H      = " ++ show e_tot_H
+          traceM $ "e_tot_He     = " ++ show e_tot_He
+          traceM $ "o_SNe        = " ++ show o_SNe
+          traceM $ "o_SNe_H      = " ++ show o_SNe_H
+          traceM $ "o_SNe_He     = " ++ show o_SNe_He
+          traceM $ "o_Wind       = " ++ show o_Wind
+
+            
+          let o_tot_Element  = o_Wind * xiISM + o_SNe_Element
+              o_tot_H = o_Wind * xiISM_H + o_SNe_H
+              o_tot_He = o_Wind * xiISM_He + o_SNe_He
+
 
           return $
             V.fromList
               [ -interpMAR z + o_tot,
-                (-1e9 * interpSFRD t + e_tot) + (interpMAR z - o_tot),
-                -interpMAR z * xiIGM + o_tot_Element,
-                interpMAR z * xiIGM - 1e9 * interpSFRD t * xiISM + e_tot_Element - o_tot_Element,
+                -interpSFRD z + e_tot + interpMAR z - o_tot,
+                ( o_Wind * (xiISM - xiIGM) + (o_SNe_Element - o_SNe * xiIGM)) / rhoIGM,
+                ( e_tot_Element - e_tot * xiISM + interpMAR z * (xiIGM - xiISM)
+                  - (o_SNe_Element - o_SNe * xiISM)) / rhoISM,
                 e_tot,
                 o_tot,
-                e_tot - xiISM,
-                -interpMAR z * xiIGM_Fe + o_tot_Fe,
-                interpMAR z * xiIGM_Fe - 1e9 * interpSFRD t * xiISM_Fe + e_tot_Fe - o_tot_Fe,
-                e_tot - xiISM_Fe
+                ( o_Wind * (xiISM_H - xiIGM_H) + (o_SNe_H - o_SNe * xiIGM_H)) / rhoIGM,
+                ( e_tot_H - e_tot * xiISM_H + interpMAR z * (xiIGM_H - xiISM_H)
+                  - (o_SNe_H - o_SNe * xiISM_H)) / rhoISM,
+                ( o_Wind * (xiISM_He - xiIGM_He) + (o_SNe_He - o_SNe * xiIGM_He)) / rhoIGM,
+                ( e_tot_He - e_tot * xiISM_He + interpMAR z * (xiIGM_He - xiISM_He)
+                  - (o_SNe_He - o_SNe * xiISM_He)) / rhoISM
               ]
 
     -- Solve the system and unpack values
-    zippedHistory <- rk4SolveHistIO odeSystem tInit ((interpT cosmology 0 - tInit) / fromIntegral nSteps) nSteps (V.fromList [igmInit, ismInit, rhoIGMElementInit, rhoISMElementInit, ejectaInit, outflowInit, metallicityInit, 0, 0, 0])
+    zippedHistory <- rk4SolveHistIO odeSystem tInit ((interpT cosmology 0 - tInit) / fromIntegral nSteps) nSteps (V.fromList [rhoIGMInit, rhoISMInit, xiIGMInit, xiISMInit, ejectaInit, outflowInit, xiIGMInit_H, xiISMInit_H, xiIGMInit_He, xiISMInit_He])
+    
+    -- Debug output
+    traceM $ "rhoBaryon = " ++ show rhoOb 
+    traceM $ "rhoIGM    = " ++ show rhoIGMInit
+    traceM $ "rhoISM    = " ++ show rhoISMInit
+    traceM $ "MAR       = " ++ show (interpMAR zMax)
+    traceM $ "SFRD      = " ++ show (interpSFRD zMax)
+    traceM $ "MAR/rhoIGM  = " ++ show (interpMAR zMax / rhoIGMInit)
+    traceM $ "SFRD/rhoISM = " ++ show (interpSFRD zMax / rhoISMInit)
 
     -- M_star = rho_tot - M_IGM - M_ISM - ejecta from the conservation equation
     -- In addition, we also normalise each mass by the total mass
     let (times, masses) = unzip zippedHistory
         result =
           ( \v ->
-              V.zipWith ($) (V.fromList [(/ rhoTot), (/ rhoTot), (/ rhoTot), (/ rhoTot), (/ rhoTot), (/ rhoTot), (/ rhoTot), (/ rhoTot), (/ rhoTot), (/ rhoTot), (/ rhoTot)]) $
-                V.snoc v (rhoTot - v V.! 0 - v V.! 1 - v V.! 4)
+              V.zipWith ($) (V.fromList [(/ mTot), (/ mTot), (/ 1), (/ 1), (/ mTot), (/ mTot), (/ 1), (/ 1), (/ 1), (/ 1)]) $
+                V.snoc v (mTot - v V.! 0 - v V.! 1 )
           )
             <$> masses
     return (times, interpZ cosmology <$> times, result)
