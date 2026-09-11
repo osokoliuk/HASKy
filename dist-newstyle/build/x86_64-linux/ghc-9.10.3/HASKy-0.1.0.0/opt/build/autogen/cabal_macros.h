@@ -80,6 +80,16 @@
   (major1) == 5 && (major2) <  3 || \
   (major1) == 5 && (major2) == 3 && (minor) <= 6)
 #endif /* MIN_VERSION_lens */
+/* package monad-parallel-0.8.0.1 */
+#ifndef VERSION_monad_parallel
+#define VERSION_monad_parallel "0.8.0.1"
+#endif /* VERSION_monad_parallel */
+#ifndef MIN_VERSION_monad_parallel
+#define MIN_VERSION_monad_parallel(major1,major2,minor) (\
+  (major1) <  0 || \
+  (major1) == 0 && (major2) <  8 || \
+  (major1) == 0 && (major2) == 8 && (minor) <= 0)
+#endif /* MIN_VERSION_monad_parallel */
 /* package mtl-2.3.1 */
 #ifndef VERSION_mtl
 #define VERSION_mtl "2.3.1"

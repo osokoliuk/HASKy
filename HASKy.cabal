@@ -81,7 +81,8 @@ library
       directory,
       lens,
       dsp,
-      hslogger
+      hslogger,
+      monad-parallel
 
     -- Directories containing source files.
     hs-source-dirs:   src

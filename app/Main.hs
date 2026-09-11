@@ -25,7 +25,7 @@ main =
   do
     -- Fix this interpolation later, this code is not prod ready...
     let pk = powerSpectrumEisensteinHu planck18
-        elem = Element {element = "Fe", isotope = 56}
+        elem = [Element {element = "Fe", isotope = 56},Element {element = "Si", isotope = 28}]
         sfCfg = MkStarFormationCfg {model_ia = "iwamoto99/WDD1", model_ccsn = "WW95", model_agb = "Cristallo11", model_ecsn = "Wanajo13", model_hne = "Kobayashi06"}
         ts =
           parMap rpar (\z -> cosmicTime planck18 z) zs
@@ -52,7 +52,6 @@ main =
             * (first_term (interpT planck18 z) + second_term (interpT planck18 z))
 
     mass_time <- igmIsmEvolution sfCfg planck18 pk Pereira Kroupa DoublePower Tinker Smooth Constant_HNe elem 1e6
-    igm <- mapConcurrently (\z -> snTermsIO sfCfg planck18 pk Pereira Kroupa Behroozi ST Smooth Constant_HNe (\x -> 1e-3) (\x -> 1e-3) 1e6 sfrd z elem) zs
     -- imf <- pure $ parMap rpar (\m -> normImf planck18 Kroupa m) $ logspace (-2) 2 50
     -- ccsn <- pure $ makeIntegrator P128 (ccsn_integrand 0) (mDown planck18 0)
     -- print $ parMap rpar (\z -> (makeIntegrator P512 (\m -> ccsn_integrand (interpT planck18 z) m) (mDown planck18 z) 100)) zs
