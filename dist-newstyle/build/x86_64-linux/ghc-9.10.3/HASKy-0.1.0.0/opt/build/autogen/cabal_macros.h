@@ -10,6 +10,16 @@
   (major1) == 0 && (major2) <  1 || \
   (major1) == 0 && (major2) == 1 && (minor) <= 0)
 #endif /* MIN_VERSION_HASKy */
+/* package Chart-1.9.5 */
+#ifndef VERSION_Chart
+#define VERSION_Chart "1.9.5"
+#endif /* VERSION_Chart */
+#ifndef MIN_VERSION_Chart
+#define MIN_VERSION_Chart(major1,major2,minor) (\
+  (major1) <  1 || \
+  (major1) == 1 && (major2) <  9 || \
+  (major1) == 1 && (major2) == 9 && (minor) <= 5)
+#endif /* MIN_VERSION_Chart */
 /* package GaussQuadIntegration-0.1 */
 #ifndef VERSION_GaussQuadIntegration
 #define VERSION_GaussQuadIntegration "0.1"
@@ -30,6 +40,16 @@
   (major1) == 4 && (major2) <  20 || \
   (major1) == 4 && (major2) == 20 && (minor) <= 2)
 #endif /* MIN_VERSION_base */
+/* package colour-2.3.7 */
+#ifndef VERSION_colour
+#define VERSION_colour "2.3.7"
+#endif /* VERSION_colour */
+#ifndef MIN_VERSION_colour
+#define MIN_VERSION_colour(major1,major2,minor) (\
+  (major1) <  2 || \
+  (major1) == 2 && (major2) <  3 || \
+  (major1) == 2 && (major2) == 3 && (minor) <= 7)
+#endif /* MIN_VERSION_colour */
 /* package containers-0.7 */
 #ifndef VERSION_containers
 #define VERSION_containers "0.7"
@@ -130,6 +150,16 @@
   (major1) == 0 && (major2) <  3 || \
   (major1) == 0 && (major2) == 3 && (minor) <= 21)
 #endif /* MIN_VERSION_safe */
+/* package strict-0.5.1 */
+#ifndef VERSION_strict
+#define VERSION_strict "0.5.1"
+#endif /* VERSION_strict */
+#ifndef MIN_VERSION_strict
+#define MIN_VERSION_strict(major1,major2,minor) (\
+  (major1) <  0 || \
+  (major1) == 0 && (major2) <  5 || \
+  (major1) == 0 && (major2) == 5 && (minor) <= 1)
+#endif /* MIN_VERSION_strict */
 /* package text-2.1.3 */
 #ifndef VERSION_text
 #define VERSION_text "2.1.3"

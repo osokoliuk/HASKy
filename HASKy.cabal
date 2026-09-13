@@ -82,7 +82,10 @@ library
       lens,
       dsp,
       hslogger,
-      monad-parallel
+      monad-parallel,
+      strict,
+      colour,
+      Chart
 
     -- Directories containing source files.
     hs-source-dirs:   src
@@ -111,7 +114,14 @@ executable HASKy
         parallel,
         async,
         array,
-        dsp 
+        dsp, 
+        Chart,
+        Chart-cairo,
+        colour,
+        data-default-class,
+        lens,
+        vector
+
 
     -- Directories containing source files.
     hs-source-dirs:   app

@@ -10,6 +10,26 @@
   (major1) == 0 && (major2) <  1 || \
   (major1) == 0 && (major2) == 1 && (minor) <= 0)
 #endif /* MIN_VERSION_HASKy */
+/* package Chart-1.9.5 */
+#ifndef VERSION_Chart
+#define VERSION_Chart "1.9.5"
+#endif /* VERSION_Chart */
+#ifndef MIN_VERSION_Chart
+#define MIN_VERSION_Chart(major1,major2,minor) (\
+  (major1) <  1 || \
+  (major1) == 1 && (major2) <  9 || \
+  (major1) == 1 && (major2) == 9 && (minor) <= 5)
+#endif /* MIN_VERSION_Chart */
+/* package Chart-cairo-1.9.4.1 */
+#ifndef VERSION_Chart_cairo
+#define VERSION_Chart_cairo "1.9.4.1"
+#endif /* VERSION_Chart_cairo */
+#ifndef MIN_VERSION_Chart_cairo
+#define MIN_VERSION_Chart_cairo(major1,major2,minor) (\
+  (major1) <  1 || \
+  (major1) == 1 && (major2) <  9 || \
+  (major1) == 1 && (major2) == 9 && (minor) <= 4)
+#endif /* MIN_VERSION_Chart_cairo */
 /* package HASKy-0.1.0.0 */
 #ifndef VERSION_HASKy
 #define VERSION_HASKy "0.1.0.0"
@@ -50,6 +70,26 @@
   (major1) == 4 && (major2) <  20 || \
   (major1) == 4 && (major2) == 20 && (minor) <= 2)
 #endif /* MIN_VERSION_base */
+/* package colour-2.3.7 */
+#ifndef VERSION_colour
+#define VERSION_colour "2.3.7"
+#endif /* VERSION_colour */
+#ifndef MIN_VERSION_colour
+#define MIN_VERSION_colour(major1,major2,minor) (\
+  (major1) <  2 || \
+  (major1) == 2 && (major2) <  3 || \
+  (major1) == 2 && (major2) == 3 && (minor) <= 7)
+#endif /* MIN_VERSION_colour */
+/* package data-default-class-0.2.0.0 */
+#ifndef VERSION_data_default_class
+#define VERSION_data_default_class "0.2.0.0"
+#endif /* VERSION_data_default_class */
+#ifndef MIN_VERSION_data_default_class
+#define MIN_VERSION_data_default_class(major1,major2,minor) (\
+  (major1) <  0 || \
+  (major1) == 0 && (major2) <  2 || \
+  (major1) == 0 && (major2) == 2 && (minor) <= 0)
+#endif /* MIN_VERSION_data_default_class */
 /* package directory-1.3.8.5 */
 #ifndef VERSION_directory
 #define VERSION_directory "1.3.8.5"
@@ -70,6 +110,16 @@
   (major1) == 0 && (major2) <  2 || \
   (major1) == 0 && (major2) == 2 && (minor) <= 5)
 #endif /* MIN_VERSION_dsp */
+/* package lens-5.3.6 */
+#ifndef VERSION_lens
+#define VERSION_lens "5.3.6"
+#endif /* VERSION_lens */
+#ifndef MIN_VERSION_lens
+#define MIN_VERSION_lens(major1,major2,minor) (\
+  (major1) <  5 || \
+  (major1) == 5 && (major2) <  3 || \
+  (major1) == 5 && (major2) == 3 && (minor) <= 6)
+#endif /* MIN_VERSION_lens */
 /* package parallel-3.3.0.0 */
 #ifndef VERSION_parallel
 #define VERSION_parallel "3.3.0.0"
@@ -80,6 +130,16 @@
   (major1) == 3 && (major2) <  3 || \
   (major1) == 3 && (major2) == 3 && (minor) <= 0)
 #endif /* MIN_VERSION_parallel */
+/* package vector-0.13.2.0 */
+#ifndef VERSION_vector
+#define VERSION_vector "0.13.2.0"
+#endif /* VERSION_vector */
+#ifndef MIN_VERSION_vector
+#define MIN_VERSION_vector(major1,major2,minor) (\
+  (major1) <  0 || \
+  (major1) == 0 && (major2) <  13 || \
+  (major1) == 0 && (major2) == 13 && (minor) <= 2)
+#endif /* MIN_VERSION_vector */
 
 /* tool gcc-16 */
 #ifndef TOOL_VERSION_gcc

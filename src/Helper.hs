@@ -22,6 +22,8 @@ import Control.Parallel (par, pseq)
 import Control.Parallel.Strategies (parTuple4, parTuple6, rpar, using, withStrategy)
 import Data.Bifunctor
 import Data.Char (isDigit, isSpace, toLower, toUpper)
+import Data.Colour
+import Data.Colour.SRGB (sRGB)
 import Data.Foldable (toList)
 import Data.List (dropWhileEnd, elemIndex, foldl1', isPrefixOf, transpose)
 import qualified Data.Map as M
@@ -32,6 +34,7 @@ import qualified Data.Text.IO as TIO
 import Data.Traversable (mapAccumL)
 import qualified Data.Vector as V
 import Debug.Trace
+import qualified Graphics.Rendering.Chart.Easy
 import Math.GaussianQuadratureIntegration
 import System.Directory (doesFileExist)
 import System.IO
@@ -122,7 +125,7 @@ mapTuple6 f (x1, x2, x3, x4, x5, x6) =
   withStrategy (parTuple6 rpar rpar rpar rpar rpar rpar) $
     (f x1, f x2, f x3, f x4, f x5, f x6)
 
--- | Parse SNe II yields (specifically, WW95)
+-- | Parse SNe II yields
 parseFile_II :: FilePath -> IO Table
 parseFile_II path = do
   exists <- doesFileExist path
@@ -225,7 +228,7 @@ parseFile_HNe path =
     exists <- doesFileExist path
     content <-
       if exists
-        then readFile path
+        then readFileStrict path
         else
           error $ "Incorrect file name" <> path
     let rows = parseLine <$> lines content
@@ -262,12 +265,12 @@ rk4StepHistIO f hist t h y = do
   k3 <- vecMultiply h <$> f hist (t + h / 2) (vecAdd y (vecMultiply 0.5 k2))
   k4 <- vecMultiply h <$> f hist (t + h) (vecAdd y k3)
 
-  pure $
-    vecAdd y $
-      vecMultiply (1 / 6) $
-        vecAdd k1 $
-          vecAdd (vecMultiply 2 k2) $
-            vecAdd (vecMultiply 2 k3) k4
+  pure
+    $ vecAdd y
+    $ vecMultiply (1 / 6)
+    $ vecAdd k1
+    $ vecAdd (vecMultiply 2 k2)
+    $ vecAdd (vecMultiply 2 k3) k4
 
 -- Solver that builds up the history
 rk4SolveHistIO ::
@@ -327,3 +330,20 @@ findClosestList val list =
 -- | Strict IO version of readFile, taken from https://stackoverflow.com/questions/22893168/preventing-getcurrentdirectory-resource-exhausted-too-many-open-files-error
 readFileStrict :: FilePath -> IO String
 readFileStrict = fmap T.unpack . TIO.readFile
+
+jetColors :: Int -> [AlphaColour Double]
+jetColors n =
+  [ opaque (sRGB r g b)
+  | i <- [0 .. n - 1],
+    let x = fromIntegral i / fromIntegral (n - 1)
+        (r, g, b) = jet x
+  ]
+
+jet :: Double -> (Double, Double, Double)
+jet x =
+  ( clamp (1.5 - abs (4 * x - 3)),
+    clamp (1.5 - abs (4 * x - 2)),
+    clamp (1.5 - abs (4 * x - 1))
+  )
+  where
+    clamp = max 0 . min 1
