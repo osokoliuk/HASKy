@@ -20,9 +20,8 @@ import Data.Char (toLower)
 import qualified Data.Map as M
 import Data.Maybe (fromMaybe)
 import Helper
-import Math.GaussianQuadratureIntegration
+import Lookup
 import Numeric (showFFloat)
-import System.Environment
 
 -- | Define a star formation model datatype, which includes the following:
 --    * yield_ia -> Element/Isotope yields model for SN type Ia, in [Msol]

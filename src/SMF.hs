@@ -21,11 +21,8 @@ Hubble parameter H0, Omega_m0, Omega_b0)
 
 import Control.Parallel.Strategies
 import Cosmology
-import qualified Data.Map as M
-import Data.Maybe (fromMaybe)
 import HMF
 import Helper
-import Math.GaussianQuadratureIntegration
 import Numeric.Tools.Differentiation
 
 -- As usual, specify all kinds of star formation efficiencies that we consider

@@ -20,6 +20,16 @@
   (major1) == 1 && (major2) <  9 || \
   (major1) == 1 && (major2) == 9 && (minor) <= 5)
 #endif /* MIN_VERSION_Chart */
+/* package Chart-cairo-1.9.4.1 */
+#ifndef VERSION_Chart_cairo
+#define VERSION_Chart_cairo "1.9.4.1"
+#endif /* VERSION_Chart_cairo */
+#ifndef MIN_VERSION_Chart_cairo
+#define MIN_VERSION_Chart_cairo(major1,major2,minor) (\
+  (major1) <  1 || \
+  (major1) == 1 && (major2) <  9 || \
+  (major1) == 1 && (major2) == 9 && (minor) <= 4)
+#endif /* MIN_VERSION_Chart_cairo */
 /* package GaussQuadIntegration-0.1 */
 #ifndef VERSION_GaussQuadIntegration
 #define VERSION_GaussQuadIntegration "0.1"

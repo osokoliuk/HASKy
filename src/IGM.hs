@@ -21,11 +21,9 @@ observe the chemical evolution of various metals in the IGM/ISM at various
 redshifts.
 -}
 
-import Control.Lens.Combinators (each, over)
 import Control.Monad.Parallel (forM)
 import Control.Parallel.Strategies
 import Cosmology
-import Data.Bifunctor
 import Data.List (elemIndex, transpose)
 import qualified Data.Map as M
 import Data.Maybe (fromJust)
@@ -34,7 +32,6 @@ import Debug.Trace
 import HMF
 import Helper
 import Lookup
-import Math.GaussianQuadratureIntegration
 import SMF
 import StarFormation
 
@@ -703,13 +700,15 @@ igmIsmEvolution sfCfg cosmology@MkCosmology {h0, om0, ob0, gn} pk rKind iKind sK
               0,
               0,
               iniAbundance hydrogenElement,
+              iniAbundance hydrogenElement,
+              iniAbundance heliumElement,
               iniAbundance heliumElement
             ]
               ++ isotopeInitialConditions elem
 
         -- For a specific isotope, extract ISM/IGM fractions from the total solver state
         isotopeState :: V.Vector Double -> Int -> (Double, Double)
-        isotopeState y i = (y V.! (4 + 2 * i), y V.! (4 + 2 * i + 1))
+        isotopeState y i = (y V.! (8 + 2 * i), y V.! (8 + 2 * i + 1))
 
         -- Convert Differential-Algebraic system into a system of ODEs
         odeSystem :: History -> Double -> V.Vector Double -> IO (V.Vector Double)
@@ -826,12 +825,13 @@ igmIsmEvolution sfCfg cosmology@MkCosmology {h0, om0, ob0, gn} pk rKind iKind sK
     traceM $ "SFRD      = " ++ show (interpSFRD zMin)
 
     -- M_star = rho_tot - M_IGM - M_ISM - ejecta from the conservation equation
+    -- Z = 1 - X - Y(metallicity vectors are added at the very end)
     -- In addition, we also normalise each mass by the total mass
     let (times, masses) = unzip zippedHistory
         result =
           ( \v ->
-              V.zipWith ($) (V.fromList $ [(/ mTot), (/ mTot), (/ 1), (/ 1)] ++ concat [[(/ 1), (/ 1)] | _ <- elem]) $
-                V.snoc v (mTot - v V.! 0 - v V.! 1)
+              V.zipWith ($) (V.fromList $ [(/ mTot), (/ mTot), (/ 1), (/ 1), (/ 1), (/ 1), (/ 1), (/ 1)] ++ concat [[(/ 1), (/ 1)] | _ <- elem] ++ [(/ mTot), (/ 1), (/ 1)]) $
+                v V.++ V.fromList [mTot - v V.! 0 - v V.! 1 - v V.! 3, 1 - v V.! 5 - v V.! 7, 1 - v V.! 4 - v V.! 6]
           )
             <$> masses
     return (times, interpZ cosmology <$> times, result)

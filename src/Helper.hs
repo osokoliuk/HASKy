@@ -15,30 +15,16 @@ A module that defines lots of functions to be used by other modules.
 Kind of useless by itself.
 -}
 
-import Control.Applicative (liftA2)
-import Control.Monad (unless)
-import Control.Monad.State
-import Control.Parallel (par, pseq)
 import Control.Parallel.Strategies (parTuple4, parTuple6, rpar, using, withStrategy)
-import Data.Bifunctor
 import Data.Char (isDigit, isSpace, toLower, toUpper)
 import Data.Colour
 import Data.Colour.SRGB (sRGB)
-import Data.Foldable (toList)
-import Data.List (dropWhileEnd, elemIndex, foldl1', isPrefixOf, transpose)
+import Data.List (elemIndex, foldl1')
 import qualified Data.Map as M
-import qualified Data.Map.Strict as M'
-import Data.Maybe (fromMaybe, mapMaybe)
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
-import Data.Traversable (mapAccumL)
 import qualified Data.Vector as V
-import Debug.Trace
-import qualified Graphics.Rendering.Chart.Easy
 import Math.GaussianQuadratureIntegration
-import System.Directory (doesFileExist)
-import System.IO
-import Text.Read (readMaybe)
 
 -- Data type that describes the precision that you want to achieve with the
 -- Gaussian quadrature integration, the only plausible choices are:
@@ -99,8 +85,10 @@ log10 x = log x / log 10
 
 -- | Helper function to linearly interpolate power spectrum
 -- Taken from the https://cmears.id.au/articles/linear-interpolation.html
+extrapolate :: (Fractional a, Num a) => a -> [a] -> [a] -> a
 extrapolate x [y1, y2] [x1, x2] = y1 + (x - x1) / (x2 - x1) * (y2 - y1)
 
+interpolate :: (Fractional a, Num a) => (a, a) -> (a, a) -> a -> a
 interpolate (a, av) (b, bv) x = av + (x - a) * (bv - av) / (b - a)
 
 mapLookup :: M.Map Double Double -> Double -> Double
@@ -124,123 +112,6 @@ mapTuple6 :: (a -> b) -> (a, a, a, a, a, a) -> (b, b, b, b, b, b)
 mapTuple6 f (x1, x2, x3, x4, x5, x6) =
   withStrategy (parTuple6 rpar rpar rpar rpar rpar rpar) $
     (f x1, f x2, f x3, f x4, f x5, f x6)
-
--- | Parse SNe II yields
-parseFile_II :: FilePath -> IO Table
-parseFile_II path = do
-  exists <- doesFileExist path
-  if not exists
-    then do
-      traceM "CCSN yield parsing failed for the chosen element"
-      pure $ Table [0.0] [(Element "H" 1, [0.0])]
-    else do
-      content <- readFileStrict path
-      let ls = lines content
-      case ls of
-        (_ : headerLine : _ : rows) -> do
-          let headerWords = words headerLine
-          case headerWords of
-            "#" : "M_init" : elems -> do
-              let tableRows = map words rows
-                  cols = transpose tableRows
-
-              unless (length cols >= 1 + length elems) $
-                error "Not enough columns for all elements"
-
-              let massCols = map read (head cols)
-                  elemCols = map (map read) (tail cols)
-                  namedCols = zip (map read elems :: [Element]) elemCols
-
-              pure $ Table massCols namedCols
-            _ -> error "Invalid header format"
-        _ -> error "File too short"
-
--- | Parse SNe Ia yields
-parseFile_Ia_Helper :: [String] -> M.Map String Double
-parseFile_Ia_Helper contents =
-  M.fromList (mapMaybe parseLine contents)
-  where
-    parseLine line
-      | null line = Nothing
-      | "#" `isPrefixOf` line = Nothing
-      | otherwise = case words line of
-          [iso, valStr] -> case readMaybe valStr of
-            Just val -> Just (iso, val)
-            Nothing -> Nothing
-          _ -> Nothing
-
-parseFile_Ia :: FilePath -> String -> IO Double
-parseFile_Ia path isotope =
-  do
-    exists <- doesFileExist path
-    content <-
-      if exists
-        then
-          readFileStrict path
-        else
-          trace
-            "SN Ia yield parsing failed for the chosen element \n"
-            return
-            ""
-    let ls = lines content
-        isoMap = parseFile_Ia_Helper ls
-    return $ fromMaybe 0 (M.lookup isotope isoMap)
-
--- | Parse AGB yields
-parseFile_AGB :: FilePath -> IO ([Double], [Double])
-parseFile_AGB path = do
-  exists <- doesFileExist path
-  content <- if exists then readFileStrict path else pure ""
-  let cols = transpose (words <$> lines content)
-  result <-
-    if null cols
-      then
-        trace
-          "AGB yield parsing failed for the chosen element \n"
-          pure
-          ([0.0], [0.0])
-      else
-        let massCols = read <$> (cols !! 0)
-            yieldCols = read <$> (cols !! 1)
-         in pure (massCols, yieldCols)
-  return result
-
-parseFile_ECSN :: FilePath -> IO (M.Map String Double)
-parseFile_ECSN path =
-  do
-    exists <- doesFileExist path
-    content <-
-      if exists
-        then readFileStrict path
-        else
-          error $ "Incorrect file name" <> path
-    let cols = parseLine <$> lines content
-    return $ M.fromList cols
-  where
-    parseLine line =
-      case words line of
-        [elem, yield] -> (elem, read yield)
-        _ -> error $ "Invalid entry at line:" ++ line
-
-parseFile_HNe :: FilePath -> IO (M.Map String [Double])
-parseFile_HNe path =
-  do
-    exists <- doesFileExist path
-    content <-
-      if exists
-        then readFileStrict path
-        else
-          error $ "Incorrect file name" <> path
-    let rows = parseLine <$> lines content
-    return $ M.fromList rows
-  where
-    parseLine line =
-      case words line of
-        [elem, y1, y2, y3, y4] -> (elem, read <$> [y1, y2, y3, y4])
-        _ ->
-          trace
-            "No HNe entry"
-            ("h1", [0.0, 0.0, 0.0, 0.0])
 
 type History = [(Double, V.Vector Double)]
 

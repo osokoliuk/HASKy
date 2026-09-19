@@ -2,6 +2,7 @@
 
 module Lookup where
 
+import Control.Monad (unless)
 {-
 Module      : HASKy.Lookup
 Description : Lookup tables
@@ -14,16 +15,136 @@ Portability : portable
 This module stores all of the lookup tables used in the code.
 -}
 
-import Data.Bifunctor
-import Data.Char (toLower)
-import Data.Data
+import Data.List (isPrefixOf, transpose)
 import Data.Map (fromList)
 import qualified Data.Map as M
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, mapMaybe)
+import Debug.Trace
 import Helper
-import Text.Read (Read (..))
+import System.Directory (doesFileExist)
+import Text.Read
+  ( Read (..),
+    readMaybe,
+  )
 
 type Metallicity = Double -> Double
+
+-- | Parse SNe II yields
+parseFile_II :: FilePath -> IO Table
+parseFile_II path = do
+  exists <- doesFileExist path
+  if not exists
+    then do
+      traceM "CCSN yield parsing failed for the chosen element"
+      pure $ Table [0.0] [(Element "H" 1, [0.0])]
+    else do
+      content <- readFileStrict path
+      let ls = lines content
+      case ls of
+        (_ : headerLine : _ : rows) -> do
+          let headerWords = words headerLine
+          case headerWords of
+            "#" : "M_init" : elems -> do
+              let tableRows = map words rows
+                  cols = transpose tableRows
+
+              unless (length cols >= 1 + length elems) $
+                error "Not enough columns for all elements"
+
+              let massCols = map read (head cols)
+                  elemCols = map (map read) (tail cols)
+                  namedCols = zip (map read elems :: [Element]) elemCols
+
+              pure $ Table massCols namedCols
+            _ -> error "Invalid header format"
+        _ -> error "File too short"
+
+-- | Parse SNe Ia yields
+parseFile_Ia_Helper :: [String] -> M.Map String Double
+parseFile_Ia_Helper contents =
+  M.fromList (mapMaybe parseLine contents)
+  where
+    parseLine line
+      | null line = Nothing
+      | "#" `isPrefixOf` line = Nothing
+      | otherwise = case words line of
+          [iso, valStr] -> case readMaybe valStr of
+            Just val -> Just (iso, val)
+            Nothing -> Nothing
+          _ -> Nothing
+
+parseFile_Ia :: FilePath -> String -> IO Double
+parseFile_Ia path isotope =
+  do
+    exists <- doesFileExist path
+    content <-
+      if exists
+        then
+          readFileStrict path
+        else
+          trace
+            "SN Ia yield parsing failed for the chosen element \n"
+            return
+            ""
+    let ls = lines content
+        isoMap = parseFile_Ia_Helper ls
+    return $ fromMaybe 0 (M.lookup isotope isoMap)
+
+-- | Parse AGB yields
+parseFile_AGB :: FilePath -> IO ([Double], [Double])
+parseFile_AGB path = do
+  exists <- doesFileExist path
+  content <- if exists then readFileStrict path else pure ""
+  let cols = transpose (words <$> lines content)
+  result <-
+    if null cols
+      then
+        trace
+          "AGB yield parsing failed for the chosen element \n"
+          pure
+          ([0.0], [0.0])
+      else
+        let massCols = read <$> (cols !! 0)
+            yieldCols = read <$> (cols !! 1)
+         in pure (massCols, yieldCols)
+  return result
+
+parseFile_ECSN :: FilePath -> IO (M.Map String Double)
+parseFile_ECSN path =
+  do
+    exists <- doesFileExist path
+    content <-
+      if exists
+        then readFileStrict path
+        else
+          error $ "Incorrect file name" <> path
+    let cols = parseLine <$> lines content
+    return $ M.fromList cols
+  where
+    parseLine line =
+      case words line of
+        [elem, yield] -> (elem, read yield)
+        _ -> error $ "Invalid entry at line:" ++ line
+
+parseFile_HNe :: FilePath -> IO (M.Map String [Double])
+parseFile_HNe path =
+  do
+    exists <- doesFileExist path
+    content <-
+      if exists
+        then readFileStrict path
+        else
+          error $ "Incorrect file name" <> path
+    let rows = parseLine <$> lines content
+    return $ M.fromList rows
+  where
+    parseLine line =
+      case words line of
+        [elem, y1, y2, y3, y4] -> (elem, read <$> [y1, y2, y3, y4])
+        _ ->
+          trace
+            "No HNe entry"
+            ("h1", [0.0, 0.0, 0.0, 0.0])
 
 -- | Stellar remnant mass for a white dwarf, taken from the [Hoek & Groenewegen 1996]
 remnantMediumMass :: Double -> M.Map Double Double

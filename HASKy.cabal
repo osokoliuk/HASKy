@@ -59,7 +59,7 @@ library
     import:           warnings
 
     -- Modules exported by the library.
-    exposed-modules: Helper, Lookup, Cosmology, HMF, SMF, IGM, Pk, StarFormation
+    exposed-modules: Helper, Lookup, Graphs, Cosmology, HMF, SMF, IGM, Pk, StarFormation
 
     -- Modules included in this library but not exported.
     -- other-modules:
@@ -85,7 +85,8 @@ library
       monad-parallel,
       strict,
       colour,
-      Chart
+      Chart,
+      Chart-cairo
 
     -- Directories containing source files.
     hs-source-dirs:   src

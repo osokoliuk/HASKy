@@ -2,7 +2,6 @@
 
 module Pk where
 
-import Control.Parallel.Strategies
 import Cosmology
 import HMF
 import Helper
