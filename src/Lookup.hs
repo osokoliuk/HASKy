@@ -19,6 +19,7 @@ import Data.List (isPrefixOf, transpose)
 import Data.Map (fromList)
 import qualified Data.Map as M
 import Data.Maybe (fromMaybe, mapMaybe)
+import qualified Data.Vector as V
 import Debug.Trace
 import Helper
 import System.Directory (doesFileExist)
@@ -143,8 +144,40 @@ parseFile_HNe path =
         [elem, y1, y2, y3, y4] -> (elem, read <$> [y1, y2, y3, y4])
         _ ->
           trace
-            "No HNe entry"
+            "No MRSNe entry"
             ("h1", [0.0, 0.0, 0.0, 0.0])
+
+parseElements_MRSNe :: FilePath -> IO ([String])
+parseElements_MRSNe path =
+  do
+    exists <- doesFileExist path
+    content <-
+      if exists
+        then readFileStrict path
+        else
+          error $ "Incorrect file name" <> path
+    let rows = parseLine <$> lines content
+        elements = replicate (length rows) (\x -> fst x) <*> rows
+    return elements
+  where
+    parseLine line =
+      case words line of
+        [elem, y1, y2, y3, y4, y5] -> (elem, read <$> [y1, y2, y3, y4, y5])
+        _ ->
+          trace
+            "No MRSNe entry"
+            ("h1", [1, 1, 1, 0.0, 0.0])
+
+parseFileColumns :: FilePath -> IO (V.Vector [String])
+parseFileColumns path =
+  do
+    exists <- doesFileExist path
+    content <-
+      if exists
+        then readFileStrict path
+        else
+          error $ "Incorrect file name" <> path
+    return $ V.fromList $ transpose [if '#' `elem` i then [] else words i | i <- lines content]
 
 -- | Stellar remnant mass for a white dwarf, taken from the [Hoek & Groenewegen 1996]
 remnantMediumMass :: Double -> M.Map Double Double

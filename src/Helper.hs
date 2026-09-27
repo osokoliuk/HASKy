@@ -19,7 +19,7 @@ import Control.Parallel.Strategies (parTuple4, parTuple6, rpar, using, withStrat
 import Data.Char (isDigit, isSpace, toLower, toUpper)
 import Data.Colour
 import Data.Colour.SRGB (sRGB)
-import Data.List (elemIndex, foldl1')
+import Data.List (elemIndex, foldl1', group, sort)
 import qualified Data.Map as M
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
@@ -218,3 +218,7 @@ jet x =
   )
   where
     clamp = max 0 . min 1
+
+-- | Remove duplicates from a list, taken from https://stackoverflow.com/questions/16108714/removing-duplicates-from-a-list-in-haskell-without-elem
+removeDuplicates :: (Ord a) => [a] -> [a]
+removeDuplicates = map head . group . sort

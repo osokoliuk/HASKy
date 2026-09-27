@@ -4,6 +4,7 @@ module Main where
 
 import Control.Concurrent.Async (mapConcurrently)
 import Control.Lens
+import Control.Monad (when)
 import Control.Parallel.Strategies
 import Cosmology
 import DSP.Basic (logspace)
@@ -24,7 +25,10 @@ import Lookup
 import Pk
 import SMF
 import StarFormation
-import System.Directory (doesFileExist)
+import System.Directory
+  ( doesFileExist,
+    removeFile,
+  )
 
 args :: [Double]
 args = []
@@ -43,11 +47,11 @@ main = do
       NovaeParams {..} = novae
       ECSNParams {..} = ecsn
 
-  (times, redshifts, abundances) <- igmIsmEvolution sfCfg planck18 pk Pereira Kroupa DoublePower Tinker Smooth Constant_HNe elem 1e6
-  print (length $ head abundances)
+  parsed <- parseFileColumns "data/CCSN/WW95/z0001/al.dat"
+  print parsed
 
-  plotMassFractions times abundances "igmism.png"
+-- (times, redshifts, chosenIsotopes, abundances) <- igmIsmEvolution sfCfg planck18 pk Pereira Kroupa DoublePower Tinker Smooth Constant_HNe elem mHaloMin
 
-  plotIsotopeAbundances times abundances elem "abundances.png"
-
-  plotMetallicity times abundances "metallicities.png"
+-- plotMassFractions times abundances "igmism.png"
+-- plotIsotopeAbundances times abundances chosenIsotopes "abundances.png"
+-- plotMetallicity times abundances "metallicities.png"

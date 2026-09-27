@@ -24,7 +24,7 @@ redshifts.
 import Control.Monad.Parallel (forM)
 import Control.Parallel.Strategies
 import Cosmology
-import Data.List (elemIndex, transpose)
+import Data.List (elemIndex, groupBy, transpose)
 import qualified Data.Map as M
 import Data.Maybe (fromJust)
 import qualified Data.Vector as V
@@ -665,6 +665,22 @@ isotopeInitialConditions :: [Element] -> [Double]
 isotopeInitialConditions =
   foldr ((++) . (\x -> [iniAbundance x, iniAbundance x])) []
 
+-- | Check if two isotopes are of the same element
+isotopeEquality :: Element -> Element -> Bool
+isotopeEquality e1 e2 = element e1 == element e2
+
+-- For a specific isotope, extract ISM/IGM fractions from the total solver state
+isotopeState :: V.Vector Double -> Int -> (Double, Double)
+isotopeState y i = (y V.! (8 + 2 * i), y V.! (8 + 2 * i + 1))
+
+-- Now create a set of coupled differential equations for each isotope
+isotopeDerivative :: V.Vector Double -> Double -> Double -> Redshift -> (Double -> Double) -> Int -> (Double, Double, Double, Double, Double, Double) -> [Double]
+isotopeDerivative y rhoIGM rhoISM z interpMAR i (e_tot, e_tot_Element, o_SNe, o_Wind, o_SNe_Element, o_tot) =
+  let (xiISM, xiIGM) = isotopeState y i
+      dXIGM = (o_Wind * (xiISM - xiIGM) + (o_SNe_Element - o_SNe * xiIGM)) / rhoIGM
+      dXISM = (e_tot_Element - e_tot * xiISM + interpMAR z * (xiIGM - xiISM) - (o_SNe_Element - o_SNe * xiISM)) / rhoISM
+   in [dXIGM, dXISM]
+
 -- | Solve four coupled first-order differential equations that govern the evolution of:
 --    * rho_IGM (1)
 --    * rho_ISM (3)
@@ -672,15 +688,21 @@ isotopeInitialConditions =
 --    * Xi_ISM  (5)
 -- with all equations being taken from the [Daigne et al. 2004]
 {-# INLINE igmIsmEvolution #-}
-igmIsmEvolution :: ReferenceStarFormationConfig -> ReferenceCosmology -> PowerSpectrum -> RemnantKind -> IMFKind -> SMFKind -> HMFKind -> WKind -> HNeKind -> [Element] -> Mhalo -> IO ([Double], [Double], [V.Vector Double])
+igmIsmEvolution :: ReferenceStarFormationConfig -> ReferenceCosmology -> PowerSpectrum -> RemnantKind -> IMFKind -> SMFKind -> HMFKind -> WKind -> HNeKind -> [String] -> Mhalo -> IO ([Double], [Double], [Element], [V.Vector Double])
 igmIsmEvolution sfCfg cosmology@MkCosmology {h0, om0, ob0, gn} pk rKind iKind sKind hKind wKind hneKind elem mh_min =
   do
+    allowedIsotopesFile <- readFileStrict "data/isotopes.dat"
     let -- Constructing stellar yields datatype as a function of metallicity of ISM and given isotope
         IGMParams {..} = defaultIGMParams
         PhysicalConstants {..} = phys
         mar = parMap rpar (\z -> 1e9 * baryonFormationRateDensity cosmology pk hKind wKind z mh_min) zs
         sfrd = parMap rpar (\z -> 1e9 * starFormationRateDensity cosmology pk sKind hKind wKind z mh_min) zs
         rhoOb = 2.77 * 1e11 * ob0 * (h0 / 100) ** 2
+
+        -- Choose all of the isotopes for the user-specified elements
+        allowedIsotopes = read <$> (read allowedIsotopesFile) :: [Element]
+        groupedIsotopes = groupBy isotopeEquality $ allowedIsotopes
+        chosenIsotopes = removeDuplicates . concat $ [if any (e ==) (element <$> xs) then xs else [] | xs <- groupedIsotopes, e <- elem]
 
         -- Unpack outflow/inflow rates and interpolate over our redshift range
         (interpMAR, interpSFRD) = (makeInterp zs mar, makeInterp zs sfrd)
@@ -704,11 +726,7 @@ igmIsmEvolution sfCfg cosmology@MkCosmology {h0, om0, ob0, gn} pk rKind iKind sK
               iniAbundance heliumElement,
               iniAbundance heliumElement
             ]
-              ++ isotopeInitialConditions elem
-
-        -- For a specific isotope, extract ISM/IGM fractions from the total solver state
-        isotopeState :: V.Vector Double -> Int -> (Double, Double)
-        isotopeState y i = (y V.! (8 + 2 * i), y V.! (8 + 2 * i + 1))
+              ++ isotopeInitialConditions chosenIsotopes
 
         -- Convert Differential-Algebraic system into a system of ODEs
         odeSystem :: History -> Double -> V.Vector Double -> IO (V.Vector Double)
@@ -748,11 +766,11 @@ igmIsmEvolution sfCfg cosmology@MkCosmology {h0, om0, ob0, gn} pk rKind iKind sK
                   then 0
                   else (makeInterp times xis_He) t'
 
-          isotopeTerms <- forM elem $ \x -> do
+          isotopeTerms <- forM chosenIsotopes $ \x -> do
             let -- Separately calculate ISM fraction of each metal that is being considered
                 (_, xis) =
                   unzip $
-                    [(t', xis) | (t', v) <- history, V.length v > 3, let xis = (v V.! (4 + 1 + 2 * fromJust (elemIndex x elem)))]
+                    [(t', xis) | (t', v) <- history, V.length v > 3, let xis = (v V.! (4 + 1 + 2 * fromJust (elemIndex x chosenIsotopes)))]
                 interpXiISM t' =
                   if length times < 1
                     then 0
@@ -773,23 +791,17 @@ igmIsmEvolution sfCfg cosmology@MkCosmology {h0, om0, ob0, gn} pk rKind iKind sK
           traceM $ "o_SNe_H      = " ++ show o_SNe_H
           traceM $ "o_SNe_He     = " ++ show o_SNe_He
           traceM $ "o_Wind       = " ++ show o_Wind
+          traceM $ "MAR       = " ++ show (interpMAR z)
+          traceM $ "SFRD      = " ++ show (interpSFRD z)
 
           let o_tot_H = o_Wind * xiISM_H + o_SNe_H
               o_tot_He = o_Wind * xiISM_He + o_SNe_He
-
-              -- Now create a set of coupled differential equations for each isotope
-              isotopeDerivative :: V.Vector Double -> Int -> (Double, Double, Double, Double, Double, Double) -> [Double]
-              isotopeDerivative y i (e_tot, e_tot_Element, o_SNe, o_Wind, o_SNe_Element, o_tot) =
-                let (xiISM, xiIGM) = isotopeState y i
-                    dXIGM = (o_Wind * (xiISM - xiIGM) + (o_SNe_Element - o_SNe * xiIGM)) / rhoIGM
-                    dXISM = (e_tot_Element - e_tot * xiISM + interpMAR z * (xiIGM - xiISM) - (o_SNe_Element - o_SNe * xiISM)) / rhoISM
-                 in [dXIGM, dXISM]
 
               -- Create a set of dXISM, dXIGM for all of the isotopes being considered
               isotopeDerivatives =
                 concat $
                   zipWith
-                    (isotopeDerivative y)
+                    (isotopeDerivative y rhoIGM rhoISM z interpMAR)
                     [0 ..]
                     isotopeTerms
 
@@ -821,8 +833,6 @@ igmIsmEvolution sfCfg cosmology@MkCosmology {h0, om0, ob0, gn} pk rKind iKind sK
 
     -- Debug output
     traceM $ "rhoBaryon = " ++ show rhoOb
-    traceM $ "MAR       = " ++ show (interpMAR zMin)
-    traceM $ "SFRD      = " ++ show (interpSFRD zMin)
 
     -- M_star = rho_tot - M_IGM - M_ISM - ejecta from the conservation equation
     -- Z = 1 - X - Y(metallicity vectors are added at the very end)
@@ -830,35 +840,8 @@ igmIsmEvolution sfCfg cosmology@MkCosmology {h0, om0, ob0, gn} pk rKind iKind sK
     let (times, masses) = unzip zippedHistory
         result =
           ( \v ->
-              V.zipWith ($) (V.fromList $ [(/ mTot), (/ mTot), (/ 1), (/ 1), (/ 1), (/ 1), (/ 1), (/ 1)] ++ concat [[(/ 1), (/ 1)] | _ <- elem] ++ [(/ mTot), (/ 1), (/ 1)]) $
+              V.zipWith ($) (V.fromList $ [(/ mTot), (/ mTot), (/ 1), (/ 1), (/ 1), (/ 1), (/ 1), (/ 1)] ++ concat [[(/ 1), (/ 1)] | _ <- chosenIsotopes] ++ [(/ mTot), (/ 1), (/ 1)]) $
                 v V.++ V.fromList [mTot - v V.! 0 - v V.! 1 - v V.! 3, 1 - v V.! 5 - v V.! 7, 1 - v V.! 4 - v V.! 6]
           )
             <$> masses
-    return (times, interpZ cosmology <$> times, result)
-
-{-
--- \| Derive the metallicity of the IGM/ISM from outflow/inflow rates of metals,
--- currently using an approach presented in [Tan et al. 2018]
-{-# INLINE igmIsmMetallicity #-}
-igmIsmMetallicity ::
-  ReferenceCosmology ->
-  PowerSpectrum ->
-  RemnantKind ->
-  IMFKind ->
-  SMFKind ->
-  HMFKind ->
-  WKind ->
-  Mhalo ->
-  ([Double], [Double], [Double])
-igmIsmMetallicity cosmology pk rKind iKind sKind hKind wKind yield_ii yield_ia yield_nsm mh_min =
-  let elem = Element "H" 1
-
-      (times, densities) =
-        bimap id (transpose . (fmap V.toList)) $
-          igmIsmEvolution cosmology pk rKind iKind sKind hKind wKind yield_ii yield_ia yield_nsm elem mh_min
-
-      result_igm = zipWith (/) (densities !! 5) (densities !! 0)
-      result_ism = zipWith (/) (densities !! 4) (densities !! 1)
-   in (times, result_igm, result_ism)
-
--}
+    return (times, interpZ cosmology <$> times, chosenIsotopes, result)

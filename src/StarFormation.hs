@@ -89,7 +89,8 @@ data MassLimits = MassLimits
     mAGBd :: Double,
     mAGBu :: Double,
     mECSNd :: Double,
-    mECSNu :: Double
+    mECSNu :: Double,
+    mHaloMin :: Double
   }
 
 data Efficiencies = Efficiencies
@@ -156,7 +157,8 @@ defaultIGMParams =
             mAGBd = 1.3,
             mAGBu = 8.0,
             mECSNd = 8.8,
-            mECSNu = 9.0
+            mECSNu = 9.0,
+            mHaloMin = 1e6
           },
       effs =
         Efficiencies
