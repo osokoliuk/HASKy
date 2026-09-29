@@ -74,6 +74,13 @@ data EjectaOutflow a
   }
   deriving (Eq, Show, Read, Functor)
 
+data IsotopeInformation a
+  = MkIsotopeInformation
+  { igmFraction :: a,
+    ismFraction :: a
+  }
+  deriving (Eq, Show, Read)
+
 -- | Models for the Initial Mass Function:
 --  * Single power-law [Salpeter et al. 1995]
 --  * Broken power-law [Kroupa et al. 2001]
@@ -688,10 +695,10 @@ isotopeDerivative y rhoIGM rhoISM z interpMAR i (e_tot, e_tot_Element, o_SNe, o_
 --    * Xi_ISM  (5)
 -- with all equations being taken from the [Daigne et al. 2004]
 {-# INLINE igmIsmEvolution #-}
-igmIsmEvolution :: ReferenceStarFormationConfig -> ReferenceCosmology -> PowerSpectrum -> RemnantKind -> IMFKind -> SMFKind -> HMFKind -> WKind -> HNeKind -> [String] -> Mhalo -> IO ([Double], [Double], [Element], [V.Vector Double])
+igmIsmEvolution :: ReferenceStarFormationConfig -> ReferenceCosmology -> PowerSpectrum -> RemnantKind -> IMFKind -> SMFKind -> HMFKind -> WKind -> HNeKind -> [String] -> Mhalo -> IO ([Double], [Double], [Element], [V.Vector Double], M.Map Element (IsotopeInformation [Double]))
 igmIsmEvolution sfCfg cosmology@MkCosmology {h0, om0, ob0, gn} pk rKind iKind sKind hKind wKind hneKind elem mh_min =
   do
-    allowedIsotopesFile <- readFileStrict "data/isotopes.dat"
+    allowedIsotopesVector <- parseFileColumns "data/isotopes.txt"
     let -- Constructing stellar yields datatype as a function of metallicity of ISM and given isotope
         IGMParams {..} = defaultIGMParams
         PhysicalConstants {..} = phys
@@ -700,7 +707,7 @@ igmIsmEvolution sfCfg cosmology@MkCosmology {h0, om0, ob0, gn} pk rKind iKind sK
         rhoOb = 2.77 * 1e11 * ob0 * (h0 / 100) ** 2
 
         -- Choose all of the isotopes for the user-specified elements
-        allowedIsotopes = read <$> (read allowedIsotopesFile) :: [Element]
+        allowedIsotopes = read <$> (allowedIsotopesVector V.! 0) :: [Element]
         groupedIsotopes = groupBy isotopeEquality $ allowedIsotopes
         chosenIsotopes = removeDuplicates . concat $ [if any (e ==) (element <$> xs) then xs else [] | xs <- groupedIsotopes, e <- elem]
 
@@ -713,7 +720,7 @@ igmIsmEvolution sfCfg cosmology@MkCosmology {h0, om0, ob0, gn} pk rKind iKind sK
         -- Finally, we also adopt the BBN abundances for H (He),
         -- such that the ICs for Xi_ISM/Xi_IGM = 0.76 (0.24) * M_ISM/M_IGM.
         (nSteps, tInit, aInit, mTot, hydrogenElement, heliumElement) =
-          (100 :: Int, interpT cosmology zMax, 0.01, rhoOb, Element {element = "H", isotope = 1}, Element {element = "He", isotope = 2})
+          (100 :: Int, interpT cosmology zMax, 0.01, rhoOb, Element {element = "H", isotope = 1}, Element {element = "He", isotope = 4})
 
         initialState =
           V.fromList $
@@ -834,14 +841,33 @@ igmIsmEvolution sfCfg cosmology@MkCosmology {h0, om0, ob0, gn} pk rKind iKind sK
     -- Debug output
     traceM $ "rhoBaryon = " ++ show rhoOb
 
-    -- M_star = rho_tot - M_IGM - M_ISM - ejecta from the conservation equation
-    -- Z = 1 - X - Y(metallicity vectors are added at the very end)
-    -- In addition, we also normalise each mass by the total mass
     let (times, masses) = unzip zippedHistory
+        -- Vector with IGM/ISM/Star masses, ejecta/outflow masses and hydrogen/helium mass fractions
+        -- along with the metallicities
+        -- M_star = rho_tot - M_IGM - M_ISM - ejecta from the conservation equation
+        -- Z = 1 - X - Y (metallicity vectors are added at the very end)
+        -- In addition, we also normalise each mass by the total mass
         result =
           ( \v ->
-              V.zipWith ($) (V.fromList $ [(/ mTot), (/ mTot), (/ 1), (/ 1), (/ 1), (/ 1), (/ 1), (/ 1)] ++ concat [[(/ 1), (/ 1)] | _ <- chosenIsotopes] ++ [(/ mTot), (/ 1), (/ 1)]) $
+              V.zipWith ($) (V.fromList $ [(/ mTot), (/ mTot), (/ 1), (/ 1), (/ 1), (/ 1), (/ 1), (/ 1), (/ mTot), (/ 1), (/ 1)]) $
                 v V.++ V.fromList [mTot - v V.! 0 - v V.! 1 - v V.! 3, 1 - v V.! 5 - v V.! 7, 1 - v V.! 4 - v V.! 6]
           )
-            <$> masses
-    return (times, interpZ cosmology <$> times, chosenIsotopes, result)
+            <$> [masses !! i | i <- [0 .. 7]]
+
+        -- List containing all of the isotope abundance history
+        resultIsotopes isotopes abundances = go (length isotopes - 1) []
+          where
+            go i isotopeHistoryMap
+              | i >= 0 =
+                  go (i - 1) $
+                    isotopeHistoryMap
+                      ++ [ ( isotopes !! i,
+                             MkIsotopeInformation
+                               { igmFraction = abundances !! (8 + 2 * i),
+                                 ismFraction = abundances !! (9 + 2 * i)
+                               }
+                           )
+                         ]
+              | otherwise = isotopeHistoryMap
+
+    return (times, interpZ cosmology <$> times, chosenIsotopes, result, M.fromList $ resultIsotopes chosenIsotopes (transpose $ V.toList <$> masses))

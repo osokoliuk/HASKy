@@ -37,7 +37,7 @@ main :: IO ()
 main = do
   -- Fix this interpolation later, this code is not prod ready...
   let pk = powerSpectrumEisensteinHu planck18
-      elem = [Element {element = "Fe", isotope = 56}, Element {element = "Si", isotope = 28}, Element {element = "C", isotope = 12}, Element {element = "O", isotope = 16}]
+      elem = ["H", "Fe", "Si"]
       sfCfg = MkStarFormationCfg {model_ia = "iwamoto99/WDD1", model_ccsn = "WW95", model_agb = "Cristallo11", model_ecsn = "Wanajo13", model_hne = "Kobayashi06"}
       IGMParams {..} = defaultIGMParams
       PhysicalConstants {..} = phys
@@ -47,10 +47,11 @@ main = do
       NovaeParams {..} = novae
       ECSNParams {..} = ecsn
 
-  parsed <- parseFileColumns "data/CCSN/WW95/z0001/al.dat"
-  print parsed
+  -- parsed <- parseFileColumns "data/CCSN/WW95/z0001/al.dat"
+  -- print parsed
 
--- (times, redshifts, chosenIsotopes, abundances) <- igmIsmEvolution sfCfg planck18 pk Pereira Kroupa DoublePower Tinker Smooth Constant_HNe elem mHaloMin
+  (times, redshifts, chosenIsotopes, abundances, abundancesIsotopes) <- igmIsmEvolution sfCfg planck18 pk Pereira Kroupa DoublePower Tinker Smooth Constant_HNe elem mHaloMin
+  print abundancesIsotopes
 
 -- plotMassFractions times abundances "igmism.png"
 -- plotIsotopeAbundances times abundances chosenIsotopes "abundances.png"
