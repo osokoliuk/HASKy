@@ -36,164 +36,176 @@ import SMF
 import StarFormation
 
 data IMFKind
-  = Salpeter
-  | Kroupa
-  | Chabrier
-  | SN_Ia
-  deriving (Eq, Show, Read)
+    = Salpeter
+    | Kroupa
+    | Chabrier
+    | SN_Ia
+    deriving (Eq, Show, Read)
 
 data RemnantKind
-  = Pereira
-  | WoosleyWeaver
-  deriving (Eq, Show, Read)
+    = Pereira
+    | WoosleyWeaver
+    deriving (Eq, Show, Read)
 
 data HNeKind
-  = Constant_HNe
-  | Grimmett
-  deriving (Eq, Show, Read)
+    = Constant_HNe
+    | Grimmett
+    deriving (Eq, Show, Read)
 
 data PNSKind
-  = Arcones
-  deriving (Eq, Show, Read)
+    = Arcones
+    deriving (Eq, Show, Read)
 
 data EjectaOutflow a
-  = MkEjectaOutflow
-  { e_AGB :: a,
-    e_AGB_Element :: a,
-    e_CCSN :: a,
-    e_CCSN_Element :: a,
-    e_ECSN_Element :: a,
-    e_HNe_Element :: a,
-    e_MRSNe_Element :: a,
-    e_SNe_Ia :: a,
-    e_SNe_Ia_Element :: a,
-    e_Novae_Element :: a,
-    e_NSM :: a,
-    e_NSM_Element :: a,
-    o_Wind :: a
-  }
-  deriving (Eq, Show, Read, Functor)
+    = MkEjectaOutflow
+    { e_AGB :: a
+    , e_AGB_Element :: a
+    , e_CCSN :: a
+    , e_CCSN_Element :: a
+    , e_ECSN_Element :: a
+    , e_HNe_Element :: a
+    , e_MRSNe_Element :: a
+    , e_SNe_Ia :: a
+    , e_SNe_Ia_Element :: a
+    , e_Novae_Element :: a
+    , e_NSM :: a
+    , e_NSM_Element :: a
+    , o_Wind :: a
+    }
+    deriving (Eq, Show, Read, Functor)
 
 data IsotopeInformation a
-  = MkIsotopeInformation
-  { igmFraction :: a,
-    ismFraction :: a
-  }
-  deriving (Eq, Show, Read)
+    = MkIsotopeInformation
+    { igmFraction :: a
+    , ismFraction :: a
+    }
+    deriving (Eq, Show, Read)
 
--- | Models for the Initial Mass Function:
---  * Single power-law [Salpeter et al. 1995]
---  * Broken power-law [Kroupa et al. 2001]
---  * Log-normal [Chabrier et al. 2003] converted to [Mpc^-3]
+data ElementInformation a
+    = MkElementInformation
+    { elementName :: String
+    , isotopeHistory :: [IsotopeInformation a]
+    }
+    deriving (Eq, Show, Read)
+
+{- | Models for the Initial Mass Function:
+ * Single power-law [Salpeter et al. 1995]
+ * Broken power-law [Kroupa et al. 2001]
+ * Log-normal [Chabrier et al. 2003] converted to [Mpc^-3]
+-}
 initialMassFunction :: IMFKind -> Mstar -> Double
 initialMassFunction iKind m =
-  let (alpha0, alpha1, alpha2, m1, m2, k0, k1, k2) =
-        (-0.3, -1.3, -2.3, 0.08, 0.5, 0.58, k0 * m1 ** (alpha0 - alpha1), k1 * m2 ** (alpha1 - alpha2))
-      (a_Ch, b_Ch, center_Ch, sigma_Ch) =
-        (0.85, 0.24, 0.079, 0.69)
-   in case iKind of
-        Salpeter -> m ** (-1.35)
-        Kroupa
-          | m < m1 -> k0 * m ** alpha0
-          | m >= m1 && m < m2 -> k1 * m ** alpha1
-          | otherwise -> k2 * m ** alpha2
-        Chabrier
-          | m < 1 -> a_Ch * exp (-(log m - log center_Ch) ** 2 / (2 * sigma_Ch ** 2))
-          | otherwise -> b_Ch * m ** (-1.3)
-        SN_Ia -> m ** (-0.35)
+    let (alpha0, alpha1, alpha2, m1, m2, k0, k1, k2) =
+            (-0.3, -1.3, -2.3, 0.08, 0.5, 0.58, k0 * m1 ** (alpha0 - alpha1), k1 * m2 ** (alpha1 - alpha2))
+        (a_Ch, b_Ch, center_Ch, sigma_Ch) =
+            (0.85, 0.24, 0.079, 0.69)
+     in case iKind of
+            Salpeter -> m ** (-1.35)
+            Kroupa
+                | m < m1 -> k0 * m ** alpha0
+                | m >= m1 && m < m2 -> k1 * m ** alpha1
+                | otherwise -> k2 * m ** alpha2
+            Chabrier
+                | m < 1 -> a_Ch * exp (-(log m - log center_Ch) ** 2 / (2 * sigma_Ch ** 2))
+                | otherwise -> b_Ch * m ** (-1.3)
+            SN_Ia -> m ** (-0.35)
 
--- | Next two functions normalise IMF between m_inf = 0.1 Msol and m_sup = 100 Msol
--- so that it can acts as a PDF in that range
+{- | Next two functions normalise IMF between m_inf = 0.1 Msol and m_sup = 100 Msol
+so that it can acts as a PDF in that range
+-}
 imfNormalisation :: ReferenceCosmology -> IMFKind -> Mstar -> Mstar -> Double
-imfNormalisation MkCosmology {prec} iKind m_down m_up =
-  let m_arr = [m_down, m_down + 0.1 .. m_up]
-      integrand m = m * initialMassFunction iKind m
-      integrator = makeIntegrator prec
-   in integrator integrand m_down m_up
+imfNormalisation MkCosmology{prec} iKind m_down m_up =
+    let m_arr = [m_down, m_down + 0.1 .. m_up]
+        integrand m = m * initialMassFunction iKind m
+        integrator = makeIntegrator prec
+     in integrator integrand m_down m_up
 
 normalisedInitialMassFunction :: ReferenceCosmology -> IMFKind -> Mstar -> Mstar -> Mstar -> Double
 normalisedInitialMassFunction cosmology iKind m_down m_up m =
-  let norm = imfNormalisation cosmology iKind m_down m_up
-   in (initialMassFunction iKind m) / norm
+    let norm = imfNormalisation cosmology iKind m_down m_up
+     in (initialMassFunction iKind m) / norm
 
 -- Define a normalised IMF for a specific IMF kind and Cosmology kind
 normImf :: ReferenceCosmology -> IMFKind -> Double -> Double
 normImf cosmology iKind =
-  let IGMParams {..} = defaultIGMParams
-      MassLimits {..} = masses
-   in normalisedInitialMassFunction cosmology iKind 0.01 mUp
+    let IGMParams{..} = defaultIGMParams
+        MassLimits{..} = masses
+     in normalisedInitialMassFunction cosmology iKind 0.01 mUp
 
 -- More so for the sake of simplicity, define a separate normalised SN Ia IMF
 normImfSN :: ReferenceCosmology -> Double -> Double -> Double -> Double
 normImfSN cosmology =
-  normalisedInitialMassFunction
-    cosmology
-    SN_Ia
+    normalisedInitialMassFunction
+        cosmology
+        SN_Ia
 
--- | Mass of a remnant produced by the supernova,
--- calculated according to various works in the units of [Msol].
--- Note that below a certain mass, stellar lifetimes are higher than the
--- t_0 (age of the universe), so there will be no remnant
+{- | Mass of a remnant produced by the supernova,
+calculated according to various works in the units of [Msol].
+Note that below a certain mass, stellar lifetimes are higher than the
+t_0 (age of the universe), so there will be no remnant
+-}
 massRemnant :: Mstar -> RemnantKind -> Double -> Double
 massRemnant m rKind metalFraction =
-  case rKind of
-    -- Remnant masses taken from the [Woosley & Weaver 95]
-    -- and [Hoek & Groenewegen 1996]
-    WoosleyWeaver
-      | m < 0.9 -> 0
-      | m <= 8 ->
-          let (mi, mr) = (unzip . M.toList) (remnantMediumMass metalFraction)
-           in makeInterp mi mr $ m
-      | m <= 40 ->
-          let (mi, mr) = (unzip . M.toList) (remnantHighMass metalFraction)
-           in makeInterp mi mr $ m
-      | otherwise ->
-          extrapolate
-            m
-            ( (\x y -> [x, y])
-                <$> M.findWithDefault 0.0 35
-                <*> M.findWithDefault 0.0 40
-                $ remnantHighMass
-                  metalFraction
-            )
-            [35, 40]
-    -- Remnant masses from the [Pereira & Miranda 2010]
-    -- Note that unlike WW95 work, these are metallicity-independent
-    Pereira
-      | m < 1 -> 0
-      | m <= 8 -> 0.1156 * m + 0.4551
-      | m <= 10 -> 1.35
-      | m < 25 -> 1.4
-      | m < 140 -> 13 / 24 * (m - 20)
-      | m <= 260 -> 0
-      | m <= 500 -> m
+    case rKind of
+        -- Remnant masses taken from the [Woosley & Weaver 95]
+        -- and [Hoek & Groenewegen 1996]
+        WoosleyWeaver
+            | m < 0.9 -> 0
+            | m <= 8 ->
+                let (mi, mr) = (unzip . M.toList) (remnantMediumMass metalFraction)
+                 in makeInterp mi mr $ m
+            | m <= 40 ->
+                let (mi, mr) = (unzip . M.toList) (remnantHighMass metalFraction)
+                 in makeInterp mi mr $ m
+            | otherwise ->
+                extrapolate
+                    m
+                    ( (\x y -> [x, y])
+                        <$> M.findWithDefault 0.0 35
+                        <*> M.findWithDefault 0.0 40
+                        $ remnantHighMass
+                            metalFraction
+                    )
+                    [35, 40]
+        -- Remnant masses from the [Pereira & Miranda 2010]
+        -- Note that unlike WW95 work, these are metallicity-independent
+        Pereira
+            | m < 1 -> 0
+            | m <= 8 -> 0.1156 * m + 0.4551
+            | m <= 10 -> 1.35
+            | m < 25 -> 1.4
+            | m < 140 -> 13 / 24 * (m - 20)
+            | m <= 260 -> 0
+            | m <= 500 -> m
 
--- | Lifetime of a main sequence star in relation to it's mass,
--- taken from the work of [Maeder & Meynet 1989] and the extrapolation to
--- m > 60 Msol is taken from the [Romano et al. 2005]
+{- | Lifetime of a main sequence star in relation to it's mass,
+taken from the work of [Maeder & Meynet 1989] and the extrapolation to
+m > 60 Msol is taken from the [Romano et al. 2005]
+-}
 tauMS :: Mstar -> CosmicTime
 tauMS m
-  | m <= 1.3 = 10 ** (-0.6545 * log10 m + 1)
-  | m <= 3 = 10 ** (-3.7 * log10 m + 1.35)
-  | m <= 7 = 10 ** (-2.51 * log10 m + 0.77)
-  | m <= 15 = 10 ** (-1.78 * log10 m + 0.17)
-  | m <= 60 = 10 ** (-0.86 * log10 m - 0.94)
-  | otherwise = 1.2 * m ** (-1.85) + 0.003
+    | m <= 1.3 = 10 ** (-0.6545 * log10 m + 1)
+    | m <= 3 = 10 ** (-3.7 * log10 m + 1.35)
+    | m <= 7 = 10 ** (-2.51 * log10 m + 0.77)
+    | m <= 15 = 10 ** (-1.78 * log10 m + 0.17)
+    | m <= 60 = 10 ** (-0.86 * log10 m - 0.94)
+    | otherwise = 1.2 * m ** (-1.85) + 0.003
 
--- | Mass of the main sequence star that dies at age t [Gyr].
--- This is practically an inverse of tauMS function defined above
+{- | Mass of the main sequence star that dies at age t [Gyr].
+This is practically an inverse of tauMS function defined above
+-}
 mDynamicalTime :: CosmicTime -> Mstar -> Mstar
 mDynamicalTime t m_up =
-  let mass_range = [0.1, 0.1 + 0.1 .. m_up]
-      interp_tau = makeInterp (tauMS <$> mass_range) mass_range
-   in interp_tau t
+    let mass_range = [0.1, 0.1 + 0.1 .. m_up]
+        interp_tau = makeInterp (tauMS <$> mass_range) mass_range
+     in interp_tau t
 
 -- | Dynamical mass of a star at redshift z
 mDynamicalRedshift :: ReferenceCosmology -> Double -> Double
 mDynamicalRedshift cosmology z =
-  let IGMParams {..} = defaultIGMParams
-      MassLimits {..} = masses
-   in mDynamicalTime (interpT cosmology z) mUp
+    let IGMParams{..} = defaultIGMParams
+        MassLimits{..} = masses
+     in mDynamicalTime (interpT cosmology z) mUp
 
 -- | Lower limit for a mass of a CCSN
 mDown :: ReferenceCosmology -> Double -> Double
@@ -202,37 +214,39 @@ mDown cosmology z = maximum [8, mDynamicalRedshift cosmology z]
 -- | Progenitor mass - proto NS mass relation from []
 massPNS :: PNSKind -> Mstar -> Mstar
 massPNS kind_PNS =
-  case kind_PNS of
-    Arcones ->
-      let masses_proto = [1.4, 1.6, 1.8, 2.0]
-          masses_prog = [13, 15, 20, 40]
-       in makeInterp masses_prog masses_proto
+    case kind_PNS of
+        Arcones ->
+            let masses_proto = [1.4, 1.6, 1.8, 2.0]
+                masses_prog = [13, 15, 20, 40]
+             in makeInterp masses_prog masses_proto
 
--- | Fraction of CCSNe that are HNe for higher masses (fiducially, for M >= 20 Msol)
--- There are two models:
---  * Constant fraction, a toy model
---  * More complicated, metallicity dependent [Grimmett et al. 2020] model
+{- | Fraction of CCSNe that are HNe for higher masses (fiducially, for M >= 20 Msol)
+There are two models:
+ * Constant fraction, a toy model
+ * More complicated, metallicity dependent [Grimmett et al. 2020] model
+-}
 fractionHNe :: HNeKind -> Double -> Double -> Double
 fractionHNe hneKind epsHNe0 metalFraction =
-  case hneKind of
-    Constant_HNe -> epsHNe0
-    Grimmett -> maximum (epsHNe0 * exp (-metalFraction / 0.001), 0.001)
+    case hneKind of
+        Constant_HNe -> epsHNe0
+        Grimmett -> maximum (epsHNe0 * exp (-metalFraction / 0.001), 0.001)
 
--- | Construct yield of SNe type II by interpolating over AGB, SAGB, ECSNe and CCSNe yields
--- If neutrino-driven yields are turned on, add yields to SN II yields following the
--- initial mass - NS mass relation
+{- | Construct yield of SNe type II by interpolating over AGB, SAGB, ECSNe and CCSNe yields
+If neutrino-driven yields are turned on, add yields to SN II yields following the
+initial mass - NS mass relation
+-}
 yieldII :: ReferenceStarFormationModel -> Double -> Double
 yieldII yields m =
-  y1 m + y2 m
+    y1 m + y2 m
   where
     (mSAGB, ySAGB) = yield_sagb yields
     yECSN = yield_ecsn yields
     (mII, yII)
-      | m < 8.0 = yield_agb yields
-      | m >= 8.8 && m < 9.0 && yECSN /= 0 = ([8.8, 9.0], [yECSN, yECSN])
-      | m < 11.0 && null ySAGB = yield_ccsn yields
-      | m < 11.0 = (mSAGB, ySAGB)
-      | otherwise = yield_ccsn yields
+        | m < 8.0 = yield_agb yields
+        | m >= 8.8 && m < 9.0 && yECSN /= 0 = ([8.8, 9.0], [yECSN, yECSN])
+        | m < 11.0 && null ySAGB = yield_ccsn yields
+        | m < 11.0 = (mSAGB, ySAGB)
+        | otherwise = yield_ccsn yields
     y1 = uncurry makeInterp $ yield_psn yields
     y2 = makeInterp mII yII
 
@@ -243,7 +257,7 @@ massEjectedAGB rKind metalFraction m = m - massRemnant m rKind metalFraction
 -- | Calculate total mass of a particular isotope ejected by an AGB star
 massEjectedAGB_Element :: ReferenceStarFormationModel -> RemnantKind -> Double -> Double -> Double
 massEjectedAGB_Element yields rKind metalFraction m =
-  massEjectedAGB rKind metalFraction m - yieldII yields m
+    massEjectedAGB rKind metalFraction m - yieldII yields m
 
 -- | Calculate metal fraction at redshift z
 metalFractionAtZ :: ReferenceCosmology -> Double -> Metallicity -> Double
@@ -252,9 +266,9 @@ metalFractionAtZ cosmology z metalFraction = metalFraction . interpT cosmology $
 -- | Calculate a yield from Novae star
 yield_Novae :: ReferenceStarFormationModel -> Double
 yield_Novae yields =
-  let IGMParams {..} = defaultIGMParams
-      Efficiencies {..} = effs
-   in epsCO * (yield_co yields) + (1 - epsCO) * (yield_one yields)
+    let IGMParams{..} = defaultIGMParams
+        Efficiencies{..} = effs
+     in epsCO * (yield_co yields) + (1 - epsCO) * (yield_one yields)
 
 -- | Calculate a yield from an HNe star as a function of mass
 yield_HNe :: ReferenceStarFormationModel -> Double -> Double
@@ -265,401 +279,404 @@ yield_HNe yields = yieldInterp
 
 -- | Helper function to construct an IMF normalised integral
 mkIntegrand ::
-  ReferenceCosmology -> (Double -> Double) -> (Double -> Double) -> Double -> (Double -> Double) -> Double -> Double -> Double
+    ReferenceCosmology -> (Double -> Double) -> (Double -> Double) -> Double -> (Double -> Double) -> Double -> Double -> Double
 mkIntegrand cosmology norm sfrd offset yield z m =
-  norm m
-    * sfrd (interpT cosmology z - offset)
-    * yield m
+    norm m
+        * sfrd (interpT cosmology z - offset)
+        * yield m
 
 -- | Similarly, a helper function to construct an IMF normalised integral with normalised IMF and no time delay
 integrand0 :: ReferenceCosmology -> IMFKind -> (Double -> Double) -> (Double -> Double) -> Double -> Double -> Double
 integrand0 cosmology iKind sfrd yield = mkIntegrand cosmology (normImf cosmology iKind) sfrd 0 yield
 
--- | Some of the terms (IGM/ISM outflows for all mass and a specific element yield, SFRD),
--- to be used in the next function
+{- | Some of the terms (IGM/ISM outflows for all mass and a specific element yield, SFRD),
+to be used in the next function
+-}
 interGalacticMediumTerms ::
-  ReferenceCosmology ->
-  ReferenceStarFormationModel ->
-  PowerSpectrum ->
-  RemnantKind ->
-  IMFKind ->
-  SMFKind ->
-  HMFKind ->
-  WKind ->
-  HNeKind ->
-  Metallicity ->
-  (Double -> Double) ->
-  Mhalo ->
-  SFRD ->
-  Redshift ->
-  EjectaOutflow Double
-interGalacticMediumTerms cosmology@MkCosmology {prec} yields pk rKind iKind sKind hKind wKind hneKind metalFraction xiISM mh_min sfrd z =
-  let IGMParams {..} = defaultIGMParams
-      PhysicalConstants {..} = phys
-      MassLimits {..} = masses
-      Efficiencies {..} = effs
-      DelayTimes {..} = delays
-      NovaeParams {..} = novae
-      ECSNParams {..} = ecsn
+    ReferenceCosmology ->
+    ReferenceStarFormationModel ->
+    PowerSpectrum ->
+    RemnantKind ->
+    IMFKind ->
+    SMFKind ->
+    HMFKind ->
+    WKind ->
+    HNeKind ->
+    Metallicity ->
+    (Double -> Double) ->
+    Mhalo ->
+    SFRD ->
+    Redshift ->
+    EjectaOutflow Double
+interGalacticMediumTerms cosmology@MkCosmology{prec} yields pk rKind iKind sKind hKind wKind hneKind metalFraction xiISM mh_min sfrd z =
+    let IGMParams{..} = defaultIGMParams
+        PhysicalConstants{..} = phys
+        MassLimits{..} = masses
+        Efficiencies{..} = effs
+        DelayTimes{..} = delays
+        NovaeParams{..} = novae
+        ECSNParams{..} = ecsn
 
-      integrator = makeIntegrator prec
+        integrator = makeIntegrator prec
 
-      birthTime m =
-        interpT cosmology z - tauMS m
+        birthTime m =
+            interpT cosmology z - tauMS m
 
-      birthZ m =
-        interpZ cosmology (birthTime m)
+        birthZ m =
+            interpZ cosmology (birthTime m)
 
-      zBirth m =
-        metalFraction (birthTime m)
+        zBirth m =
+            metalFraction (birthTime m)
 
-      xiBirth m =
-        xiISM (birthTime m)
+        xiBirth m =
+            xiISM (birthTime m)
 
-      returnedMass m =
-        m - massRemnant m rKind (zBirth m)
+        returnedMass m =
+            m - massRemnant m rKind (zBirth m)
 
-      returnedElement yieldFun m =
-        yieldFun m
-          + xiBirth m * returnedMass m
+        returnedElement yieldFun m =
+            yieldFun m
+                + xiBirth m * returnedMass m
 
-      integrandAGB m =
-        normImf cosmology iKind m
-          * sfrd (birthTime m)
-          * returnedMass m
+        integrandAGB m =
+            normImf cosmology iKind m
+                * sfrd (birthTime m)
+                * returnedMass m
 
-      integrandAGBElement m =
-        normImf cosmology iKind m
-          * sfrd (birthTime m)
-          * returnedElement (yieldII yields) m
+        integrandAGBElement m =
+            normImf cosmology iKind m
+                * sfrd (birthTime m)
+                * returnedElement (yieldII yields) m
 
-      fHNe m =
-        fractionHNe
-          hneKind
-          epsHNe0
-          (zBirth m)
+        fHNe m =
+            fractionHNe
+                hneKind
+                epsHNe0
+                (zBirth m)
 
-      integrandCCSN m =
-        normImf cosmology iKind m
-          * sfrd (birthTime m)
-          * returnedMass m
+        integrandCCSN m =
+            normImf cosmology iKind m
+                * sfrd (birthTime m)
+                * returnedMass m
 
-      integrandCCSNElement m =
-        (1.0 - fHNe m - epsMRSNe)
-          * normImf cosmology iKind m
-          * sfrd (birthTime m)
-          * returnedElement (yieldII yields) m
+        integrandCCSNElement m =
+            (1.0 - fHNe m - epsMRSNe)
+                * normImf cosmology iKind m
+                * sfrd (birthTime m)
+                * returnedElement (yieldII yields) m
 
-      integrandHNeElement m =
-        fHNe m
-          * normImf cosmology iKind m
-          * sfrd (birthTime m)
-          * returnedElement (yield_HNe yields) m
+        integrandHNeElement m =
+            fHNe m
+                * normImf cosmology iKind m
+                * sfrd (birthTime m)
+                * returnedElement (yield_HNe yields) m
 
-      integrandMRSNElement m =
-        epsMRSNe
-          * normImf cosmology iKind m
-          * sfrd (birthTime m)
-          * returnedElement (yield_HNe yields) m
+        integrandMRSNElement m =
+            epsMRSNe
+                * normImf cosmology iKind m
+                * sfrd (birthTime m)
+                * returnedElement (yield_HNe yields) m
 
-      integrandECSNElement m =
-        normImf cosmology iKind m
-          * sfrd (birthTime m)
-          * returnedElement (yieldII yields) m
+        integrandECSNElement m =
+            normImf cosmology iKind m
+                * sfrd (birthTime m)
+                * returnedElement (yieldII yields) m
 
-      integrandWind m =
-        normImf cosmology iKind m
-          * sfrd (birthTime m)
-          * 2.0
-          * snEnergy
-          / ( kmsErgMsol
-                * escapeVelocitySq
-                  cosmology
-                  pk
-                  hKind
-                  wKind
-                  mh_min
-                  z
-            )
+        integrandWind m =
+            normImf cosmology iKind m
+                * sfrd (birthTime m)
+                * 2.0
+                * snEnergy
+                / ( kmsErgMsol
+                        * escapeVelocitySq
+                            cosmology
+                            pk
+                            hKind
+                            wKind
+                            mh_min
+                            z
+                  )
 
-      integrandNSM m =
-        normImf cosmology iKind m
-          * sfrd (interpT cosmology z - delayNSM)
+        integrandNSM m =
+            normImf cosmology iKind m
+                * sfrd (interpT cosmology z - delayNSM)
 
-      integrandNovaeElement m =
-        normImf cosmology iKind m
-          * sfrd (interpT cosmology z - delayNovae)
-          * mEjNovae
-          * nNovae
-          * alphaNovae
-          * yield_Novae yields
+        integrandNovaeElement m =
+            normImf cosmology iKind m
+                * sfrd (interpT cosmology z - delayNovae)
+                * mEjNovae
+                * nNovae
+                * alphaNovae
+                * yield_Novae yields
 
-      e_AGB =
-        integrator
-          integrandAGB
-          mAGBd
-          mAGBu
+        e_AGB =
+            integrator
+                integrandAGB
+                mAGBd
+                mAGBu
 
-      e_AGB_Element =
-        integrator
-          integrandAGBElement
-          mAGBd
-          mAGBu
+        e_AGB_Element =
+            integrator
+                integrandAGBElement
+                mAGBd
+                mAGBu
 
-      e_CCSN =
-        integrator
-          integrandCCSN
-          (mDown cosmology z)
-          mUp
+        e_CCSN =
+            integrator
+                integrandCCSN
+                (mDown cosmology z)
+                mUp
 
-      e_CCSN_Element =
-        integrator
-          integrandCCSNElement
-          (mDown cosmology z)
-          mUp
+        e_CCSN_Element =
+            integrator
+                integrandCCSNElement
+                (mDown cosmology z)
+                mUp
 
-      e_HNe_Element =
-        integrator
-          integrandHNeElement
-          (mDown cosmology z)
-          mUp
+        e_HNe_Element =
+            integrator
+                integrandHNeElement
+                (mDown cosmology z)
+                mUp
 
-      e_MRSNe_Element =
-        integrator
-          integrandMRSNElement
-          (mDown cosmology z)
-          mUp
+        e_MRSNe_Element =
+            integrator
+                integrandMRSNElement
+                (mDown cosmology z)
+                mUp
 
-      e_ECSN_Element =
-        integrator
-          integrandECSNElement
-          mECSNd
-          mECSNu
+        e_ECSN_Element =
+            integrator
+                integrandECSNElement
+                mECSNd
+                mECSNu
 
-      o_Wind =
-        epsW
-          * integrator
-            integrandWind
-            (mDown cosmology z)
-            mUp
+        o_Wind =
+            epsW
+                * integrator
+                    integrandWind
+                    (mDown cosmology z)
+                    mUp
 
-      e_NSM =
-        alphaNSM
-          * integrator
-            integrandNSM
-            mNSMd
-            mNSMu
+        e_NSM =
+            alphaNSM
+                * integrator
+                    integrandNSM
+                    mNSMd
+                    mNSMu
 
-      e_NSM_Element =
-        yield_nsm yields * e_NSM
+        e_NSM_Element =
+            yield_nsm yields * e_NSM
 
-      e_Novae_Element =
-        integrator
-          integrandNovaeElement
-          mNovaeD
-          mNovaeU
+        e_Novae_Element =
+            integrator
+                integrandNovaeElement
+                mNovaeD
+                mNovaeU
 
-      firstTerm =
-        bRG
-          * integrator
-            ( \m ->
-                normImfSN cosmology mDLRG mDURG m
-                  * sfrd (birthTime m)
-                  / m
-            )
-            mDLRG
-            mDURG
+        firstTerm =
+            bRG
+                * integrator
+                    ( \m ->
+                        normImfSN cosmology mDLRG mDURG m
+                            * sfrd (birthTime m)
+                            / m
+                    )
+                    mDLRG
+                    mDURG
 
-      secondTerm =
-        bMS
-          * integrator
-            ( \m ->
-                normImfSN cosmology mDLMS mDUMS m
-                  * sfrd (birthTime m)
-                  / m
-            )
-            mDLMS
-            mDUMS
+        secondTerm =
+            bMS
+                * integrator
+                    ( \m ->
+                        normImfSN cosmology mDLMS mDUMS m
+                            * sfrd (birthTime m)
+                            / m
+                    )
+                    mDLMS
+                    mDUMS
 
-      e_SNe_Ia =
-        mCO
-          * integrator
-            ( \m ->
-                normImf cosmology iKind m
-                  / m
-            )
-            (max mPL (mDynamicalRedshift cosmology z))
-            mPU
-          * (firstTerm + secondTerm)
+        e_SNe_Ia =
+            mCO
+                * integrator
+                    ( \m ->
+                        normImf cosmology iKind m
+                            / m
+                    )
+                    (max mPL (mDynamicalRedshift cosmology z))
+                    mPU
+                * (firstTerm + secondTerm)
 
-      e_SNe_Ia_Element =
-        yield_ia yields * e_SNe_Ia
-   in MkEjectaOutflow
-        { e_AGB = e_AGB,
-          e_AGB_Element = e_AGB_Element,
-          e_CCSN = e_CCSN,
-          e_CCSN_Element = e_CCSN_Element,
-          e_ECSN_Element = e_ECSN_Element,
-          e_HNe_Element = e_HNe_Element,
-          e_MRSNe_Element = e_MRSNe_Element,
-          e_SNe_Ia = e_SNe_Ia,
-          e_SNe_Ia_Element = e_SNe_Ia_Element,
-          e_Novae_Element = e_Novae_Element,
-          e_NSM = e_NSM,
-          e_NSM_Element = e_NSM_Element,
-          o_Wind = o_Wind
-        }
+        e_SNe_Ia_Element =
+            yield_ia yields * e_SNe_Ia
+     in MkEjectaOutflow
+            { e_AGB = e_AGB
+            , e_AGB_Element = e_AGB_Element
+            , e_CCSN = e_CCSN
+            , e_CCSN_Element = e_CCSN_Element
+            , e_ECSN_Element = e_ECSN_Element
+            , e_HNe_Element = e_HNe_Element
+            , e_MRSNe_Element = e_MRSNe_Element
+            , e_SNe_Ia = e_SNe_Ia
+            , e_SNe_Ia_Element = e_SNe_Ia_Element
+            , e_Novae_Element = e_Novae_Element
+            , e_NSM = e_NSM
+            , e_NSM_Element = e_NSM_Element
+            , o_Wind = o_Wind
+            }
 
--- | Extract rates from the EjectaOutflow dataclass and convert them into an appropriate form
--- to be used further in the ODE solver
+{- | Extract rates from the EjectaOutflow dataclass and convert them into an appropriate form
+to be used further in the ODE solver
+-}
 computeRates :: EjectaOutflow Double -> (Double, Double, Double, Double, Double, Double)
 computeRates rates =
-  ( e_SNe_Ia + e_NSM + e_CCSN,
-    e_tot_Element,
-    eps_sn * e_AGB,
-    o_Wind,
-    eps_sn * e_tot_Element,
-    eps_sn * (e_SNe_Ia + e_NSM + e_CCSN) + o_Wind
-  )
+    ( e_SNe_Ia + e_NSM + e_CCSN
+    , e_tot_Element
+    , eps_sn * e_AGB
+    , o_Wind
+    , eps_sn * e_tot_Element
+    , eps_sn * (e_SNe_Ia + e_NSM + e_CCSN) + o_Wind
+    )
   where
     eps_sn = 0.005
     e_tot_Element =
-      e_AGB_Element
-        + e_CCSN_Element
-        + e_ECSN_Element
-        + e_HNe_Element
-        + e_MRSNe_Element
-        + e_SNe_Ia_Element
-        + e_Novae_Element
-        + e_NSM_Element
+        e_AGB_Element
+            + e_CCSN_Element
+            + e_ECSN_Element
+            + e_HNe_Element
+            + e_MRSNe_Element
+            + e_SNe_Ia_Element
+            + e_Novae_Element
+            + e_NSM_Element
     MkEjectaOutflow
-      { e_AGB,
-        e_AGB_Element,
-        e_CCSN,
-        e_CCSN_Element,
-        e_ECSN_Element,
-        e_HNe_Element,
-        e_MRSNe_Element,
-        e_SNe_Ia,
-        e_SNe_Ia_Element,
-        e_Novae_Element,
-        e_NSM,
-        e_NSM_Element,
-        o_Wind
-      } = rates
+        { e_AGB
+        , e_AGB_Element
+        , e_CCSN
+        , e_CCSN_Element
+        , e_ECSN_Element
+        , e_HNe_Element
+        , e_MRSNe_Element
+        , e_SNe_Ia
+        , e_SNe_Ia_Element
+        , e_Novae_Element
+        , e_NSM
+        , e_NSM_Element
+        , o_Wind
+        } = rates
 
--- Separate IO function for IGM/ISM terms
+-- | Separate IO function for IGM/ISM terms
 igmTermsIO ::
-  ReferenceStarFormationConfig ->
-  ReferenceCosmology ->
-  PowerSpectrum ->
-  RemnantKind ->
-  IMFKind ->
-  SMFKind ->
-  HMFKind ->
-  WKind ->
-  HNeKind ->
-  Metallicity ->
-  (Double -> Double) ->
-  Mhalo ->
-  SFRD ->
-  Redshift ->
-  Element ->
-  IO (Double, Double, Double, Double, Double, Double)
+    ReferenceStarFormationConfig ->
+    ReferenceCosmology ->
+    PowerSpectrum ->
+    RemnantKind ->
+    IMFKind ->
+    SMFKind ->
+    HMFKind ->
+    WKind ->
+    HNeKind ->
+    Metallicity ->
+    (Double -> Double) ->
+    Mhalo ->
+    SFRD ->
+    Redshift ->
+    Element ->
+    IO (Double, Double, Double, Double, Double, Double)
 igmTermsIO sfCfg cosmology pk rKind iKind sKind hKind wKind hneKind metalFraction xiISM mh_min sfrd z elem =
-  do
-    snIaYieldRetrieved <- retrieveYieldIa sfCfg elem
-    ccsnYieldRetrieved <- retrieveYieldCCSN sfCfg elem (metalFraction (interpT cosmology z))
-    agbYieldRetrieved <- retrieveYieldAGB sfCfg elem (metalFraction (interpT cosmology z))
-    ecsnYieldRetrieved <- retrieveYieldECSN sfCfg elem
-    hneYieldRetrieved <- retrieveYieldHNe sfCfg elem (metalFraction (interpT cosmology z))
+    do
+        snIaYieldRetrieved <- retrieveYieldIa sfCfg elem
+        ccsnYieldRetrieved <- retrieveYieldCCSN sfCfg elem (metalFraction (interpT cosmology z))
+        agbYieldRetrieved <- retrieveYieldAGB sfCfg elem (metalFraction (interpT cosmology z))
+        ecsnYieldRetrieved <- retrieveYieldECSN sfCfg elem
+        hneYieldRetrieved <- retrieveYieldHNe sfCfg elem (metalFraction (interpT cosmology z))
 
-    let yields =
-          MkStarFormation
-            { yield_ia = snIaYieldRetrieved,
-              yield_ccsn = ccsnYieldRetrieved,
-              yield_hne = hneYieldRetrieved,
-              yield_ecsn = ecsnYieldRetrieved,
-              yield_agb = agbYieldRetrieved,
-              yield_sagb = ([0], [0]),
-              yield_nsm = 0,
-              yield_psn = ([0], [0]),
-              yield_co = 0,
-              yield_one = 0
-            }
+        let yields =
+                MkStarFormation
+                    { yield_ia = snIaYieldRetrieved
+                    , yield_ccsn = ccsnYieldRetrieved
+                    , yield_hne = hneYieldRetrieved
+                    , yield_ecsn = ecsnYieldRetrieved
+                    , yield_agb = agbYieldRetrieved
+                    , yield_sagb = ([0], [0])
+                    , yield_nsm = 0
+                    , yield_psn = ([0], [0])
+                    , yield_co = 0
+                    , yield_one = 0
+                    }
 
-    pure
-      $ computeRates
-      $ interGalacticMediumTerms
-        cosmology
-        yields
-        pk
-        rKind
-        iKind
-        sKind
-        hKind
-        wKind
-        hneKind
-        metalFraction
-        xiISM
-        mh_min
-        sfrd
-        z
+        pure
+            $ computeRates
+            $ interGalacticMediumTerms
+                cosmology
+                yields
+                pk
+                rKind
+                iKind
+                sKind
+                hKind
+                wKind
+                hneKind
+                metalFraction
+                xiISM
+                mh_min
+                sfrd
+                z
 
--- Separate IO function for SN terms
+-- | Separate IO function for SN terms
 snTermsIO ::
-  ReferenceStarFormationConfig ->
-  ReferenceCosmology ->
-  PowerSpectrum ->
-  RemnantKind ->
-  IMFKind ->
-  SMFKind ->
-  HMFKind ->
-  WKind ->
-  HNeKind ->
-  Metallicity ->
-  (Double -> Double) ->
-  Mhalo ->
-  SFRD ->
-  Redshift ->
-  Element ->
-  IO (Double, Double, Double, Double)
+    ReferenceStarFormationConfig ->
+    ReferenceCosmology ->
+    PowerSpectrum ->
+    RemnantKind ->
+    IMFKind ->
+    SMFKind ->
+    HMFKind ->
+    WKind ->
+    HNeKind ->
+    Metallicity ->
+    (Double -> Double) ->
+    Mhalo ->
+    SFRD ->
+    Redshift ->
+    Element ->
+    IO (Double, Double, Double, Double)
 snTermsIO sfCfg cosmology pk rKind iKind sKind hKind wKind hneKind metalFraction xiISM mh_min sfrd z elem =
-  do
-    snIaYieldRetrieved <- retrieveYieldIa sfCfg elem
-    ccsnYieldRetrieved <- retrieveYieldCCSN sfCfg elem (metalFraction z)
-    agbYieldRetrieved <- retrieveYieldAGB sfCfg elem (metalFraction z)
-    ecsnYieldRetrieved <- retrieveYieldECSN sfCfg elem
-    hneYieldRetrieved <- retrieveYieldHNe sfCfg elem (metalFraction z)
-    let yields =
-          MkStarFormation
-            { yield_ia = snIaYieldRetrieved,
-              yield_ccsn = ccsnYieldRetrieved,
-              yield_hne = hneYieldRetrieved,
-              yield_ecsn = ecsnYieldRetrieved,
-              yield_agb = agbYieldRetrieved,
-              yield_sagb = ([0], [0]),
-              yield_nsm = 0,
-              yield_psn = ([0], [0]),
-              yield_co = 0,
-              yield_one = 0
-            }
-        result =
-          let MkEjectaOutflow {e_AGB, e_AGB_Element, e_CCSN, e_CCSN_Element, e_ECSN_Element, e_HNe_Element, e_MRSNe_Element, e_SNe_Ia, e_SNe_Ia_Element, e_Novae_Element, e_NSM, e_NSM_Element, o_Wind} =
-                interGalacticMediumTerms cosmology yields pk rKind iKind sKind hKind wKind hneKind metalFraction xiISM mh_min sfrd z
-           in (e_CCSN, e_CCSN_Element, e_SNe_Ia, e_SNe_Ia_Element)
+    do
+        snIaYieldRetrieved <- retrieveYieldIa sfCfg elem
+        ccsnYieldRetrieved <- retrieveYieldCCSN sfCfg elem (metalFraction z)
+        agbYieldRetrieved <- retrieveYieldAGB sfCfg elem (metalFraction z)
+        ecsnYieldRetrieved <- retrieveYieldECSN sfCfg elem
+        hneYieldRetrieved <- retrieveYieldHNe sfCfg elem (metalFraction z)
+        let yields =
+                MkStarFormation
+                    { yield_ia = snIaYieldRetrieved
+                    , yield_ccsn = ccsnYieldRetrieved
+                    , yield_hne = hneYieldRetrieved
+                    , yield_ecsn = ecsnYieldRetrieved
+                    , yield_agb = agbYieldRetrieved
+                    , yield_sagb = ([0], [0])
+                    , yield_nsm = 0
+                    , yield_psn = ([0], [0])
+                    , yield_co = 0
+                    , yield_one = 0
+                    }
+            result =
+                let MkEjectaOutflow{e_AGB, e_AGB_Element, e_CCSN, e_CCSN_Element, e_ECSN_Element, e_HNe_Element, e_MRSNe_Element, e_SNe_Ia, e_SNe_Ia_Element, e_Novae_Element, e_NSM, e_NSM_Element, o_Wind} =
+                        interGalacticMediumTerms cosmology yields pk rKind iKind sKind hKind wKind hneKind metalFraction xiISM mh_min sfrd z
+                 in (e_CCSN, e_CCSN_Element, e_SNe_Ia, e_SNe_Ia_Element)
 
-    return result
+        return result
 
--- | Set up initial abundance for a given isotope
--- Big Bang Nucleosynthesis abundances are taken from the [Coc et al. 2014]
+{- | Set up initial abundance for a given isotope
+Big Bang Nucleosynthesis abundances are taken from the [Coc et al. 2014]
+-}
 iniAbundance :: Element -> Double
 iniAbundance elem =
-  case element elem of
-    "H" -> if isotope elem == 1 then (1 - fd) * fh else fd * fh
-    "He" -> if isotope elem == 4 then (1 - fh3) * yp else fh3
-    "Li" | isotope elem == 7 -> fli7
-    _ -> 0
+    case element elem of
+        "H" -> if isotope elem == 1 then (1 - fd) * fh else fd * fh
+        "He" -> if isotope elem == 4 then (1 - fh3) * yp else fh3
+        "Li" | isotope elem == 7 -> fli7
+        _ -> 0
   where
     yp = 0.2464
     fh = 1 - yp
@@ -670,7 +687,7 @@ iniAbundance elem =
 -- | Create initial conditions for a set of isotopes
 isotopeInitialConditions :: [Element] -> [Double]
 isotopeInitialConditions =
-  foldr ((++) . (\x -> [iniAbundance x, iniAbundance x])) []
+    foldr ((++) . (\x -> [iniAbundance x, iniAbundance x])) []
 
 -- | Check if two isotopes are of the same element
 isotopeEquality :: Element -> Element -> Bool
@@ -683,191 +700,227 @@ isotopeState y i = (y V.! (8 + 2 * i), y V.! (8 + 2 * i + 1))
 -- Now create a set of coupled differential equations for each isotope
 isotopeDerivative :: V.Vector Double -> Double -> Double -> Redshift -> (Double -> Double) -> Int -> (Double, Double, Double, Double, Double, Double) -> [Double]
 isotopeDerivative y rhoIGM rhoISM z interpMAR i (e_tot, e_tot_Element, o_SNe, o_Wind, o_SNe_Element, o_tot) =
-  let (xiISM, xiIGM) = isotopeState y i
-      dXIGM = (o_Wind * (xiISM - xiIGM) + (o_SNe_Element - o_SNe * xiIGM)) / rhoIGM
-      dXISM = (e_tot_Element - e_tot * xiISM + interpMAR z * (xiIGM - xiISM) - (o_SNe_Element - o_SNe * xiISM)) / rhoISM
-   in [dXIGM, dXISM]
+    let (xiISM, xiIGM) = isotopeState y i
+        dXIGM = (o_Wind * (xiISM - xiIGM) + (o_SNe_Element - o_SNe * xiIGM)) / rhoIGM
+        dXISM = (e_tot_Element - e_tot * xiISM + interpMAR z * (xiIGM - xiISM) - (o_SNe_Element - o_SNe * xiISM)) / rhoISM
+     in [dXIGM, dXISM]
 
--- | Solve four coupled first-order differential equations that govern the evolution of:
---    * rho_IGM (1)
---    * rho_ISM (3)
---    * Xi_IGM  (4)
---    * Xi_ISM  (5)
--- with all equations being taken from the [Daigne et al. 2004]
+{- | Solve many coupled first-order differential equations that govern the evolution of:
+   * rho_IGM
+   * rho_ISM
+   * Xi_IGM
+   * Xi_ISM
+   * m_ej
+   * m_outflow
+with all equations being taken from the [Daigne et al. 2004]
+-}
 {-# INLINE igmIsmEvolution #-}
-igmIsmEvolution :: ReferenceStarFormationConfig -> ReferenceCosmology -> PowerSpectrum -> RemnantKind -> IMFKind -> SMFKind -> HMFKind -> WKind -> HNeKind -> [String] -> Mhalo -> IO ([Double], [Double], [Element], [V.Vector Double], M.Map Element (IsotopeInformation [Double]))
-igmIsmEvolution sfCfg cosmology@MkCosmology {h0, om0, ob0, gn} pk rKind iKind sKind hKind wKind hneKind elem mh_min =
-  do
-    allowedIsotopesVector <- parseFileColumns "data/isotopes.txt"
-    let -- Constructing stellar yields datatype as a function of metallicity of ISM and given isotope
-        IGMParams {..} = defaultIGMParams
-        PhysicalConstants {..} = phys
-        mar = parMap rpar (\z -> 1e9 * baryonFormationRateDensity cosmology pk hKind wKind z mh_min) zs
-        sfrd = parMap rpar (\z -> 1e9 * starFormationRateDensity cosmology pk sKind hKind wKind z mh_min) zs
-        rhoOb = 2.77 * 1e11 * ob0 * (h0 / 100) ** 2
+igmIsmEvolution ::
+    ReferenceStarFormationConfig ->
+    ReferenceCosmology ->
+    PowerSpectrum ->
+    RemnantKind ->
+    IMFKind ->
+    SMFKind ->
+    HMFKind ->
+    WKind ->
+    HNeKind ->
+    [String] ->
+    Mhalo ->
+    IO ([Double], [Double], [Element], [[Element]], [V.Vector Double], M.Map String (M.Map Element (IsotopeInformation [Double])))
+igmIsmEvolution sfCfg cosmology@MkCosmology{h0, om0, ob0, gn} pk rKind iKind sKind hKind wKind hneKind elem mh_min =
+    do
+        allowedIsotopesVector <- parseFileColumns "data/isotopes.txt"
+        let
+            -- Constructing stellar yields datatype as a function of metallicity of ISM and given isotope
+            IGMParams{..} = defaultIGMParams
+            PhysicalConstants{..} = phys
+            mar = parMap rpar (\z -> 1e9 * baryonFormationRateDensity cosmology pk hKind wKind z mh_min) zs
+            sfrd = parMap rpar (\z -> 1e9 * starFormationRateDensity cosmology pk sKind hKind wKind z mh_min) zs
+            rhoOb = 2.77 * 1e11 * ob0 * (h0 / 100) ** 2
 
-        -- Choose all of the isotopes for the user-specified elements
-        allowedIsotopes = read <$> (allowedIsotopesVector V.! 0) :: [Element]
-        groupedIsotopes = groupBy isotopeEquality $ allowedIsotopes
-        chosenIsotopes = removeDuplicates . concat $ [if any (e ==) (element <$> xs) then xs else [] | xs <- groupedIsotopes, e <- elem]
+            -- Choose all of the isotopes for the user-specified elements
+            allowedIsotopes = read <$> (allowedIsotopesVector V.! 0) :: [Element]
+            groupedIsotopes = removeDuplicates . groupBy isotopeEquality $ allowedIsotopes
+            groupedChosenIsotopes = filter (/= []) [if any (e ==) (element <$> xs) then xs else [] | xs <- groupedIsotopes, e <- elem]
+            chosenIsotopes = concat groupedChosenIsotopes
 
-        -- Unpack outflow/inflow rates and interpolate over our redshift range
-        (interpMAR, interpSFRD) = (makeInterp zs mar, makeInterp zs sfrd)
+            -- Unpack outflow/inflow rates and interpolate over our redshift range
+            (interpMAR, interpSFRD) = (makeInterp zs mar, makeInterp zs sfrd)
 
-        -- ICs are set assuming very small baryon fraction in the structures,
-        -- with rho_ISM/rho_IGM ~ 0.01 (stellar mass is negligible at this redshift)
-        -- following the prescription of [Daigne et al. 2006]
-        -- Finally, we also adopt the BBN abundances for H (He),
-        -- such that the ICs for Xi_ISM/Xi_IGM = 0.76 (0.24) * M_ISM/M_IGM.
-        (nSteps, tInit, aInit, mTot, hydrogenElement, heliumElement) =
-          (100 :: Int, interpT cosmology zMax, 0.01, rhoOb, Element {element = "H", isotope = 1}, Element {element = "He", isotope = 4})
+            -- ICs are set assuming very small baryon fraction in the structures,
+            -- with rho_ISM/rho_IGM ~ 0.01 (stellar mass is negligible at this redshift)
+            -- following the prescription of [Daigne et al. 2006]
+            -- Finally, we also adopt the BBN abundances for H (He),
+            -- such that the ICs for Xi_ISM/Xi_IGM = 0.76 (0.24) * M_ISM/M_IGM.
+            (nSteps, tInit, aInit, mTot, hydrogenElement, heliumElement) =
+                (100 :: Int, interpT cosmology zMax, 0.01, rhoOb, Element{element = "H", isotope = 1}, Element{element = "He", isotope = 4})
 
-        initialState =
-          V.fromList $
-            [ (1 - aInit) * mTot,
-              aInit * mTot,
-              0,
-              0,
-              iniAbundance hydrogenElement,
-              iniAbundance hydrogenElement,
-              iniAbundance heliumElement,
-              iniAbundance heliumElement
-            ]
-              ++ isotopeInitialConditions chosenIsotopes
+            initialState =
+                V.fromList $
+                    [ (1 - aInit) * mTot
+                    , aInit * mTot
+                    , 0
+                    , 0
+                    , iniAbundance hydrogenElement
+                    , iniAbundance hydrogenElement
+                    , iniAbundance heliumElement
+                    , iniAbundance heliumElement
+                    ]
+                        ++ isotopeInitialConditions chosenIsotopes
 
-        -- Convert Differential-Algebraic system into a system of ODEs
-        odeSystem :: History -> Double -> V.Vector Double -> IO (V.Vector Double)
-        odeSystem history t y = do
-          let -- Interpolate ISM fraction of metals
-              (times, metals) =
-                unzip $
-                  [(t', metals) | (t', v) <- history, V.length v > 3, let metals = (1 - v V.! 5 - v V.! 7)]
+            -- Convert Differential-Algebraic system into a system of ODEs
+            odeSystem :: History -> Double -> V.Vector Double -> IO (V.Vector Double)
+            odeSystem history t y = do
+                let
+                    -- Interpolate ISM fraction of metals
+                    (times, metals) =
+                        unzip $
+                            [(t', metals) | (t', v) <- history, V.length v > 3, let metals = (1 - v V.! 5 - v V.! 7)]
 
-              interpMetal t' =
-                if length times < 1
-                  then 0
-                  else (makeInterp times metals) t'
+                    interpMetal t' =
+                        if length times < 1
+                            then 0
+                            else (makeInterp times metals) t'
 
-              z = interpZ cosmology t
-              rhoIGM = y V.! 0
-              rhoISM = y V.! 1
-              xiIGM_H = y V.! 4
-              xiISM_H = y V.! 5
-              xiIGM_He = y V.! 6
-              xiISM_He = y V.! 7
+                    z = interpZ cosmology t
+                    rhoIGM = y V.! 0
+                    rhoISM = y V.! 1
+                    xiIGM_H = y V.! 4
+                    xiISM_H = y V.! 5
+                    xiIGM_He = y V.! 6
+                    xiISM_He = y V.! 7
 
-              -- Interpolate H and He ISM mass fractions
-              (_, xis_H) =
-                unzip $
-                  [(t', xis_H) | (t', v) <- history, V.length v > 3, let xis_H = (v V.! 5)]
-              interpXiISM_H t' =
-                if length times < 1
-                  then 0
-                  else (makeInterp times xis_H) t'
+                    -- Interpolate H and He ISM mass fractions
+                    (_, xis_H) =
+                        unzip $
+                            [(t', xis_H) | (t', v) <- history, V.length v > 3, let xis_H = (v V.! 5)]
+                    interpXiISM_H t' =
+                        if length times < 1
+                            then 0
+                            else (makeInterp times xis_H) t'
 
-              (_, xis_He) =
-                unzip $
-                  [(t', xis_He) | (t', v) <- history, V.length v > 3, let xis_He = (v V.! 7)]
-              interpXiISM_He t' =
-                if length times < 1
-                  then 0
-                  else (makeInterp times xis_He) t'
+                    (_, xis_He) =
+                        unzip $
+                            [(t', xis_He) | (t', v) <- history, V.length v > 3, let xis_He = (v V.! 7)]
+                    interpXiISM_He t' =
+                        if length times < 1
+                            then 0
+                            else (makeInterp times xis_He) t'
 
-          isotopeTerms <- forM chosenIsotopes $ \x -> do
-            let -- Separately calculate ISM fraction of each metal that is being considered
-                (_, xis) =
-                  unzip $
-                    [(t', xis) | (t', v) <- history, V.length v > 3, let xis = (v V.! (4 + 1 + 2 * fromJust (elemIndex x chosenIsotopes)))]
-                interpXiISM t' =
-                  if length times < 1
-                    then 0
-                    else (makeInterp times xis) t'
+                isotopeTerms <- forM chosenIsotopes $ \x -> do
+                    let
+                        -- Separately calculate ISM fraction of each metal that is being considered
+                        (_, xis) =
+                            unzip $
+                                [(t', xis) | (t', v) <- history, V.length v > 3, let xis = (v V.! (4 + 1 + 2 * fromJust (elemIndex x chosenIsotopes)))]
+                        interpXiISM t' =
+                            if length times < 1
+                                then 0
+                                else (makeInterp times xis) t'
 
-            (e_tot, e_tot_Element, o_SNe, o_Wind, o_SNe_Element, o_tot) <- igmTermsIO sfCfg cosmology pk rKind iKind sKind hKind wKind hneKind interpMetal interpXiISM mh_min interpSFRD z x
-            pure (e_tot, e_tot_Element, o_SNe, o_Wind, o_SNe_Element, o_tot)
+                    (e_tot, e_tot_Element, o_SNe, o_Wind, o_SNe_Element, o_tot) <- igmTermsIO sfCfg cosmology pk rKind iKind sKind hKind wKind hneKind interpMetal interpXiISM mh_min interpSFRD z x
+                    pure (e_tot, e_tot_Element, o_SNe, o_Wind, o_SNe_Element, o_tot)
 
-          (e_tot, e_tot_H, o_SNe, o_Wind, o_SNe_H, o_tot) <- igmTermsIO sfCfg cosmology pk rKind iKind sKind hKind wKind hneKind interpMetal interpXiISM_H mh_min interpSFRD z hydrogenElement
-          (_, e_tot_He, _, _, o_SNe_He, _) <- igmTermsIO sfCfg cosmology pk rKind iKind sKind hKind wKind hneKind interpMetal interpXiISM_He mh_min interpSFRD z heliumElement
+                (e_tot, e_tot_H, o_SNe, o_Wind, o_SNe_H, o_tot) <- igmTermsIO sfCfg cosmology pk rKind iKind sKind hKind wKind hneKind interpMetal interpXiISM_H mh_min interpSFRD z hydrogenElement
+                (_, e_tot_He, _, _, o_SNe_He, _) <- igmTermsIO sfCfg cosmology pk rKind iKind sKind hKind wKind hneKind interpMetal interpXiISM_He mh_min interpSFRD z heliumElement
 
-          -- Debug output
-          traceM $ "Redshift:    = " ++ show z
-          traceM $ "e_tot        = " ++ show e_tot
-          traceM $ "e_tot_H      = " ++ show e_tot_H
-          traceM $ "e_tot_He     = " ++ show e_tot_He
-          traceM $ "o_SNe        = " ++ show o_SNe
-          traceM $ "o_SNe_H      = " ++ show o_SNe_H
-          traceM $ "o_SNe_He     = " ++ show o_SNe_He
-          traceM $ "o_Wind       = " ++ show o_Wind
-          traceM $ "MAR       = " ++ show (interpMAR z)
-          traceM $ "SFRD      = " ++ show (interpSFRD z)
+                -- Debug output
+                traceM $ "Redshift:    = " ++ show z
+                traceM $ "e_tot        = " ++ show e_tot
+                traceM $ "e_tot_H      = " ++ show e_tot_H
+                traceM $ "e_tot_He     = " ++ show e_tot_He
+                traceM $ "o_SNe        = " ++ show o_SNe
+                traceM $ "o_SNe_H      = " ++ show o_SNe_H
+                traceM $ "o_SNe_He     = " ++ show o_SNe_He
+                traceM $ "o_Wind       = " ++ show o_Wind
+                traceM $ "MAR       = " ++ show (interpMAR z)
+                traceM $ "SFRD      = " ++ show (interpSFRD z)
 
-          let o_tot_H = o_Wind * xiISM_H + o_SNe_H
-              o_tot_He = o_Wind * xiISM_He + o_SNe_He
+                let o_tot_H = o_Wind * xiISM_H + o_SNe_H
+                    o_tot_He = o_Wind * xiISM_He + o_SNe_He
 
-              -- Create a set of dXISM, dXIGM for all of the isotopes being considered
-              isotopeDerivatives =
-                concat $
-                  zipWith
-                    (isotopeDerivative y rhoIGM rhoISM z interpMAR)
-                    [0 ..]
-                    isotopeTerms
+                    -- Create a set of dXISM, dXIGM for all of the isotopes being considered
+                    isotopeDerivatives =
+                        concat $
+                            zipWith
+                                (isotopeDerivative y rhoIGM rhoISM z interpMAR)
+                                [0 ..]
+                                isotopeTerms
 
-          return
-            $ V.fromList
-            $ [ -interpMAR z + o_tot,
-                -interpSFRD z + e_tot + interpMAR z - o_tot,
-                e_tot,
-                o_tot,
-                (o_Wind * (xiISM_H - xiIGM_H) + (o_SNe_H - o_SNe * xiIGM_H)) / rhoIGM,
-                ( e_tot_H
-                    - e_tot * xiISM_H
-                    + interpMAR z * (xiIGM_H - xiISM_H)
-                    - (o_SNe_H - o_SNe * xiISM_H)
+                return
+                    $ V.fromList
+                    $ [ -interpMAR z + o_tot
+                      , -interpSFRD z + e_tot + interpMAR z - o_tot
+                      , e_tot
+                      , o_tot
+                      , (o_Wind * (xiISM_H - xiIGM_H) + (o_SNe_H - o_SNe * xiIGM_H)) / rhoIGM
+                      , ( e_tot_H
+                            - e_tot * xiISM_H
+                            + interpMAR z * (xiIGM_H - xiISM_H)
+                            - (o_SNe_H - o_SNe * xiISM_H)
+                        )
+                            / rhoISM
+                      , (o_Wind * (xiISM_He - xiIGM_He) + (o_SNe_He - o_SNe * xiIGM_He)) / rhoIGM
+                      , ( e_tot_He
+                            - e_tot * xiISM_He
+                            + interpMAR z * (xiIGM_He - xiISM_He)
+                            - (o_SNe_He - o_SNe * xiISM_He)
+                        )
+                            / rhoISM
+                      ]
+                        ++ isotopeDerivatives
+
+        -- Solve the system and unpack values
+        zippedHistory <- rk4SolveHistIO odeSystem tInit ((interpT cosmology 0 - tInit) / fromIntegral nSteps) nSteps initialState
+
+        -- Debug output
+        traceM $ "rhoBaryon = " ++ show rhoOb
+
+        let (times, masses) = unzip zippedHistory
+            -- Vector with IGM/ISM/Star masses, ejecta/outflow masses and hydrogen/helium mass fractions
+            -- along with the metallicities
+            -- M_star = rho_tot - M_IGM - M_ISM - ejecta from the conservation equation
+            -- Z = 1 - X - Y (metallicity vectors are added at the very end)
+            -- In addition, we also normalise each mass by the total mass
+            result =
+                ( \v ->
+                    V.zipWith ($) (V.fromList $ [(/ mTot), (/ mTot), (/ 1), (/ 1), (/ 1), (/ 1), (/ 1), (/ 1), (/ mTot), (/ 1), (/ 1)]) $
+                        v V.++ V.fromList [1 - v V.! 0 - v V.! 1 - v V.! 3, 1 - v V.! 5 - v V.! 7, 1 - v V.! 4 - v V.! 6]
                 )
-                  / rhoISM,
-                (o_Wind * (xiISM_He - xiIGM_He) + (o_SNe_He - o_SNe * xiIGM_He)) / rhoIGM,
-                ( e_tot_He
-                    - e_tot * xiISM_He
-                    + interpMAR z * (xiIGM_He - xiISM_He)
-                    - (o_SNe_He - o_SNe * xiISM_He)
-                )
-                  / rhoISM
-              ]
-              ++ isotopeDerivatives
+                    <$> [masses !! i | i <- [0 .. 7]]
 
-    -- Solve the system and unpack values
-    zippedHistory <- rk4SolveHistIO odeSystem tInit ((interpT cosmology 0 - tInit) / fromIntegral nSteps) nSteps initialState
+            -- List containing all of the isotope abundance history
+            resultIsotopes isotopes abundances i j = go i []
+              where
+                go i isotopeHistoryMap
+                    | i >= j =
+                        go (i - 1) $
+                            isotopeHistoryMap
+                                ++ [
+                                       ( isotopes !! i
+                                       , MkIsotopeInformation
+                                            { igmFraction = abundances !! (8 + 2 * i)
+                                            , ismFraction = abundances !! (9 + 2 * i)
+                                            }
+                                       )
+                                   ]
+                    | otherwise = isotopeHistoryMap
 
-    -- Debug output
-    traceM $ "rhoBaryon = " ++ show rhoOb
+            -- Group isotopes by element
+            resultElements isotopes groupedIsotopes abundances = go (length groupedIsotopes - 1) []
+              where
+                go i elementHistoryMap
+                    | i >= 0 =
+                        let subElement = head $ groupedIsotopes !! i
+                            subElementIndex = fromJust $ elemIndex subElement isotopes
+                         in go (i - 1) $
+                                elementHistoryMap
+                                    ++ [
+                                           ( element subElement
+                                           , M.fromList $ resultIsotopes isotopes abundances (subElementIndex + length (groupedIsotopes !! i) - 1) subElementIndex
+                                           )
+                                       ]
+                    | otherwise = elementHistoryMap
 
-    let (times, masses) = unzip zippedHistory
-        -- Vector with IGM/ISM/Star masses, ejecta/outflow masses and hydrogen/helium mass fractions
-        -- along with the metallicities
-        -- M_star = rho_tot - M_IGM - M_ISM - ejecta from the conservation equation
-        -- Z = 1 - X - Y (metallicity vectors are added at the very end)
-        -- In addition, we also normalise each mass by the total mass
-        result =
-          ( \v ->
-              V.zipWith ($) (V.fromList $ [(/ mTot), (/ mTot), (/ 1), (/ 1), (/ 1), (/ 1), (/ 1), (/ 1), (/ mTot), (/ 1), (/ 1)]) $
-                v V.++ V.fromList [mTot - v V.! 0 - v V.! 1 - v V.! 3, 1 - v V.! 5 - v V.! 7, 1 - v V.! 4 - v V.! 6]
-          )
-            <$> [masses !! i | i <- [0 .. 7]]
-
-        -- List containing all of the isotope abundance history
-        resultIsotopes isotopes abundances = go (length isotopes - 1) []
-          where
-            go i isotopeHistoryMap
-              | i >= 0 =
-                  go (i - 1) $
-                    isotopeHistoryMap
-                      ++ [ ( isotopes !! i,
-                             MkIsotopeInformation
-                               { igmFraction = abundances !! (8 + 2 * i),
-                                 ismFraction = abundances !! (9 + 2 * i)
-                               }
-                           )
-                         ]
-              | otherwise = isotopeHistoryMap
-
-    return (times, interpZ cosmology <$> times, chosenIsotopes, result, M.fromList $ resultIsotopes chosenIsotopes (transpose $ V.toList <$> masses))
+        return (times, interpZ cosmology <$> times, chosenIsotopes, groupedChosenIsotopes, result, M.fromList $ resultElements chosenIsotopes groupedChosenIsotopes (transpose $ V.toList <$> masses))

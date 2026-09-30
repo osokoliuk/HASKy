@@ -2,7 +2,9 @@
 
 module Graphs where
 
+import qualified Data.Map as M
 import qualified Data.Vector as V
+
 {-
 Module      : HASKy.Graphs
 Description : Graphs module
@@ -20,32 +22,58 @@ import Graphics.Rendering.Chart
 import Graphics.Rendering.Chart.Backend.Cairo
 import qualified Graphics.Rendering.Chart.Easy as C
 import Helper
+import IGM
 
 -- Plot general information
 
-plotMassFractions :: [Double] -> [V.Vector Double] -> [Char] -> IO ()
+plotMassFractions ::
+    [Double] ->
+    [V.Vector Double] ->
+    [Char] ->
+    IO ()
 plotMassFractions times abundances@(a : as) filename = toFile C.def filename $
-  do
-    layout_title C..= "ISM/IGM mass fractions"
-    C.setColors [C.opaque C.blue, C.opaque C.red, C.opaque C.green, C.opaque C.orange]
-    C.plot (C.line "IGM" [zip times $ ((\x -> x V.! 0) <$> abundances)])
-    C.plot (C.line "ISM" [zip times $ ((\x -> x V.! 1) <$> abundances)])
-    C.plot (C.line "Stars" [zip times $ ((\x -> x V.! (V.length a - 3)) <$> abundances)])
+    do
+        layout_title C..= "ISM/IGM mass fractions"
+        C.setColors [C.opaque C.blue, C.opaque C.red, C.opaque C.green, C.opaque C.orange]
+        C.plot (C.line "IGM" [zip times $ ((\x -> x V.! 0) <$> abundances)])
+        C.plot (C.line "ISM" [zip times $ ((\x -> x V.! 1) <$> abundances)])
+        C.plot (C.line "Stars" [zip times $ ((\x -> x V.! (V.length a - 3)) <$> abundances)])
 
-plotIsotopeAbundances :: [Double] -> [V.Vector Double] -> [Element] -> [Char] -> IO ()
-plotIsotopeAbundances times abundances elem filename = toFile C.def filename $
-  do
-    layout_title C..= "ISM abundances"
-    C.setColors (jetColors . length $ elem)
-    mapM_ (\i -> C.plot $ C.line (show (elem !! i)) [zip times ((\x -> log10 x) <$> (\v -> v V.! (9 + 2 * i)) <$> abundances)]) [0 .. length elem - 1]
+plotIsotopeAbundances ::
+    [Double] ->
+    M.Map String (M.Map Element (IsotopeInformation [Double])) ->
+    [String] ->
+    [[Element]] ->
+    [Char] ->
+    IO ()
+plotIsotopeAbundances times abundances elems groupedIsotopes filename =
+    toFile C.def filename $ do
+        layout_title C..= "ISM abundances"
+        C.setColors (jetColors (length (concat groupedIsotopes)))
+
+        mapM_
+            ( \i ->
+                mapM_
+                    ( \j ->
+                        case M.lookup (elems !! i) abundances >>= M.lookup (groupedIsotopes !! i !! j) of
+                            Nothing -> pure ()
+                            Just isotopeInfo ->
+                                C.plot $
+                                    C.line
+                                        (show (groupedIsotopes !! i !! j))
+                                        [zip times (map (log10) (ismFraction isotopeInfo))]
+                    )
+                    [0 .. length (groupedIsotopes !! i) - 1]
+            )
+            [0 .. length elems - 1]
 
 plotMetallicity :: [Double] -> [V.Vector Double] -> [Char] -> IO ()
 plotMetallicity times abundances@(a : as) filename = toFile C.def filename $
-  do
-    layout_title C..= "ISM/IGM metallicity"
-    C.setColors [C.opaque C.blue, C.opaque C.red]
-    C.plot (C.line "Z_IGM" [zip times $ ((\x -> x V.! (V.length a - 1)) <$> abundances)])
-    C.plot (C.line "Z_ISM" [zip times $ ((\x -> x V.! (V.length a - 2)) <$> abundances)])
+    do
+        layout_title C..= "ISM/IGM metallicity"
+        C.setColors [C.opaque C.blue, C.opaque C.red]
+        C.plot (C.line "Z_IGM" [zip times $ ((\x -> x V.! (V.length a - 1)) <$> abundances)])
+        C.plot (C.line "Z_ISM" [zip times $ ((\x -> x V.! (V.length a - 2)) <$> abundances)])
 
 -- Plot ejection / outflow rates from different sources
 

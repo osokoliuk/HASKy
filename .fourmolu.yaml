@@ -1,0 +1,5 @@
+indent-wheres: true
+indent-do: 1
+indent-module: 1
+indent-case: 1
+column-limit: 40

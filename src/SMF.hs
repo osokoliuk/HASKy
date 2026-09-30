@@ -27,154 +27,161 @@ import Numeric.Tools.Differentiation
 
 -- As usual, specify all kinds of star formation efficiencies that we consider
 data SMFKind
-  = DoublePower
-  | Behroozi
-  | EMERGE
-  deriving (Eq, Show, Read)
+    = DoublePower
+    | Behroozi
+    | EMERGE
+    deriving (Eq, Show, Read)
 
 type Mstar = Double
 
 type SFRD = Mstar -> Double
 
--- | Star formation efficiency, i.e. Star mass / Halo mass
--- There are three possible choices for the SFE model:
---    * Simple double power-law
---    * Behroozi et al. 2013 model
---    * EMERGE semi-analytical model
+{- | Star formation efficiency, i.e. Star mass / Halo mass
+There are three possible choices for the SFE model:
+   * Simple double power-law
+   * Behroozi et al. 2013 model
+   * EMERGE semi-analytical model
+-}
 epsStar :: ReferenceCosmology -> SMFKind -> Mhalo -> Redshift -> Double
-epsStar cosmology@MkCosmology {h0, om0, ob0} sKind mh z =
-  let -- A set of best fit parameter for the double power-law
-      eps_0, mh_0, gamma_lo, gamma_hi :: Double
-      (eps_0, mh_0, gamma_lo, gamma_hi) = (0.21, 2.8 * 1e11, 0.49, -0.61)
+epsStar cosmology@MkCosmology{h0, om0, ob0} sKind mh z =
+    let
+        -- A set of best fit parameter for the double power-law
+        eps_0, mh_0, gamma_lo, gamma_hi :: Double
+        (eps_0, mh_0, gamma_lo, gamma_hi) = (0.21, 2.8 * 1e11, 0.49, -0.61)
 
-      -- A set of best fit parameters for the Behroozi et al. 2013 SFE model
-      e0, e1, e2, e3, m0, m1, m2, a0, a1, d0, d1, d2, g0, g1, g2 :: Double
-      (e0, e1, e2, e3, m0, m1, m2, a0, a1, d0, d1, d2, g0, g1, g2) =
-        ( -1.777,
-          -0.006,
-          -0.000,
-          -0.119,
-          11.514,
-          -1.793,
-          -0.251,
-          -1.412,
-          0.731,
-          3.508,
-          2.608,
-          -0.043,
-          0.316,
-          1.319,
-          0.279
-        )
+        -- A set of best fit parameters for the Behroozi et al. 2013 SFE model
+        e0, e1, e2, e3, m0, m1, m2, a0, a1, d0, d1, d2, g0, g1, g2 :: Double
+        (e0, e1, e2, e3, m0, m1, m2, a0, a1, d0, d1, d2, g0, g1, g2) =
+            ( -1.777
+            , -0.006
+            , -0.000
+            , -0.119
+            , 11.514
+            , -1.793
+            , -0.251
+            , -1.412
+            , 0.731
+            , 3.508
+            , 2.608
+            , -0.043
+            , 0.316
+            , 1.319
+            , 0.279
+            )
 
-      -- Some helper functions for Behroozi et al. 2013 SFE model
-      a, nu, epsilon, m_1, alpha, delta, gamma :: Double
-      a = 1 / (1 + z)
-      nu = exp (-4 * a ** 2)
-      epsilon = (10 **) $ e0 + (e1 * (a - 1) + e2 * z) * nu + e3 * (a - 1)
-      m_1 = (10 **) $ m0 + (m1 * (a - 1) + m2 * z) * nu
-      alpha = a0 + (a1 * (a - 1)) * nu
-      delta = d0 + (d1 * (a - 1) + d2 * z) * nu
-      gamma = g0 + (g1 * (a - 1) + g2 * z) * nu
-      fBehroozi x = -log10 (10 ** (alpha * x) + 1) + delta * (log10 (1 + exp (x))) ** gamma / (1 + exp (10 ** (-x)))
-   in case sKind of
-        DoublePower -> eps_0 / ((mh / mh_0) ** gamma_lo + (mh / mh_0) ** gamma_hi)
-        Behroozi ->
-          let mstar = 10 ** (log10 (epsilon * m_1) + fBehroozi (log10 (mh / m_1)) - fBehroozi (0))
-           in (mstar / mh) / (ob0 / om0)
+        -- Some helper functions for Behroozi et al. 2013 SFE model
+        a, nu, epsilon, m_1, alpha, delta, gamma :: Double
+        a = 1 / (1 + z)
+        nu = exp (-4 * a ** 2)
+        epsilon = (10 **) $ e0 + (e1 * (a - 1) + e2 * z) * nu + e3 * (a - 1)
+        m_1 = (10 **) $ m0 + (m1 * (a - 1) + m2 * z) * nu
+        alpha = a0 + (a1 * (a - 1)) * nu
+        delta = d0 + (d1 * (a - 1) + d2 * z) * nu
+        gamma = g0 + (g1 * (a - 1) + g2 * z) * nu
+        fBehroozi x = -log10 (10 ** (alpha * x) + 1) + delta * (log10 (1 + exp (x))) ** gamma / (1 + exp (10 ** (-x)))
+     in
+        case sKind of
+            DoublePower -> eps_0 / ((mh / mh_0) ** gamma_lo + (mh / mh_0) ** gamma_hi)
+            Behroozi ->
+                let mstar = 10 ** (log10 (epsilon * m_1) + fBehroozi (log10 (mh / m_1)) - fBehroozi (0))
+                 in (mstar / mh) / (ob0 / om0)
 
--- | Mass accretion history for the CDM halo with
--- parameters alpha_MAR and beta_MAR taken to be an average for the LCDM model
--- within the 1e8 <= Mh <= 1e14 bounds
+{- | Mass accretion history for the CDM halo with
+parameters alpha_MAR and beta_MAR taken to be an average for the LCDM model
+within the 1e8 <= Mh <= 1e14 bounds
+-}
 massAccretionHistory :: Mhalo -> Redshift -> Double
 massAccretionHistory mh z =
-  let alpha_MAR = 0.24
-      neta_MAR = -0.75
-   in mh * (1 + z) ** (alpha_MAR) * exp (neta_MAR * z)
+    let alpha_MAR = 0.24
+        neta_MAR = -0.75
+     in mh * (1 + z) ** (alpha_MAR) * exp (neta_MAR * z)
 
--- | Mass accretion rate, i.e., rate at which halo of mass Mh gains mass,
--- adopted in the units of a solar mass from the [Fakhouri et al. 2013] work
+{- | Mass accretion rate, i.e., rate at which halo of mass Mh gains mass,
+adopted in the units of a solar mass from the [Fakhouri et al. 2013] work
+-}
 massAccretionRate :: ReferenceCosmology -> Mhalo -> Redshift -> Double
-massAccretionRate cosmology@MkCosmology {h0, om0, ob0} mh z =
-  25.3
-    * (mh / 1e12) ** 1.1
-    * (1 + 1.65 * z)
-    * sqrt (om0 * (1 + z) ** 3 + 1 - om0)
+massAccretionRate cosmology@MkCosmology{h0, om0, ob0} mh z =
+    25.3
+        * (mh / 1e12) ** 1.1
+        * (1 + 1.65 * z)
+        * sqrt (om0 * (1 + z) ** 3 + 1 - om0)
 
--- | Star formation rate, derived simply as a normalised halo mass accretion rate
--- eps_star converts baryonic mass to a stellar mass, while factor Om0/Ob0 converts
--- halo mass to baryonic mass
+{- | Star formation rate, derived simply as a normalised halo mass accretion rate
+eps_star converts baryonic mass to a stellar mass, while factor Om0/Ob0 converts
+halo mass to baryonic mass
+-}
 starFormationRate :: SMFKind -> ReferenceCosmology -> Mhalo -> Redshift -> Double
-starFormationRate sKind cosmology@MkCosmology {h0, om0, ob0} mh z =
-  let ep = epsStar cosmology sKind mh z
-   in ep * massAccretionRate cosmology mh z
+starFormationRate sKind cosmology@MkCosmology{h0, om0, ob0} mh z =
+    let ep = epsStar cosmology sKind mh z
+     in ep * massAccretionRate cosmology mh z
 
 -- | Stellar mass function, derived from the HMF and SFE via a simple chain rule
 stellarMassFunction ::
-  ReferenceCosmology ->
-  PowerSpectrum ->
-  SMFKind ->
-  HMFKind ->
-  WKind ->
-  [Mhalo] ->
-  Redshift ->
-  ([Mstar], [Double])
-stellarMassFunction cosmology@MkCosmology {h0, om0, ob0} pk sKind hKind wKind mh_arr z =
-  let ms :: Mhalo -> Mstar -- Function that gives stellar mass
-      ms mh = mh * epsStar cosmology sKind mh z
+    ReferenceCosmology ->
+    PowerSpectrum ->
+    SMFKind ->
+    HMFKind ->
+    WKind ->
+    [Mhalo] ->
+    Redshift ->
+    ([Mstar], [Double])
+stellarMassFunction cosmology@MkCosmology{h0, om0, ob0} pk sKind hKind wKind mh_arr z =
+    let ms :: Mhalo -> Mstar -- Function that gives stellar mass
+        ms mh = mh * epsStar cosmology sKind mh z
 
-      ms_arr = ms <$> mh_arr
-      hmf_arr =
-        parMap rseq (\mh -> haloMassFunction cosmology pk hKind wKind mh z) mh_arr
+        ms_arr = ms <$> mh_arr
+        hmf_arr =
+            parMap rseq (\mh -> haloMassFunction cosmology pk hKind wKind mh z) mh_arr
 
-      ln_factors :: [Double] -- Turns dMh/dMstar into dlnMh/dlog10Mstar
-      ln_factors = zipWith (\x y -> x * log 10 / y) ms_arr mh_arr
+        ln_factors :: [Double] -- Turns dMh/dMstar into dlnMh/dlog10Mstar
+        ln_factors = zipWith (\x y -> x * log 10 / y) ms_arr mh_arr
 
-      dmhdms :: [Double] -- Part of the chain rule to turn HMF into SMF
-      dmhdms =
-        zipWith (/) ln_factors $
-          (\mh -> diffRes $ diffRichardson ms (mh * 1e-6) mh) <$> mh_arr
-   in (ms_arr, zipWith (\x y -> x * y) hmf_arr dmhdms)
+        dmhdms :: [Double] -- Part of the chain rule to turn HMF into SMF
+        dmhdms =
+            zipWith (/) ln_factors $
+                (\mh -> diffRes $ diffRichardson ms (mh * 1e-6) mh) <$> mh_arr
+     in (ms_arr, zipWith (\x y -> x * y) hmf_arr dmhdms)
 
 -- | Rate at which baryons are accreted by structures, in [Msol yr^-1 Mpc^-3]
 baryonFormationRateDensity :: ReferenceCosmology -> PowerSpectrum -> HMFKind -> WKind -> Redshift -> Mhalo -> Double
-baryonFormationRateDensity cosmology@MkCosmology {om0, ob0, prec} pk hKind wKind z mh_min =
-  let mh_arr = (10 **) <$> [log10 mh_min, log10 mh_min + 0.01 .. 16]
+baryonFormationRateDensity cosmology@MkCosmology{om0, ob0, prec} pk hKind wKind z mh_min =
+    let mh_arr = (10 **) <$> [log10 mh_min, log10 mh_min + 0.01 .. 16]
 
-      hmf_arr =
-        (\mh -> haloMassFunction cosmology pk hKind wKind mh z) <$> mh_arr
-      dndmh = zipWith (/) hmf_arr mh_arr
-
-      interp_hmf = makeInterp mh_arr dndmh
-
-      integrand mh =
-        (interp_hmf mh)
-          * (ob0 / om0 * massAccretionRate cosmology mh z)
-      integrator = makeIntegrator prec
-
-      result = integrator integrand (minimum mh_arr) (maximum mh_arr)
-   in result
-
--- | Similarly, we also define a star formation rate density in [Msol yr^-1 Mpc^-3],
--- to be used in the IGM/ISM mass fraction differential equations
-starFormationRateDensity :: ReferenceCosmology -> PowerSpectrum -> SMFKind -> HMFKind -> WKind -> Redshift -> Mhalo -> Double
-starFormationRateDensity cosmology@MkCosmology {prec} pk sKind hKind wKind z mh_min =
-  if z <= 20
-    then
-      let mh_arr = (10 **) <$> [log10 mh_min, log10 mh_min + 0.01 .. 16]
-
-          hmf_arr =
+        hmf_arr =
             (\mh -> haloMassFunction cosmology pk hKind wKind mh z) <$> mh_arr
-          dndmh = zipWith (/) hmf_arr mh_arr
+        dndmh = zipWith (/) hmf_arr mh_arr
 
-          interp_hmf = makeInterp mh_arr dndmh
+        interp_hmf = makeInterp mh_arr dndmh
 
-          integrand mh =
+        integrand mh =
             (interp_hmf mh)
-              * (starFormationRate sKind cosmology mh z)
-          integrator = makeIntegrator prec
+                * (ob0 / om0 * massAccretionRate cosmology mh z)
+        integrator = makeIntegrator prec
 
-          result = integrator integrand (minimum mh_arr) (maximum mh_arr)
-       in result
-    else
-      0
+        result = integrator integrand (minimum mh_arr) (maximum mh_arr)
+     in result
+
+{- | Similarly, we also define a star formation rate density in [Msol yr^-1 Mpc^-3],
+to be used in the IGM/ISM mass fraction differential equations
+-}
+starFormationRateDensity :: ReferenceCosmology -> PowerSpectrum -> SMFKind -> HMFKind -> WKind -> Redshift -> Mhalo -> Double
+starFormationRateDensity cosmology@MkCosmology{prec} pk sKind hKind wKind z mh_min =
+    if z <= 20
+        then
+            let mh_arr = (10 **) <$> [log10 mh_min, log10 mh_min + 0.01 .. 16]
+
+                hmf_arr =
+                    (\mh -> haloMassFunction cosmology pk hKind wKind mh z) <$> mh_arr
+                dndmh = zipWith (/) hmf_arr mh_arr
+
+                interp_hmf = makeInterp mh_arr dndmh
+
+                integrand mh =
+                    (interp_hmf mh)
+                        * (starFormationRate sKind cosmology mh z)
+                integrator = makeIntegrator prec
+
+                result = integrator integrand (minimum mh_arr) (maximum mh_arr)
+             in result
+        else
+            0
